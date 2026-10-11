@@ -210,3 +210,16 @@
     if (again) again.addEventListener('click', function () { check(row, true); });
   });
 })();
+
+// Inbox › Connect: the option cards open their setup details.
+document.querySelectorAll('[data-open]').forEach(function (a) {
+  var d = document.getElementById(a.dataset.open);
+  if (!d) return;
+  if (!d.open) d.classList.add('folded');
+  a.addEventListener('click', function (e) {
+    e.preventDefault();
+    d.classList.remove('folded');
+    d.open = true;
+    d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});

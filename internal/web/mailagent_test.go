@@ -47,7 +47,7 @@ func TestInboxAgentConnect(t *testing.T) {
 	}
 
 	b := get(h, "/inbox").Body.String()
-	if !strings.Contains(b, "Connect mail &amp; calendar") || !strings.Contains(b, `data-mail-check="/mail/agent/check?agent=codex"`) || !strings.Contains(b, "Use codex") {
+	if !strings.Contains(b, "Connect your email &amp; calendar") || !strings.Contains(b, `data-mail-check="/mail/agent/check?agent=codex"`) || !strings.Contains(b, "Use codex") {
 		t.Fatalf("inbox does not offer the agent:\n%s", b)
 	}
 	if b := get(h, "/mail/agent/check?agent=codex").Body.String(); !strings.Contains(b, `"name":"gmail"`) || !strings.Contains(b, `"ready":true`) || strings.Contains(b, "context7") || strings.Contains(b, "hint") {

@@ -13,7 +13,7 @@ All notable changes to ScoutJobs. The format follows
   Google Calendar, Microsoft 365, any mail MCP server), logs them, adds
   interviews and calendar events, and files drafts. No Google Cloud project or
   password needed; nothing is sent. `scoutjobs email sync --via agent` does
-  the same in a terminal. The Inbox's *Connect mail & calendar* panel offers
+  the same in a terminal. The Inbox's *Connect your email & calendar* panel offers
   it first, with the own Google client, IMAP (iCloud and others) and other MCP
   apps as the alternatives.
 - Search finds the jobs that fit: with a filled `profile.md`, results are

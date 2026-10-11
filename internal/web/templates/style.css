@@ -735,3 +735,43 @@ table.results .why.bad{color:var(--bad)}
 .tloc{flex:0 1 150px}
 .jobcard .chip.loc{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
 .issues td.where{font-size:12.5px;color:var(--muted);max-width:180px}
+
+/* Inbox › Connect */
+.connect-h h2{font-size:22px;font-weight:650;letter-spacing:-.02em}
+.connect-h p{margin:4px 0 0;max-width:72ch}
+ol.steps{list-style:none;counter-reset:step;margin:20px 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+ol.steps li{counter-increment:step;display:grid;grid-template-columns:28px 1fr;column-gap:10px;font-size:13.5px}
+ol.steps li::before{content:counter(step);grid-row:span 2;width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;background:var(--subtle);color:var(--muted);border:1px solid var(--line)}
+ol.steps li:first-child::before{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+ol.steps span{color:var(--muted);font-size:12.5px}
+.connect-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.providers{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.provider{display:flex;flex-direction:column;gap:8px;padding:18px;border:1px solid var(--line);border-radius:12px}
+.provider:first-child{border-color:var(--acc);box-shadow:var(--ring)}
+.provider b{font-size:16px}.provider p{margin:0;font-size:13px;flex:1}
+.provider .btn{width:100%;margin-top:6px}.provider small{font-size:11.5px}
+.plogo{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.plogo svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.plogo.gmail{background:var(--bad-sub);color:var(--bad)}.plogo.outlook{background:var(--info-sub);color:var(--info)}
+.connect .option.rec{margin-top:14px}
+.connect .option.rec h3{text-transform:none;letter-spacing:0;color:var(--fg)}
+p.or{display:flex;align-items:center;gap:12px;margin:20px 0 14px;color:var(--muted);font-size:12.5px}
+p.or::before,p.or::after{content:"";flex:1;border-top:1px solid var(--line)}
+.alts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.alt{display:flex;flex-direction:column;gap:6px;padding:14px;border:1px solid var(--line);border-radius:10px;font-size:13.5px}
+.alt p{margin:0;font-size:12.5px;flex:1}.alt .btn{margin-top:4px}
+.connect-side{display:grid;gap:4px}
+.connect-side .trust{padding:14px;border-radius:12px;background:var(--acc-sub)}
+.connect-side .trust p{margin:8px 0 0}
+ul.checks{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px}
+ul.checks li{padding-left:22px;position:relative}
+ul.checks li::before{content:"✓";position:absolute;left:2px;color:var(--ok);font-weight:700}
+ul.reads{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ul.reads li{display:flex;gap:10px;align-items:center;font-size:13px}
+ul.reads li div{display:grid}ul.reads li .muted{font-size:12px}
+.ri{width:34px;height:34px;flex:none;border-radius:8px;background:var(--subtle);display:flex;align-items:center;justify-content:center}
+.ri svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.connect-side .status{font-size:13px;margin:0}
+@media (max-width:1000px){.connect-grid{grid-template-columns:1fr}}
+@media (max-width:640px){ol.steps,.providers{grid-template-columns:1fr}}
+.connect details.option.folded{display:none}

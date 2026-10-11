@@ -18,18 +18,38 @@
 {{if .Testing}}<p class="callout">Your Google Cloud app is in Testing mode, so Google disconnects ScoutJobs on {{.Ends.Format "Jan 2"}}. <a href="https://console.cloud.google.com/auth/audience" rel="noopener noreferrer" target="_blank">Publish it</a> (Audience &rsaquo; Publish app), then connect Google again.</p>{{end}}
 {{end}}{{end}}
 {{if .Choose}}<section class="panel connect" id="connect">
-<div class="panel-h"><h2>Connect mail &amp; calendar</h2><span class="muted">ScoutJobs reads replies to your applications, files drafts and adds interviews to your calendar. It never sends, deletes or changes anything else.</span></div>
-{{with .AI}}<div class="option rec" id="ai"><h3>Your AI agent <span class="badge done">recommended</span></h3>
-<p>Claude or Codex reads your mail through the connectors you sign in to once: Gmail and Google Calendar, Microsoft 365 for Outlook and its calendar, and others. No Google Cloud project and no passwords in ScoutJobs.</p>
-{{if .Agents}}<ol class="setup">
-  <li><b>Claude</b>: open <a href="https://claude.ai/settings/connectors" rel="noopener noreferrer" target="_blank">claude.ai &rsaquo; Settings &rsaquo; Connectors</a> and connect Gmail and Google Calendar, or Microsoft 365. <b>Codex</b>: <code>codex mcp add</code> your mail server, then <code>codex mcp login &lt;name&gt;</code>.</li>
-  <li>Pick your agent. ScoutJobs shows what it can reach.</li>
+<div class="connect-h"><h2>Connect your email &amp; calendar</h2>
+<p class="muted">ScoutJobs reads replies to your applications, files drafts and adds interviews to your calendar. It never sends, deletes or changes anything else.</p></div>
+<ol class="steps">
+  <li><b>Choose your provider</b><span>Gmail or Outlook.</span></li>
+  <li><b>Sign in</b><span>Once, in your AI agent's connectors.</span></li>
+  <li><b>You're done</b><span>Press Sync now to bring in the replies.</span></li>
 </ol>
-<ul class="agents">{{$cur := .Agent}}{{range .Agents}}<li data-mail-check="/mail/agent/check?agent={{.}}"><b class="agentname">{{.}}</b> <span class="conns muted"><span class="spin" aria-hidden="true"></span>looking for mail connectors…</span>
+<div class="connect-grid">
+<div class="connect-main">
+{{with .AI}}<h3 class="first">Choose your email provider</h3>
+<div class="providers">
+  <div class="provider"><span class="plogo gmail" aria-hidden="true">{{template "ico-inbox"}}</span><b>Gmail</b>
+    <p class="muted">Your agent reads replies in Gmail and adds interviews to Google Calendar.</p>
+    <a class="btn primary" href="https://claude.ai/settings/connectors" rel="noopener noreferrer" target="_blank">Connect Gmail &rsaquo;</a>
+    <small class="muted">In Claude, connect Gmail and Google Calendar.</small></div>
+  <div class="provider"><span class="plogo outlook" aria-hidden="true">{{template "ico-inbox"}}</span><b>Outlook</b>
+    <p class="muted">Your agent reads replies in Outlook and adds interviews to its calendar.</p>
+    <a class="btn" href="https://claude.ai/settings/connectors" rel="noopener noreferrer" target="_blank">Connect Outlook &rsaquo;</a>
+    <small class="muted">In Claude, connect Microsoft 365.</small></div>
+</div>
+<div class="option rec" id="ai"><h3>Then pick your AI agent</h3>
+{{if .Agents}}<ul class="agents">{{$cur := .Agent}}{{range .Agents}}<li data-mail-check="/mail/agent/check?agent={{.}}"><b class="agentname">{{.}}</b> <span class="conns muted"><span class="spin" aria-hidden="true"></span>looking for mail connectors…</span>
   {{if eq . $cur}}<span class="badge done">in use</span> <form class="inline" method="post" action="/mail/agent/off"><button class="mini">Stop using it</button></form>{{else}}<form class="inline" method="post" action="/mail/agent"><input type="hidden" name="agent" value="{{.}}"><button class="mini primary">Use {{.}}</button></form>{{end}}
   <button class="mini" type="button" data-recheck>Check again</button></li>{{end}}</ul>
-<p class="muted small">Trade-offs: your agent's provider reads the messages it opens; a sync takes a minute or two and costs agent tokens; mail comes in when you press Sync now, not in the background. On a Team or Enterprise plan an admin has to allow the connectors. Claude gets only reading, draft and new-event tools; Codex keeps to the same rule through its instructions.</p>
-{{else}}<p class="callout">Install <a href="https://claude.com/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or Codex to use this.</p>{{end}}</div>{{end}}
+<p class="muted small">Using Codex? <code>codex mcp add</code> your mail server, then <code>codex mcp login &lt;name&gt;</code>.</p>
+{{else}}<p class="callout">Install <a href="https://claude.com/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or Codex to use this.</p>{{end}}</div>
+<p class="or"><span>Or choose another option</span></p>{{end}}
+<div class="alts">
+  {{with .Google}}{{if and .Offered (not .Connected)}}<div class="alt"><b>Your own Google client</b><p class="muted">No AI reads your mail, and it syncs in the background. About 3 minutes in Google Cloud.</p><a class="btn" href="#google" data-open="google">Set up</a></div>{{end}}{{end}}
+  <div class="alt"><b>Other email provider</b><p class="muted">IMAP for iCloud, Fastmail, Yahoo and other mailboxes. Reads only.</p><a class="btn" href="#imap" data-open="imap">Set up IMAP</a></div>
+  <div class="alt"><b>Another AI app</b><p class="muted">Claude Desktop, ChatGPT, Cursor or any MCP app with a mail connector.</p><a class="btn" href="#mcp" data-open="mcp">See instructions</a></div>
+</div>
 {{with .Google}}{{if and .Offered (not .Connected)}}<details class="option" id="google"{{if .Client}} open{{end}}><summary><b>Your own Google client</b> (advanced): replies are matched on this machine, no AI reads your mail, and it syncs in the background</summary>
 {{if .Client}}<p>Your Google client is saved. Press Connect Google, pick your account, and <b>tick every box</b> Google offers; Google sends you back here.</p>
 <form method="post" action="/gmail/connect"><button class="primary">Connect Google</button></form>
@@ -58,6 +78,24 @@
 <p>Add <code>imap_host: imap.mail.me.com:993</code> (iCloud) and <code>imap_user: you@icloud.com</code> to <code>config.yaml</code>, set <code>SCOUTJOBS_IMAP_PASSWORD</code> to an app-specific password (Apple: account.apple.com &rsaquo; Sign-In and Security), and restart <code>scoutjobs serve</code>. It reads only: no drafts, no calendar.</p></details>
 <details class="option" id="mcp"><summary><b>Another AI app</b>: Claude Desktop, ChatGPT, Cursor or any MCP client with a mail connector</summary>
 <p>Add the ScoutJobs MCP server (<code>scoutjobs mcp</code>) next to the app's mail connector and ask it to “check my inbox for replies to my job applications”. It logs each match with <code>email_log</code>, and the messages show up here.</p></details>
+</div>
+<aside class="connect-side">
+  <div class="trust"><h3 class="first">You stay in control</h3><ul class="checks">
+    <li>ScoutJobs only reads your mail and calendar.</li>
+    <li>It never sends, deletes or changes a message.</li>
+    <li>Drafts wait in your mailbox until you send them.</li>
+    <li>No passwords are stored in ScoutJobs.</li></ul>
+  {{with .AI}}<p class="muted small">With an AI agent, its provider reads the messages it opens. A sync takes a minute or two and costs agent tokens. Mail comes in when you press Sync now, not in the background. On a Team or Enterprise plan, an admin has to allow the connectors.</p>{{end}}</div>
+  <h3>What ScoutJobs will read</h3>
+  <ul class="reads">
+    <li><span class="ri" aria-hidden="true">{{template "ico-inbox"}}</span><div><b>Recruiter replies</b><span class="muted">Replies to your applications.</span></div></li>
+    <li><span class="ri" aria-hidden="true">{{template "ico-calendar"}}</span><div><b>Interviews</b><span class="muted">Added to your calendar.</span></div></li>
+    <li><span class="ri" aria-hidden="true">{{template "ico-doc"}}</span><div><b>Application context</b><span class="muted">Matches each e-mail to the right job.</span></div></li>
+  </ul>
+  <h3>Connection status</h3>
+  <p class="status">{{if eq .Source "agent"}}<span class="badge done">connected</span> {{.Account}} reads your mail{{else if eq .Source "gmail"}}<span class="badge done">connected</span> Google {{.Account}}{{else if eq .Source "imap"}}<span class="badge done">connected</span> IMAP {{.Account}}{{else}}<span class="badge todo">not connected</span>{{end}}</p>
+</aside>
+</div>
 </section>{{end}}
 {{if .Days}}
 {{range .Days}}<section class="panel"><div class="panel-h"><h2>{{if .Day}}{{when .Day}}{{else}}Undated{{end}}</h2><span class="n">{{len .Rows}}</span></div>
