@@ -7,6 +7,8 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-11
+
 ### Added
 - Document provenance (#32): the draft review, each PDF export and the ATS
   score record the SHA-256 of the files they covered in `provenance.json`.
@@ -239,7 +241,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.2
