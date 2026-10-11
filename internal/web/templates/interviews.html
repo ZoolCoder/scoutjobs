@@ -31,7 +31,11 @@
   <span class="cal"><small>{{mon .At}}</small><b>{{dom .At}}</b></span>
   <div class="who"><a href="/pipeline?job={{.JobID}}"><b>{{.Company}}</b></a> <span class="muted">{{.Title}}</span><small>{{title .Stage}}{{with hm .At}} · {{.}}{{end}}{{with .Format}} · {{.}}{{end}}{{with .Interviewer}} · with {{.}}{{end}}</small></div>
   <details class="prep-pop"><summary><span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span></summary>{{template "prep-check" (prepArgs . "/interviews")}}</details>
-  <details class="prep-pop outcome"><summary class="btn mini" title="Set the outcome">…</summary><form method="post" action="/interviews/{{.ID}}" class="seg-btns"><input type="hidden" name="back" value="/interviews">{{range $oc}}<button name="outcome" value="{{.}}" class="mini">{{title .}}</button>{{end}}</form></details>
+  <button type="button" class="btn mini" popovertarget="oc-{{.ID}}" title="Set the outcome" aria-label="Set the outcome for {{.Company}}">…</button>
+  <div popover id="oc-{{.ID}}" class="dlg"><h3>How did it go?</h3><p class="sub">{{.Company}} · <span class="cap">{{title .Stage}}</span></p>
+    <form method="post" action="/interviews/{{.ID}}"><input type="hidden" name="back" value="/interviews"><div class="seg-btns">{{range $oc}}<button name="outcome" value="{{.}}" class="mini cap">{{title .}}</button>{{end}}</div>
+    <div class="acts"><button type="button" class="mini" popovertarget="oc-{{.ID}}" popovertargetaction="hide">Cancel</button></div></form>
+  </div>
 </li>{{end}}{{end}}</ul>
 </section>
 {{end}}

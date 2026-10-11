@@ -12,10 +12,12 @@
   <span class="tag p{{.Priority}}">P{{.Priority}}</span>
   <div class="who"><b>{{.Skill}}</b>{{with .Notes}} <span class="muted">{{.}}</span>{{end}}<small>asked by {{.Demand}} job{{if ne .Demand 1}}s{{end}} · {{f1 .Hours}}h logged{{with .Resource}} · <a href="{{.}}" rel="noopener noreferrer" target="_blank">resource ↗</a>{{end}}</small></div>
   <span class="badge {{.Status}}">{{title .Status}}</span>
-  <details class="prep-pop outcome"><summary class="btn mini" title="Log hours or change status">…</summary><div class="popform">
-    <form method="post" action="/learning/{{.ID}}" class="inline"><input name="hours" type="number" step="0.5" min="0.5" placeholder="0.5" class="h" aria-label="hours"><span class="muted">h</span><button class="mini primary">Log</button></form>
-    <form method="post" action="/learning/{{.ID}}" class="seg-btns">{{$s := .Status}}{{range $o := (split "planned,in_progress,done")}}{{if ne $o $s}}<button name="status" value="{{$o}}" class="mini">{{title $o}}</button>{{end}}{{end}}</form>
-  </div></details>
+  <button type="button" class="btn mini" popovertarget="learn-{{.ID}}" title="Log hours or change status" aria-label="Update {{.Skill}}">…</button>
+  <div popover id="learn-{{.ID}}" class="dlg"><h3>{{.Skill}}</h3><p class="sub">{{f1 .Hours}}h logged so far.</p>
+    <form method="post" action="/learning/{{.ID}}"><label>Hours spent<input name="hours" type="number" step="0.5" min="0.5" placeholder="1" required autofocus></label>
+    <div class="acts"><button type="button" class="mini" popovertarget="learn-{{.ID}}" popovertargetaction="hide">Cancel</button><button class="mini primary">Log hours</button></div></form>
+    <form method="post" action="/learning/{{.ID}}" class="dlg-sec"><span class="lbl">Mark as</span><div class="seg-btns">{{$s := .Status}}{{range $o := (split "planned,in_progress,done")}}{{if ne $o $s}}<button name="status" value="{{$o}}" class="mini cap">{{title $o}}</button>{{end}}{{end}}</div></form>
+  </div>
 </li>{{end}}</ul>
 {{else}}<p class="empty">No gaps yet. The <code>upskill</code> skill compares your tracked jobs with your profile.</p>{{end}}
 </section>

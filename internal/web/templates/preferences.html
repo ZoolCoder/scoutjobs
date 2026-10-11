@@ -30,8 +30,10 @@
 <div class="grid-2 wide-l">
 <section class="panel">
 <div class="panel-h"><h2>What you want</h2><span class="n">{{len .Prefs}}</span>
-  <details class="prep-pop addpref"><summary class="btn primary mini">+ Add preference</summary>
-  <form method="post" action="/preferences" class="popform"><label>Preference<input name="key" placeholder="e.g. Remote" required></label><label>Your setting<input name="value" placeholder="e.g. remote only" required></label><button class="mini primary">Save</button></form></details></div>
+  <button type="button" class="btn primary mini addpref" popovertarget="pref-add">+ Add preference</button></div>
+<div popover id="pref-add" class="dlg"><h3>Add a preference</h3><p class="sub">Tell ScoutJobs what you want. It uses this when scoring jobs.</p>
+  <form method="post" action="/preferences"><label>Preference<input name="key" placeholder="e.g. Remote" required autofocus></label><label>Your setting<input name="value" placeholder="e.g. remote only" required><small>Separate several values with commas.</small></label>
+  <div class="acts"><button type="button" class="mini" popovertarget="pref-add" popovertargetaction="hide">Cancel</button><button class="mini primary">Save</button></div></form></div>
 {{if .Prefs}}<ul class="prows">
 <li class="ph"><span>Preference</span><span>Your setting</span><span>How sure</span><span>Why</span><span></span></li>
 {{range .Prefs}}<li>
@@ -39,10 +41,11 @@
   <span class="vals">{{range split .Value}}<span class="chip">{{.}}</span>{{end}}</span>
   {{if eq .Source "stated"}}<span class="muted small">You set it</span>{{else}}<span class="conf"><span class="mono">{{pct .Confidence}}</span><meter min="0" max="1" value="{{.Confidence}}"></meter></span>{{end}}
   <span class="muted small">{{with .Evidence}}{{.}}{{else}}—{{end}}</span>
-  <details class="prep-pop"><summary class="btn mini" title="Change or remove">…</summary><div class="popform">
-    <form method="post" action="/preferences"><input type="hidden" name="key" value="{{.Key}}"><label>Change to<input name="value" value="{{.Value}}" required></label><button class="mini primary">Save</button></form>
-    <form method="post" action="/preferences/delete"><input type="hidden" name="key" value="{{.Key}}"><button class="mini out">Remove</button></form>
-  </div></details>
+  <button type="button" class="btn mini" popovertarget="pref-{{.Key}}" title="Change or remove" aria-label="Change or remove {{title .Key}}">…</button>
+  <div popover id="pref-{{.Key}}" class="dlg"><h3 class="cap">{{title .Key}}</h3><p class="sub">Change your setting, or remove it.</p>
+    <form method="post" action="/preferences" id="pref-{{.Key}}-f"><input type="hidden" name="key" value="{{.Key}}"><label>Your setting<input name="value" value="{{.Value}}" required autofocus><small>Separate several values with commas.</small></label></form>
+    <div class="acts"><form method="post" action="/preferences/delete" class="lead"><input type="hidden" name="key" value="{{.Key}}"><button class="mini danger">Remove</button></form>
+    <button type="button" class="mini" popovertarget="pref-{{.Key}}" popovertargetaction="hide">Cancel</button><button class="mini primary" form="pref-{{.Key}}-f">Save</button></div></div>
 </li>{{end}}</ul>
 <p class="muted small">Learned from the jobs you skip and apply to. Anything you set or change yourself is never overwritten.</p>
 {{if .Rejected}}<details class="rejected"><summary class="muted small">{{len .Rejected}} rejected proposal{{if ne (len .Rejected) 1}}s{{end}}</summary>

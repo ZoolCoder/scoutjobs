@@ -233,3 +233,74 @@ document.querySelectorAll('[data-open]').forEach(function (a) {
   open();
   window.addEventListener('hashchange', open);
 })();
+
+// Every page: a thin bar at the top while the next page loads, and the clicked button spins and
+// stays disabled, so a slow answer never looks like nothing happened and nothing is sent twice.
+(function () {
+  var bar = document.createElement('div');
+  bar.className = 'loadbar';
+  bar.setAttribute('role', 'progressbar');
+  bar.setAttribute('aria-label', 'Loading');
+  bar.hidden = true;
+  document.body.appendChild(bar);
+  var delay, safety;
+
+  // fast answers skip the bar; a download never unloads the page, so give up after a while
+  function start() {
+    clearTimeout(delay);
+    clearTimeout(safety);
+    delay = setTimeout(function () {
+      bar.hidden = false;
+      document.body.setAttribute('aria-busy', 'true');
+    }, 150);
+    safety = setTimeout(stop, 15000);
+  }
+
+  function stop() {
+    clearTimeout(delay);
+    clearTimeout(safety);
+    bar.hidden = true;
+    document.body.removeAttribute('aria-busy');
+    document.querySelectorAll('button.working').forEach(function (b) {
+      b.classList.remove('working');
+      b.disabled = false;
+    });
+  }
+
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (e.defaultPrevented || (f.target && f.target !== '_self')) return;
+    start();
+    var btn = e.submitter;
+    if (!btn || btn.classList.contains('busy')) return;
+    btn.classList.add('working');
+    setTimeout(function () { btn.disabled = true; }, 0); // after the form has read the button's value
+  });
+
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if ((a.target && a.target !== '_self') || a.hasAttribute('download')) return;
+    var u = new URL(a.href, location.href);
+    if (u.origin !== location.origin) return;
+    if (u.pathname === location.pathname && u.search === location.search && u.hash) return;
+    start();
+  });
+
+  window.addEventListener('pageshow', stop); // back/forward restores the page as it was left
+})();
+
+// Dropdowns built on <details>: close on a click outside or on Escape, like a native menu.
+(function () {
+  var open = function () { return document.querySelectorAll('details.prep-pop[open]'); };
+  document.addEventListener('click', function (e) {
+    open().forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    open().forEach(function (d) {
+      d.open = false;
+      d.querySelector('summary').focus();
+    });
+  });
+})();
