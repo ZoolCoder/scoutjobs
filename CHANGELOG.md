@@ -7,6 +7,30 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-11
+
+### Added
+- Learned preferences wait for review: `learn-preferences` proposes them with
+  confidence, supporting and contradicting decisions and evidence, and the
+  Preferences page lists them under "Awaiting your review" with confirm, edit
+  (saved as stated) and reject. Also `scoutjobs pref propose|review|confirm|reject`,
+  the matching MCP tools and `/api/preferences/proposals`. Every outcome is an
+  Activity event; a rejected value comes back only with more support (#12).
+- `GET /healthz` reports the dashboard's version, pid, binary and data dir.
+- `kill -HUP <pid>` restarts the dashboard on the installed binary.
+
+### Changed
+- A learned preference no longer overwrites a stated one; the API answers 409.
+- `scoutjobs doctor` warns when the running dashboard is on another version or
+  data dir, and `scoutjobs update` says whether the dashboard will restart (#17).
+
+### Fixed
+- `scoutjobs serve` on a busy port names the dashboard or program holding it
+  and suggests a free port, instead of a bare bind error.
+- Database open errors name the database path and where the data dir came
+  from, with a hint for SQLite 14, 8, 5 and 6, including macOS privacy-protected
+  folders such as ~/Documents (#19).
+
 ## [0.3.1] - 2026-10-11
 
 ### Added
@@ -109,7 +133,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.2.0
