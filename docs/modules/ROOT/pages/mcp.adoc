@@ -1,0 +1,68 @@
+= MCP server
+:description: scoutjobs mcp exposes every CLI command as an MCP tool over stdio, for Claude Desktop, Codex, Cursor and any other MCP client.
+
+`scoutjobs mcp` is a Model Context Protocol server on stdin and stdout: newline-delimited JSON-RPC 2.0, no network port, no token. Every tool is a `scoutjobs` command run in-process with `--json`, so an MCP client gets the same rows the skills get. The server starts in a few milliseconds and keeps no state of its own; the data stays in `~/.scoutjobs`.
+
+== Tools
+
+[cols="1,2"]
+|===
+| Tool | CLI command
+
+| `brief`, `stats`, `doctor` | `scoutjobs brief --compact`, `scoutjobs stats --json`, `scoutjobs doctor --json`
+| `job_list`, `job_show`, `job_add`, `job_set`, `job_skip` | `scoutjobs job ...`
+| `search` | `scoutjobs search --json --compact`, `add: true` tracks the matches
+| `cv_files`, `cv_log`, `cv_list`, `cv_export` | `scoutjobs cv ...`
+| `email_draft`, `email_show`, `email_sync` | `scoutjobs email ...`; `email_send` and `email_test` are not exposed
+| `decision_log`, `decision_summary` | `scoutjobs decision ...`
+| `pref_list`, `pref_set`, `pref_rm` | `scoutjobs pref ...`
+| `interview_list`, `interview_add`, `interview_set` | `scoutjobs interview ...`
+| `session_log`, `session_list` | `scoutjobs session ...`
+| `learn_list`, `learn_add`, `learn_set` | `scoutjobs learn ...`
+| `run` | any argument list, e.g. `["job","list","--json"]`; `email send`, `email test`, `serve` and `mcp` are refused
+|===
+
+Sending e-mail is not on the server by design: the agent drafts, the user runs `scoutjobs email send <id> --yes` in a terminal. See xref:apply-by-email.adoc[].
+
+== Clients
+
+Claude Code picks the server up from the repository's `.mcp.json`; for any project, add it by hand:
+
+[source,console]
+----
+$ claude mcp add scoutjobs -- scoutjobs mcp
+----
+
+Claude Desktop, `claude_desktop_config.json`:
+
+[source,json]
+----
+{"mcpServers": {"scoutjobs": {"command": "scoutjobs", "args": ["mcp"]}}}
+----
+
+Codex, `~/.codex/config.toml`:
+
+[source,toml]
+----
+[mcp_servers.scoutjobs]
+command = "scoutjobs"
+args = ["mcp"]
+----
+
+Cursor, `.cursor/mcp.json` in the project or `~/.cursor/mcp.json`:
+
+[source,json]
+----
+{"mcpServers": {"scoutjobs": {"command": "scoutjobs", "args": ["mcp"]}}}
+----
+
+`scoutjobs` must be on the PATH the client starts with. GUI apps on macOS do not read your shell profile, so give the full path (`/opt/homebrew/bin/scoutjobs` or `$HOME/go/bin/scoutjobs`) when the client reports "command not found".
+
+== Protocol
+
+[source,console]
+----
+$ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"brief","arguments":{}}}' | scoutjobs mcp
+----
+
+Supported methods: `initialize`, `notifications/initialized`, `ping`, `tools/list`, `tools/call`. Resources and prompts are not implemented; the skills already carry the prompts. Tool failures come back as a result with `isError: true` and the CLI error text, so the model can correct its call.

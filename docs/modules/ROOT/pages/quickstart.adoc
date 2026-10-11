@@ -1,0 +1,72 @@
+= Quickstart
+:description: From an empty ~/.scoutjobs to the first application in one session.
+
+This walks through one full loop with Claude Code. In Codex the commands are `/scoutjobs-setup`, `/scoutjobs-search` and so on; in Cursor or Gemini say the sentence in the right-hand column.
+
+== 1. Tell it who you are
+
+Drop your current CV into `~/.scoutjobs/cv/` (PDF, DOCX, Markdown or text), then:
+
+----
+/scoutjobs:setup
+----
+
+The `scoutjobs-setup` skill reads the CV, writes `profile.md` (facts about you: roles, dates, skills, numbers) and asks what you want: remote or not, locations, salary floor, roles to avoid. Those become stated preferences with confidence 1. Everything a skill later writes into a resume or cover letter must exist in `profile.md`, so take a minute to correct it.
+
+Start the dashboard in another terminal and keep it open:
+
+[source,console]
+----
+$ scoutjobs serve
+dashboard at http://127.0.0.1:7070
+----
+
+== 2. Check the CV once
+
+----
+/scoutjobs:cv
+----
+
+Two scores out of 100 (ATS readiness, content quality), a verdict, up to eight gaps. Fix the structural ones in the master CV now (two-column layout, missing section titles, no metrics); the per-job ones are handled later by `resume-tailor`. The result lands on the Profile & CV page.
+
+== 3. Find jobs
+
+----
+/scoutjobs:search senior go engineer, remote EU
+----
+
+Public ATS APIs (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio), RSS feeds and remote boards, no keys, deduplicated by URL and title, salaries converted to `currency`, added as `new`. Put the queries and your target companies in `config.yaml` (`search_queries`, `search_boards: greenhouse:stripe, lever:netlify`) so a bare `/scoutjobs:search` repeats them. Paste a URL or the posting text for anything else.
+
+== 4. Score and decide
+
+----
+/scoutjobs:fit
+----
+
+Every `new` job gets a 0-100 score with three reasons and moves to `ranked`. The skill asks which to apply to and which to skip. A skip is logged with your reason in your words; that is what the learner reads on Friday.
+
+== 5. Tailor and write
+
+----
+/scoutjobs:apply 3
+----
+
+Writes `resume.md` and `cover-letter.md` into `~/.scoutjobs/applications/<company>_<title>/`, both reviewed by `draft-reviewer` against `profile.md`, and marks the job `drafted`. Rewrite one piece with `/scoutjobs:tailor 3` or `/scoutjobs:cover 3`, and check the tailored resume against the posting with `/scoutjobs:cv --job 3`. The job page shows the four kit steps turning green. See xref:cv-and-cover-letter.adoc[].
+
+== 6. Send
+
+Set `email_from` and `smtp_host` in `config.yaml`, export `SCOUTJOBS_SMTP_PASSWORD`, then:
+
+----
+/scoutjobs:send 3
+----
+
+The skill builds the e-mail (cover letter as body, tailored resume attached), shows all of it, and asks in a full sentence. Only your yes in that conversation sends. The job moves to `applied` and the follow-up timer starts. See xref:apply-by-email.adoc[].
+
+== 7. Every morning
+
+----
+/scoutjobs:brief
+----
+
+Interviews in the next 48 hours, follow-ups due, drafts waiting, new jobs, one learning task. Under 15 lines. On Friday `/scoutjobs:review` closes the week and runs `learn-preferences`.

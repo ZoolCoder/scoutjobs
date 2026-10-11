@@ -1,0 +1,60 @@
+{{template "head" .}}
+{{with .Data}}{{$j := .Job}}
+<header class="top job">
+<div><a class="crumb" href="/pipeline">← Pipeline</a>
+<div class="jobhead">{{template "gauge-lg" $j.FitScore}}<h1>{{$j.Company}}<small>{{$j.Title}}</small></h1><span class="badge {{$j.Status}}">{{title $j.Status}}</span></div></div>
+<span class="now">{{$.Now}}</span>
+</header>
+<div class="grid-3">
+<div class="stack span-2">
+<section class="panel">
+  <div class="panel-h"><h2>Get selected</h2><span class="n">{{.KitDone}}/4</span><span class="act muted">run in your agent</span></div>
+  <ol class="kit">
+    <li><span class="badge {{if .Resume}}done{{else}}todo{{end}}">{{if .Resume}}done{{else}}todo{{end}}</span><div><b>Tailor CV to this job</b><small>Rewrites <code>resume.md</code> against the posting. Every claim stays traceable to <code>profile.md</code>.</small></div><code class="cmd">/scoutjobs:apply {{$j.ID}}</code></li>
+    <li><span class="badge {{if .Cover}}done{{else}}todo{{end}}">{{if .Cover}}done{{else}}todo{{end}}</span><div><b>Cover letter for this role</b><small>Written to the posting and your stories, reviewed by <code>draft-reviewer</code>. Rewrite any time.</small></div><code class="cmd">/scoutjobs:cover {{$j.ID}}</code></li>
+    <li>{{with .Check}}<span class="badge {{if ge .ATSScore 70}}done{{else}}todo{{end}}">ATS {{fit .ATSScore}}</span><div><b>ATS check against this posting</b><small>{{.Summary}}{{if .Gaps}}<br>{{range split .Gaps}}<span class="chip warn">{{.}}</span> {{end}}{{end}}</small></div>{{else}}<span class="badge todo">todo</span><div><b>ATS check against this posting</b><small>Keyword coverage, parseable layout, missing skills for this job.</small></div>{{end}}<code class="cmd">/scoutjobs:cv --job {{$j.ID}}</code></li>
+    <li><span class="badge {{if .Sent}}done{{else if .Draft}}drafted{{else}}todo{{end}}">{{if .Sent}}sent{{else if .Draft}}draft{{else}}todo{{end}}</span><div><b>Send the application</b><small>{{if .Sent}}Sent{{with .Draft}} to {{.To}}{{end}}. Follow-up timer runs from the applied date.{{else if .Draft}}Draft ready for {{.Draft.To}}: {{.Draft.Subject}}. The agent sends only after you say yes, or <a href="{{mailto .Draft}}">open it in your mail app</a>.{{else}}Cover letter as body, tailored resume attached, to {{if $j.Contact}}{{$j.Contact}}{{else}}the contact you set with <code>scoutjobs job set {{$j.ID}} --contact hr@…</code>{{end}}. You confirm before anything is sent.{{end}}</small></div><code class="cmd">/scoutjobs:send {{$j.ID}}</code></li>
+  </ol>
+</section>
+<section class="panel">
+  <div class="panel-h"><h2>Why this job fits</h2><span class="n">fit {{fit $j.FitScore}}</span></div>
+  {{if $j.FitNotes}}<p class="pre">{{$j.FitNotes}}</p>{{else}}<p class="empty">Fit not scored yet. Run the <code>job-fit</code> skill or <code>/scoutjobs:fit {{$j.ID}}</code>.</p>{{end}}
+  {{if $j.Notes}}<h3>Notes</h3><p class="pre">{{$j.Notes}}</p>{{end}}
+  <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input name="note" placeholder="Add a note"><button class="primary">Add</button></form>
+</section>
+<section class="panel">
+  <div class="panel-h"><h2>Interviews</h2><span class="n">{{len .Interviews}}</span><a class="act" href="/interviews">All interviews</a></div>
+  {{if .Interviews}}<table><tbody>{{range .Interviews}}<tr><td class="mono">{{when .At}}</td><td>{{title .Stage}}</td><td class="muted">{{.Format}}</td><td><span class="badge {{.PrepStatus}}">{{title .PrepStatus}}</span></td><td>{{if .Outcome}}<span class="badge {{.Outcome}}">{{.Outcome}}</span>{{end}}</td></tr>{{if .Feedback}}<tr><td></td><td colspan="4" class="muted">{{.Feedback}}</td></tr>{{end}}{{end}}</tbody></table>
+  {{else}}<p class="empty">None yet. <code>scoutjobs interview add {{$j.ID}} --stage screen --at YYYY-MM-DD</code></p>{{end}}
+</section>
+<section class="panel">
+  <div class="panel-h"><h2>History</h2><span class="n">{{len .Events}}</span></div>
+  <ul class="timeline">{{range .Events}}<li><span class="mono">{{when .At}}</span><span><span class="tag">{{.Kind}}</span> {{.Note}}</span></li>{{end}}</ul>
+</section>
+</div>
+<div class="stack">
+<section class="panel">
+  <div class="panel-h"><h2>Application</h2></div>
+  <dl class="facts">
+    <dt>Status</dt><dd><span class="badge {{$j.Status}}">{{title $j.Status}}</span></dd>
+    <dt>Move to</dt><dd>{{template "move" (dict_status $j.ID $j.Status (printf "/jobs/%d" $j.ID))}}</dd>
+    <dt>Where</dt><dd>{{$j.Location}} {{if $j.Remote}}<span class="chip">{{$j.Remote}}</span>{{end}}</dd>
+    {{if $j.URL}}<dt>Posting</dt><dd><a href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{$j.URL}}</a></dd>{{end}}
+    <dt>Source</dt><dd>{{$j.Source}}</dd>
+    {{if $j.Contact}}<dt>Contact</dt><dd><a href="mailto:{{$j.Contact}}">{{$j.Contact}}</a></dd>{{end}}
+    {{if $j.SalaryMax}}<dt>Salary</dt><dd>{{$j.SalaryMin}}–{{$j.SalaryMax}} {{$j.Currency}}</dd>{{end}}
+    {{if $j.Deadline}}<dt>Deadline</dt><dd>{{$j.Deadline}}</dd>{{end}}
+    {{if $j.Tags}}<dt>Tags</dt><dd>{{range split $j.Tags}}<span class="chip">{{.}}</span> {{end}}</dd>{{end}}
+    <dt>Added</dt><dd>{{day $j.CreatedAt}}</dd>
+  </dl>
+</section>
+<section class="panel">
+  <div class="panel-h"><h2>Files</h2><span class="n">{{len .Files}}</span></div>
+  {{if .Files}}{{$id := $j.ID}}{{range .Files}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}">{{template "ico-doc"}}{{.}}</a> {{end}}{{else}}<p class="muted">None yet. Drafts land here when you run <code>/scoutjobs:apply</code>.</p>{{end}}
+  <p class="mono small">{{tilde .Dir}}</p>
+  {{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export"><button class="mini" type="submit">Export resume.md as PDF</button></form>{{end}}
+</section>
+</div>
+</div>
+{{end}}
+{{template "foot" .}}

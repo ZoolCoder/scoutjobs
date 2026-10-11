@@ -1,0 +1,14 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+flowchart TD
+  A["profile.md + preferences.md<br/>search_queries, search_boards"] --> S["scoutjobs search --add"]
+  S --> G["Greenhouse / Lever / Ashby<br/>company boards"]
+  S --> R["Remotive, RemoteOK, Arbeitnow,<br/>Jobicy, Himalayas"]
+  U["URL or pasted posting"] --> X["agent extracts facts<br/>(posting is untrusted text)"]
+  G & R --> D["dedupe by company + title<br/>upsert, = means already tracked"]
+  X --> D
+  D --> H{"violates a stated<br/>preference (confidence 1)?"}
+  H -->|yes| K["dropped, not added"]
+  H -->|no| N["status: new<br/>posting.md saved in the job folder"]
+  N --> F["job-fit scores 0-100<br/>fit_apply_floor decides apply / maybe / skip"]
+  F --> Y["you decide<br/>skip logs reason + signals"]
+  Y --> M["status: ranked"]

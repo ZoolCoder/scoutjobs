@@ -1,0 +1,50 @@
+# Antora playbook for the ScoutJobs user manual.
+#
+# Build locally with:
+#   make docs            (npm ci + npx antora antora-playbook.yml)
+# then open build/site/index.html
+#
+# The content source is this working tree, so a local build documents what is
+# checked out right now, uncommitted edits included (worktrees: true).
+antora:
+  extensions:
+    - require: '@antora/lunr-extension'
+      index_latest_only: true
+
+site:
+  title: ScoutJobs
+  url: https://zoolcoder.github.io/scoutjobs
+  start_page: scoutjobs::index.adoc
+  robots: allow
+
+content:
+  sources:
+    - url: .
+      start_path: docs
+      branches: HEAD
+      worktrees: true
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+  # Brand layer over the default UI, shared with the other ZoolCoder tool sites.
+  supplemental_files: ./docs/supplemental-ui
+
+asciidoc:
+  extensions:
+    # Renders the [mermaid] blocks in docs/modules/ROOT/partials/diagrams/.
+    - asciidoctor-kroki
+  attributes:
+    experimental: ''
+    idprefix: ''
+    idseparator: '-'
+    tabsize: 2
+    go-version: '1.27'
+    source-highlighter: highlight.js
+    # Fetch the SVG at build time so the published site has no runtime
+    # dependency on kroki.io. Needs network access during the build.
+    kroki-fetch-diagram: true
+
+output:
+  dir: ./build/site

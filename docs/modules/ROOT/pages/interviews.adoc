@@ -1,0 +1,46 @@
+= Interviews and learning
+:description: Prep, mock, debrief, and the learning plan built from your own pipeline.
+
+== Prepare
+
+----
+/scoutjobs:interview 3
+----
+
+`interview-prep` researches the company and role from `posting.md` and `research.md`, lists the likely questions for the stage (`scoutjobs interview list` knows whether it is a screen, technical, system design or behavioral round), maps your STAR stories to them, and writes `interview-prep.md` into the job folder. The interview shows as *ready* in the brief once the sheet exists.
+
+Stories live in `~/.scoutjobs/stories/`. `/scoutjobs:story` extracts one from a CV line or a two-minute conversation using the STAR frame, so the prep has material to map.
+
+== Mock
+
+----
+/scoutjobs:mock behavioral
+/scoutjobs:mock coding
+/scoutjobs:mock system_design
+----
+
+A timed session with a persona (in Claude Code a dedicated interviewer subagent; elsewhere the main agent plays it until you say "done"), scored against the frameworks in `behavioral-frameworks`, `coding-frameworks` and `system-design-frameworks`, logged with `scoutjobs session log` so the Interviews page shows the trend.
+
+== Debrief
+
+----
+/scoutjobs:debrief 3
+----
+
+Right after a real interview: the questions asked, what went well, what did not, the outcome, and a thank-you note draft saved as `debrief-<date>.md`. Questions you could not answer become learning items.
+
+== Learn
+
+----
+/scoutjobs:upskill
+----
+
+`upskill` counts which skills your tracked postings ask for and you lack, ranks the gaps, proposes a plan with resources and hours, and tracks progress with `scoutjobs learn set`. The daily brief surfaces one `in_progress` item with a 30-minute suggestion; the Learning page shows the rest.
+
+== The weekly review
+
+----
+/scoutjobs:review
+----
+
+Funnel and response rate for the week, follow-ups you missed, stale jobs to close as `no_response`, and `learn-preferences`: it reads every decision you logged and proposes preferences ("you skip anything onsite", "you apply to everything with Go and Postgres even below the salary floor") with a confidence. You confirm or reject each one. Confirmed ones go into `preferences.md` and change the scorer next week.

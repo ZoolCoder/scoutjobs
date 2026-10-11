@@ -1,0 +1,22 @@
+* xref:index.adoc[Introduction]
+* xref:install.adoc[Install]
+* xref:quickstart.adoc[Quickstart]
+* Using it
+** xref:dashboard.adoc[Dashboard]
+** xref:pipeline.adoc[Pipeline]
+** xref:cv-and-cover-letter.adoc[CV and cover letter]
+** xref:apply-by-email.adoc[Apply by e-mail]
+** xref:interviews.adoc[Interviews and learning]
+* Agents
+** xref:agents.adoc[Claude Code, Codex, Cursor, Gemini, Copilot]
+** xref:skills.adoc[All skills]
+** xref:cloud.adoc[Cloud and remote agents]
+** xref:mcp.adoc[MCP server]
+* Reference
+** xref:cli.adoc[CLI]
+** xref:api.adoc[JSON API and webhook]
+** xref:configuration.adoc[Configuration and data layout]
+** xref:flows.adoc[All flow diagrams]
+* xref:security.adoc[Security and privacy]
+* xref:troubleshooting.adoc[Troubleshooting]
+* xref:contributing.adoc[Contributing and support]

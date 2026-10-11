@@ -1,0 +1,15 @@
+{
+  "name": "ScoutJobs daily brief",
+  "nodes": [
+    {"parameters": {"rule": {"interval": [{"field": "cronExpression", "expression": "0 8 * * 1-5"}]}}, "name": "Every weekday 08:00", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0]},
+    {"parameters": {"url": "http://127.0.0.1:7070/api/brief", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "options": {}}, "name": "GET /api/brief", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [220, 0]},
+    {"parameters": {"jsCode": "const b = $input.first().json;\nconst lines = [`ScoutJobs ${b.date}: ${b.applied_week}/${b.target_week} applied this week, ${b.open} open, streak ${b.streak}d`];\nfor (const i of b.upcoming_interviews || []) lines.push(`Interview ${i.at} ${i.company} (${i.stage}) prep: ${i.prep_status}`);\nfor (const j of b.follow_ups_due || []) lines.push(`Follow up: ${j.company} - ${j.title}`);\nfor (const j of b.drafted_jobs || []) lines.push(`Draft waiting: ${j.company} - ${j.title}`);\nif ((b.new_jobs || []).length) lines.push(`${b.new_jobs.length} new postings to score`);\nreturn [{ json: { text: lines.join('\\n') } }];"}, "name": "Format", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [440, 0]},
+    {"parameters": {"chatId": "={{ $env.TELEGRAM_CHAT_ID }}", "text": "={{ $json.text }}", "additionalFields": {}}, "name": "Telegram (swap for Slack/email)", "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [660, 0]}
+  ],
+  "connections": {
+    "Every weekday 08:00": {"main": [[{"node": "GET /api/brief", "type": "main", "index": 0}]]},
+    "GET /api/brief": {"main": [[{"node": "Format", "type": "main", "index": 0}]]},
+    "Format": {"main": [[{"node": "Telegram (swap for Slack/email)", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

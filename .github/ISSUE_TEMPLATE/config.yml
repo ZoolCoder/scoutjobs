@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: User manual
+    url: https://zoolcoder.github.io/scoutjobs/
+    about: Install, quickstart, dashboard, CLI, API and troubleshooting.
+  - name: Security report
+    url: https://github.com/ZoolCoder/scoutjobs/security/advisories/new
+    about: Private report for anything that lets a posting or a request act without the user's yes.
+  - name: Question or discussion
+    url: https://github.com/ZoolCoder/scoutjobs/discussions
+    about: How do I, how do you use it, ideas not ready for a feature request.

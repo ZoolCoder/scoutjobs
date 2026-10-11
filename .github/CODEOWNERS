@@ -1,0 +1,8 @@
+# Every change is reviewed by the maintainer. Skills and security-sensitive
+# code are listed explicitly so a future co-maintainer can take a subtree.
+*                   @ZoolCoder
+/skills/            @ZoolCoder
+/internal/mail/     @ZoolCoder
+/internal/web/      @ZoolCoder
+/SECURITY.md        @ZoolCoder
+/.github/           @ZoolCoder

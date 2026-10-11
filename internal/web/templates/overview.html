@@ -1,0 +1,117 @@
+{{template "head" .}}
+{{with .Data}}
+{{if .TodoJobs}}{{$j := index .TodoJobs 0}}
+<section class="next">
+  {{template "gauge-lg" $j.FitScore}}
+  <div><span class="next-k">Next best move</span><h2>Finish your strongest draft</h2><p>{{$j.Company}} · {{$j.Title}}{{if $j.FitNotes}} · {{$j.FitNotes}}{{end}}</p></div>
+  <a class="btn primary" href="/jobs/{{$j.ID}}">Review draft</a>
+</section>
+{{else if .Stats.DueFollowUps}}{{$j := index .Stats.DueFollowUps 0}}
+<section class="next">
+  {{template "gauge-lg" $j.FitScore}}
+  <div><span class="next-k">Next best move</span><h2>Follow up with {{$j.Company}}</h2><p>{{$j.Title}} · quiet since {{day $j.UpdatedAt}}</p></div>
+  <a class="btn primary" href="/jobs/{{$j.ID}}">Open job</a>
+</section>
+{{else if .Upcoming}}{{$i := index .Upcoming 0}}
+<section class="next">
+  <span class="gauge lg g0"><b>{{title $i.Stage}}</b></span>
+  <div><span class="next-k">Next best move</span><h2>Prepare for {{$i.Company}}</h2><p>{{title $i.Stage}} interview · {{when $i.At}} · prep {{title $i.PrepStatus}}</p></div>
+  <a class="btn primary" href="/interviews">Open interviews</a>
+</section>
+{{else if not .Checks}}
+<section class="next">
+  <span class="gauge lg g0"><b>CV</b></span>
+  <div><span class="next-k">Next best move</span><h2>Check your CV before you apply</h2><p>Scores ATS readiness and content quality, lists gaps against your target roles.</p></div>
+  <a class="btn primary" href="/profile">Profile &amp; CV</a>
+</section>
+{{else}}
+<section class="next">
+  <span class="gauge lg g0"><b>{{.Stats.Open}}</b></span>
+  <div><span class="next-k">Next best move</span><h2>Find and rank new jobs</h2><p>Run <code>scoutjobs search --remote --add</code> or the <code>job-search</code> skill, then score fit.</p></div>
+  <a class="btn primary" href="/pipeline">Open pipeline</a>
+</section>
+{{end}}
+
+<section class="kpis">
+  <a class="kpi" href="/pipeline"><span class="ic">{{template "ico-doc"}}</span><span class="lbl">Open jobs</span><b>{{.Stats.Open}}</b><span class="hint">in your pipeline</span></a>
+  <a class="kpi acc" href="/pipeline?q=drafted"><span class="ic">{{template "ico-send"}}</span><span class="lbl">Applied this week</span><b>{{.Stats.AppliedWeek}}<small>/ {{.Target}}</small></b><span class="hint">weekly target</span><meter min="0" max="{{.Target}}" value="{{.Stats.AppliedWeek}}"></meter></a>
+  <a class="kpi" href="/interviews"><span class="ic">{{template "ico-calendar"}}</span><span class="lbl">Upcoming interviews</span><b>{{len .Upcoming}}</b><span class="hint">{{with .Upcoming}}{{$n := index . 0}}next {{mon $n.At}} {{dom $n.At}} · {{$n.Company}}{{else}}none scheduled{{end}}</span></a>
+  <a class="kpi" href="/activity"><span class="ic">{{template "ico-bars"}}</span><span class="lbl">Response rate</span><b>{{pct .Stats.ResponseRate}}</b><span class="hint">of {{.Stats.AppliedTotal}} applications</span><meter min="0" max="1" value="{{.Stats.ResponseRate}}"></meter></a>
+</section>
+
+<div class="grid-2">
+<section class="panel">
+  <div class="panel-h"><h2>Pipeline health</h2><span class="n">{{.Stats.Open}} active</span><a class="act" href="/pipeline">Open pipeline</a></div>
+  <div class="split">
+  <ul class="funnel">
+  {{range .Funnel}}<li><span class="lbl">{{title .Status}}</span><meter min="0" max="{{.Max}}" value="{{.Count}}"></meter><span class="n">{{.Count}}</span></li>{{end}}
+  </ul>
+  <div><h3 class="first">Applications <span class="muted">· last 8 weeks · target {{.Target}}</span></h3>
+  <ul class="weeks">{{range $i, $w := .Weekly}}<li><i class="h{{$w.Pct}}" title="{{$w.Count}}"></i><span>W{{$i}}</span></li>{{end}}</ul></div>
+  </div>
+  {{if .Stats.DueFollowUps}}
+  <h3>Follow-ups due <span class="n">{{len .Stats.DueFollowUps}}</span></h3>
+  <ul class="plain">{{range .Stats.DueFollowUps}}<li><a href="/jobs/{{.ID}}">{{.Company}}</a> · {{.Title}} <em>quiet since {{day .UpdatedAt}}</em></li>{{end}}</ul>
+  {{end}}
+  {{if .Stats.Stale}}
+  <h3>Stale <span class="n">{{len .Stats.Stale}}</span></h3>
+  <ul class="plain">{{range .Stats.Stale}}<li><a href="/jobs/{{.ID}}">{{.Company}}</a> · {{.Title}}
+    <form method="post" action="/jobs/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="no_response"><input type="hidden" name="back" value="/"><button class="mini">Mark no response</button></form></li>{{end}}</ul>
+  {{end}}
+</section>
+
+<section class="panel">
+  <div class="panel-h"><h2>Coming up</h2><span class="n">{{len .Upcoming}}</span><a class="act" href="/interviews">All interviews</a></div>
+  {{if .Upcoming}}
+  <ul class="rows">
+  {{range .Upcoming}}<li>{{template "cal" .At}}<span><a href="/jobs/{{.JobID}}">{{.Company}}</a><small>{{title .Stage}}{{if .Format}} · {{.Format}}{{end}}{{with hm .At}} · {{.}}{{end}}</small></span><span class="badge {{.PrepStatus}}">{{title .PrepStatus}}</span></li>{{end}}
+  </ul>
+  {{else}}<p class="empty">No interviews scheduled. They appear here once you add one to a job.</p>{{end}}
+
+  <h3>Drafts waiting <span class="n">{{len .TodoJobs}}</span></h3>
+  {{if .TodoJobs}}<ul class="rows">{{range .TodoJobs}}<li><span></span><span><a href="/jobs/{{.ID}}">{{.Company}}</a> · {{.Title}}<small>edited {{day .UpdatedAt}}</small></span>{{template "gauge" .FitScore}}</li>{{end}}</ul>
+  {{else}}<p class="muted">Nothing drafted. Try <code>/scoutjobs:apply</code>.</p>{{end}}
+</section>
+
+<section class="panel">
+  <div class="panel-h"><h2>Learning progress</h2><span class="n">{{f1 .Stats.LearningHours}}h</span><a class="act" href="/learning">Practice and gaps</a></div>
+  {{if .Learning}}
+  <table><thead><tr><th>Topic</th><th>Status</th><th>Hours</th><th>Demand</th></tr></thead><tbody>{{range .Learning}}<tr><td>{{.Skill}}</td><td><span class="badge {{.Status}}">{{title .Status}}</span></td><td class="mono">{{f1 .Hours}}h</td><td class="mono">{{.Demand}} jobs</td></tr>{{end}}</tbody></table>
+  {{else}}<p class="empty">No gaps tracked. The <code>upskill</code> skill finds them from the jobs you skipped or lost.</p>{{end}}
+  {{if .Sessions}}
+  <h3>Recent practice</h3>
+  <ul class="plain">{{range .Sessions}}<li><span class="mono">{{day .At}}</span> {{title .Kind}} {{if .Topic}}· {{.Topic}}{{end}} {{if ge .Score 0}}<span class="fit">{{.Score}}</span>{{end}}</li>{{end}}</ul>
+  {{end}}
+</section>
+
+<section class="panel">
+  <div class="panel-h"><h2>CV health</h2><a class="act" href="/profile">Profile &amp; CV</a></div>
+  {{with .Checks}}{{range .}}
+  <div class="cv">
+    <div class="score">{{template "gauge-lg" .ATSScore}}<small>ATS score</small></div>
+    <div><div class="file"><span class="ic">{{template "ico-doc"}}</span><span><b>{{.File}}</b><small>content {{fit .Score}} · checked {{day .At}}</small></span></div>
+    <p class="callout">{{.Summary}}</p>
+    {{if .Gaps}}<p>{{range split .Gaps}}<span class="chip warn">{{.}}</span> {{end}}</p>{{end}}</div>
+  </div>
+  {{end}}
+  {{else}}<p class="empty">Not checked yet. Say “check my CV” or run <code>/scoutjobs:cv</code>.</p>{{end}}
+</section>
+</div>
+
+<section class="panel">
+  <div class="panel-h"><h2>What ScoutJobs is learning about you</h2><a class="act" href="/preferences">All preferences</a></div>
+  {{if .Prefs}}
+  <dl class="prefs">{{range .Prefs}}<dt>{{title .Key}}</dt><dd>{{.Value}}</dd><dd class="src"><span class="badge {{.Source}}">{{if eq .Source "learned"}}{{pct .Confidence}}{{else}}stated{{end}}</span></dd>{{end}}</dl>
+  {{else}}<p class="empty">Nothing yet. Every skip, apply and decline teaches it. Run <code>learn-preferences</code> after a few decisions.</p>{{end}}
+  {{if .Decisions}}
+  <h3>Last decisions</h3>
+  <ul class="plain">{{range .Decisions}}<li><span class="mono">{{day .At}}</span> <b>{{title .Kind}}</b> {{.Company}} <em>{{.Reason}}</em></li>{{end}}</ul>
+  {{end}}
+</section>
+
+<section class="panel">
+  <div class="panel-h"><h2>Recent activity</h2><a class="act" href="/activity">Full log</a></div>
+  <ul class="timeline">{{range .Recent}}<li><span class="mono">{{when .At}}</span><span><span class="badge {{.Kind}}">{{title .Kind}}</span> {{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a> · {{end}}{{.Note}}</span></li>{{else}}<li><span class="mono">—</span><span class="muted">Empty. Add a job: <code>scoutjobs job add --company X --title Y</code> or <code>scoutjobs search --remote --add</code></span></li>{{end}}</ul>
+</section>
+{{end}}
+{{template "foot" .}}

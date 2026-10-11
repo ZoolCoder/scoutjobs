@@ -1,0 +1,21 @@
+{
+  "name": "scoutjobs",
+  "owner": {
+    "name": "Abdallah Emad (ZoolCoder)",
+    "url": "https://github.com/zoolcoder"
+  },
+  "metadata": {
+    "description": "ScoutJobs: skills, commands and agents for running a job search with an AI agent.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "scoutjobs",
+      "source": "./",
+      "description": "Find and score jobs, tailor applications, prep and mock interviews, learn your preferences, track everything on a local dashboard.",
+      "version": "0.1.0",
+      "category": "productivity",
+      "tags": ["job-search", "interview", "resume", "career"]
+    }
+  ]
+}

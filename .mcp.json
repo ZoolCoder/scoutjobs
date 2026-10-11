@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "scoutjobs": {
+      "command": "scoutjobs",
+      "args": ["mcp"]
+    }
+  }
+}

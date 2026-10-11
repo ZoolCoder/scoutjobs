@@ -1,0 +1,47 @@
+= Troubleshooting
+:description: The errors you are most likely to see and what they mean.
+
+Start with `scoutjobs doctor`: it checks PATH, the data directory, config keys, mail secrets, which agents have the skills, and whether the dashboard is up, and prints a fix per finding. `scoutjobs doctor --online` also asks GitHub for the latest release; without the flag it never leaves the machine.
+
+Not on this page? Open an issue at https://github.com/ZoolCoder/scoutjobs/issues with the `scoutjobs doctor` output; the templates ask for it. Redact employer names and postings, never attach `scoutjobs.db`. Anything that lets a posting act without your yes goes through https://github.com/ZoolCoder/scoutjobs/security/advisories/new instead.
+
+[cols="2,3"]
+|===
+| Symptom | Fix
+
+| `scoutjobs: command not found` in the agent
+| `~/.local/bin` is not on `PATH` for that shell. `make install`, then add the directory to `PATH` in your shell profile, restart the agent.
+
+| The brief says the profile is still the template
+| Run `/scoutjobs:setup` (Codex: `/scoutjobs-setup`). It needs a CV in `~/.scoutjobs/cv/`.
+
+| `no cover-letter.md in ...: write the cover letter first`
+| `/scoutjobs:cover <id>`; `email draft` uses that file as the body.
+
+| `no draft for job N: run scoutjobs email draft N first`
+| `email send` and `email show` need the draft on disk.
+
+| `email send` refuses
+| Pass `--yes`. The refusal without it is deliberate.
+
+| `SCOUTJOBS_SMTP_PASSWORD not set`, or `535 authentication failed`
+| Export the variable in the shell that runs the CLI. Gmail needs an app password, not the account password, and `smtp_host: smtp.gmail.com:587`.
+
+| `401 unauthorized` on `/api/*`
+| `api_token` is set; send `Authorization: Bearer <token>`.
+
+| `400` on `PUT /api/jobs/\{id}/files/x.pdf`
+| Only `.md`, `.txt` and `.json` are writable through the API.
+
+| `search` prints a warning about a board
+| That board was unreachable or the slug is wrong; the others still ran. Slugs come from the careers URL after `boards.greenhouse.io/`, `jobs.lever.co/`, `jobs.ashbyhq.com/`, `apply.workable.com/`, `jobs.smartrecruiters.com/`, or the subdomain of `<slug>.jobs.personio.de`. `scoutjobs doctor` does not test boards; run the search with one `--board` to isolate it.
+
+| Codex does not show `/scoutjobs-*`
+| Run `SCOUTJOBS_PLATFORMS=codex ./install.sh` and restart Codex; prompts are in `~/.codex/prompts/`.
+
+| Dark theme does not stick
+| The sidebar switch is per browser; `theme:` in `config.yaml` is the default for new browsers.
+
+| Diagrams missing in a local docs build
+| `make docs` needs network access to kroki.io once per diagram (`kroki-fetch-diagram`).
+|===

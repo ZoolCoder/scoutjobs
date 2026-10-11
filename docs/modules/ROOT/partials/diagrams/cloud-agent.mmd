@@ -1,0 +1,18 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+sequenceDiagram
+  actor U as You (laptop)
+  participant T as Tunnel (cloudflared, tailscale)
+  participant D as scoutjobs serve + api_token
+  participant A as Cloud agent (Claude Code web, Codex cloud)
+  U->>D: scoutjobs serve
+  U->>T: cloudflared tunnel --url http://127.0.0.1:7070
+  T-->>U: https://xyz.trycloudflare.com
+  U->>A: URL + token in the agent's secrets
+  A->>D: GET /api/brief (Bearer token)
+  A->>D: GET /api/jobs/3, GET /api/jobs/3/files/posting.md
+  A->>D: PUT /api/jobs/3/files/resume.md
+  A->>D: PUT /api/jobs/3/files/cover-letter.md
+  A->>D: POST /api/cv/checks, POST /api/jobs/3/status {drafted}
+  A->>D: POST /api/jobs/3/email/draft {"to": "hr@..."}
+  A-->>U: "run: scoutjobs email send 3 --yes"
+  U->>U: reads the draft on the job page, sends from the laptop

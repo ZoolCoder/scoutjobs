@@ -1,0 +1,74 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild when something that affects the site changes.
+    paths:
+      - 'docs/**'
+      - 'antora-playbook.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+# Least privilege: the build job needs only to read the repo. Pages deployment
+# gets its own narrower grants on the deploy job.
+permissions:
+  contents: read
+
+# One deployment at a time. Do not cancel a run in progress: a half-finished
+# Pages deployment is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Antora reads the git history of this worktree, so a shallow clone
+          # would hide the branch it is told to build.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Antora
+        run: npm ci
+
+      - name: Build the site
+        run: npx antora --fetch antora-playbook.yml
+
+      - name: Fail on a broken cross-reference
+        # Antora reports an unresolved xref as a warning and still emits a page
+        # with a broken link. A docs site whose navigation silently rots is not
+        # worth publishing, so treat any warning as a build failure.
+        run: |
+          npx antora --fetch antora-playbook.yml 2>&1 | tee build.log
+          if grep -q '"level":"warn"' build.log; then
+            echo "::error::Antora emitted warnings; see the log above."
+            grep '"level":"warn"' build.log
+            exit 1
+          fi
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

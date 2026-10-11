@@ -1,0 +1,80 @@
+# goreleaser release --clean   (CI runs it on every v* tag, see .github/workflows/release.yml)
+version: 2
+
+project_name: scoutjobs
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/scoutjobs
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/zoolcoder/scoutjobs/internal/cli.Version={{ .Version }}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+# deb, rpm and apk for Linux; `sudo dpkg -i`, `sudo rpm -i` or `sudo apk add --allow-untrusted`
+nfpms:
+  - package_name: scoutjobs
+    vendor: ZoolCoder
+    homepage: https://zoolcoder.github.io/scoutjobs/
+    maintainer: ZoolCoder <abdallah.coder@gmail.com>
+    description: Job-search copilot for AI coding agents; CLI, local dashboard and skills
+    license: MIT
+    section: utils
+    bindir: /usr/bin
+    formats: [deb, rpm, apk]
+    file_name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/scoutjobs/LICENSE
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat'
+      order: 0
+    - title: Fixes
+      regexp: '^fix'
+      order: 1
+    - title: Other
+      order: 999
+  filters:
+    exclude: ['^docs', '^chore', '^ci', '^test']
+
+release:
+  draft: false
+  prerelease: auto
+
+# The cask lives in this repo: brew tap zoolcoder/scoutjobs https://github.com/zoolcoder/scoutjobs
+homebrew_casks:
+  - name: scoutjobs
+    repository:
+      owner: zoolcoder
+      name: scoutjobs
+      branch: main
+    directory: Casks
+    commit_author:
+      name: goreleaser
+      email: goreleaser@users.noreply.github.com
+    commit_msg_template: "chore(brew): cask for {{ .Tag }}"
+    homepage: https://zoolcoder.github.io/scoutjobs/
+    description: Job-search copilot for AI coding agents; CLI, local dashboard and skills
+    license: MIT

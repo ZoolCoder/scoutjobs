@@ -1,0 +1,65 @@
+# ScoutJobs + n8n (or Make, Zapier, cron, anything with HTTP)
+
+Two directions, both local and opt-in:
+
+1. **Pull**: the dashboard (`scoutjobs serve`) exposes a JSON API. Poll it on a schedule.
+2. **Push**: set `webhook_url` in `~/.scoutjobs/config.yaml` and every event (job added, status change, note, interview, cv_check) is POSTed as JSON the moment the CLI or dashboard records it.
+
+## Setup
+
+```yaml
+# ~/.scoutjobs/config.yaml
+api_token: change-me-long-random        # /api/* then needs "Authorization: Bearer change-me-long-random"
+webhook_url: http://127.0.0.1:5678/webhook/scoutjobs   # your n8n Webhook node (test or production URL)
+webhook_secret: another-long-random         # optional: every POST gets X-ScoutJobs-Signature (HMAC-SHA256 over "<X-ScoutJobs-Timestamp>.<body>") to verify in a Code node
+```
+
+Restart `scoutjobs serve`. The dashboard stays on `127.0.0.1`; if n8n runs in Docker, reach it via `host.docker.internal:7070` from the container, or run `scoutjobs serve --addr 0.0.0.0:7070` only on a trusted network with `api_token` set.
+
+## API
+
+| Method | Path | Body / query | Returns |
+|---|---|---|---|
+| GET | `/api/brief` | | today: applied this week vs target, follow-ups due, stale, upcoming interviews, new and drafted jobs |
+| GET | `/api/stats` | | funnel and rates (same as `scoutjobs stats --json`) |
+| GET | `/api/jobs` | `?status=new&q=stripe&open=1&limit=20` | job rows |
+| POST | `/api/jobs` | `{"company","title","url","location","remote","source","posted_at","tags","salary_min","salary_max","currency","notes"}` | 201 created / 200 existing (same company and normalised title, or same posting URL) |
+| GET | `/api/jobs/{id}` | | job, events, interviews |
+| POST | `/api/jobs/{id}/status` | `{"status":"applied","reason":"..."}` | updated job; skip/withdraw/decline also log a decision |
+| POST | `/api/jobs/{id}/note` | `{"note":"..."}` | 201 |
+| GET | `/api/jobs/{id}/files` | | application folder (`files`: name, size, modified) and the kit (resume, cover, ats, draft, sent, done of 4) |
+| GET | `/api/jobs/{id}/files/{name}` | | `{"name","size","body"}` for `.md`, `.txt`, `.json`, `.eml` |
+| PUT | `/api/jobs/{id}/files/{name}` | raw text or `{"body":"..."}` | 201 new / 200 replaced; `.md`, `.txt`, `.json` only, 1 MB |
+| POST | `/api/jobs/{id}/export` | `{"file":"resume.md"}` (optional) | 201 `{"file","bytes"}`: resume.pdf written next to the Markdown |
+| POST | `/api/jobs/{id}/email/draft` | `{"to","subject","body","attach":["x.pdf"]}` (all optional) | 201, the message and the local send command; needs `cover-letter.md` |
+| GET | `/api/profile` | | `profile`, `preferences`, `cv_dir`, `cv_files`, `latest_check` |
+| POST | `/api/cv/checks` | `{"file","score","ats_score","summary","gaps","job_id"}` | 201 |
+| GET | `/api/cv/checks` | `?limit=20` | check history |
+| GET | `/api/events` | `?limit=50` | recent activity |
+| POST | `/api/jobs/{id}/skip` | `{"reason":"...","signals":{...}}` | `job skip`: status skipped plus the decision the learner reads |
+| POST | `/api/search` | `{"queries":["go"],"boards":["greenhouse:acme"],"remote":true,"limit":40,"add":true}` | `scoutjobs search`: `postings`, `added`, `errors`; omitted queries and boards fall back to `config.yaml` |
+| GET, POST | `/api/interviews` | `?job=3&all=1`; POST `{"job_id","stage","at","format","interviewer"}` | interviews (upcoming unless `all`); POST 201 and the job moves to `interview` when earlier |
+| PATCH | `/api/interviews/{id}` | `{"at","format","interviewer","prep_status","outcome","feedback","stage"}`, any subset | updated interview |
+| GET, POST | `/api/sessions` | `?limit=30`; POST `{"kind","topic","score","notes"}` | practice sessions, newest first; POST 201 |
+| GET, POST | `/api/learning` | POST `{"skill","priority","resource","demand","notes"}` (upsert by skill) | learning items; POST 201 |
+| PATCH | `/api/learning/{id}` | `{"status","resource","notes","hours","priority","demand"}`, `hours` is added | updated item |
+| GET | `/api/preferences` | | stated and learned preferences |
+| PUT, DELETE | `/api/preferences/{key}` | PUT `{"value","confidence","evidence","source"}` | the preference; DELETE 204 |
+| GET, POST | `/api/decisions` | `?limit=50`; POST `{"job_id","kind","reason","signals"}` | decisions, newest first; POST 201 |
+
+Sending e-mail is not on the API: `scoutjobs email send <id> --yes` runs on the machine that owns the SMTP password.
+
+Webhook payload:
+
+```json
+{"event":"status","job_id":12,"company":"Stripe","title":"Backend Engineer","note":"ranked -> applied","at":"2026-10-11T09:30:00Z"}
+```
+
+## Example workflows
+
+- `daily-brief.json`: every morning at 08:00, GET `/api/brief`, format a message, send it to Telegram/Slack/email (swap the last node).
+- `webhook-to-calendar.json`: receive ScoutJobs events; when `event` is `interview`, create a calendar entry; when `event` is `status` and the note ends in `applied`, start a 10-day follow-up timer.
+
+Import via n8n → Workflows → Import from file, then set your token in the HTTP Request node credentials (Header Auth, name `Authorization`, value `Bearer <api_token>`).
+
+Postings that arrive from other automations (an RSS node, a mail parser) go in through `POST /api/jobs` or `scoutjobs job import` with JSON lines on stdin.

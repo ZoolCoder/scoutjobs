@@ -1,0 +1,74 @@
+<script id="site-script" src="{{{uiRootPath}}}/js/site.js" data-ui-root-path="{{{uiRootPath}}}"></script>
+<script async src="{{{uiRootPath}}}/js/vendor/highlight.js"></script>
+{{#if env.SITE_SEARCH_PROVIDER}}
+{{> search-scripts}}
+{{/if}}
+<script>
+// Theme toggle. The head script has already set data-theme; this only wires the
+// button and remembers the choice.
+;(function () {
+  var root = document.documentElement
+  var buttons = document.querySelectorAll('.zc-theme-toggle')
+  if (!buttons.length) return
+
+  function label (theme) {
+    return theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'
+  }
+
+  function sync (theme) {
+    buttons.forEach(function (b) {
+      b.setAttribute('aria-label', label(theme))
+      b.setAttribute('title', label(theme))
+    })
+  }
+
+  sync(root.getAttribute('data-theme') || 'dark')
+
+  buttons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light'
+      root.setAttribute('data-theme', next)
+      sync(next)
+      try { localStorage.setItem('zc-theme', next) } catch (e) { /* choice is not persisted */ }
+    })
+  })
+})()
+</script>
+<script>
+// Copy buttons on code blocks. Injected rather than baked into the HTML so the
+// pages stay clean and a reader without JS simply sees no button.
+;(function () {
+  if (!navigator.clipboard) return
+
+  document.querySelectorAll('.doc .listingblock > .content').forEach(function (content) {
+    var code = content.querySelector('pre > code, pre')
+    if (!code) return
+
+    var button = document.createElement('button')
+    button.className = 'zc-copy'
+    button.type = 'button'
+    button.setAttribute('aria-label', 'Copy to clipboard')
+    button.textContent = 'Copy'
+    content.appendChild(button)
+
+    button.addEventListener('click', function () {
+      // Console blocks mark the prompt with .hljs-meta and upstream makes it
+      // unselectable; strip it so a pasted command runs as-is.
+      var clone = code.cloneNode(true)
+      clone.querySelectorAll('.hljs-meta').forEach(function (m) { m.remove() })
+      var text = clone.textContent.replace(/^[ \t]+/gm, function (indent) { return indent })
+
+      navigator.clipboard.writeText(text.trim()).then(function () {
+        button.textContent = 'Copied'
+        button.classList.add('is-copied')
+        setTimeout(function () {
+          button.textContent = 'Copy'
+          button.classList.remove('is-copied')
+        }, 1600)
+      }).catch(function () {
+        button.textContent = 'Press \u2318C'
+      })
+    })
+  })
+})()
+</script>

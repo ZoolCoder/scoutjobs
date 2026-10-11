@@ -1,0 +1,85 @@
+= CLI
+:description: Every scoutjobs command. Skills use these; so can you.
+
+[source,console]
+----
+$ scoutjobs help
+----
+
+Add `--json` to any read command. `SCOUTJOBS_HOME` overrides the data directory. `--compact` on `brief` and `job list` drops long text.
+
+== Setup
+
+[cols="2,3"]
+|===
+| Command | Does
+
+| `scoutjobs init` | creates `~/.scoutjobs`: `config.yaml`, `profile.md`, `preferences.md`, `cv/`, `scoutjobs.db`
+| `scoutjobs path` | prints the data directory
+| `scoutjobs version` | prints the version (`dev` for a local build, the tag for a release)
+| `scoutjobs serve [--addr 127.0.0.1:7070]` | dashboard and JSON API
+| `scoutjobs mcp` | MCP server on stdio, every command as a tool; see xref:mcp.adoc[]
+| `scoutjobs doctor` | install health: PATH, data dir, unknown config keys, mail password in the environment, skills linked per agent, Codex prompts, dashboard up; `--online` adds one GET to GitHub and says whether a newer release exists; `--json` for agents
+| `scoutjobs export` | full JSON dump, for backup
+|===
+
+== Jobs
+
+[source,console]
+----
+$ scoutjobs search --query "senior go engineer" --remote --add        # remote boards, add as new
+$ scoutjobs search --board greenhouse:stripe --board lever:netlify     # ATS boards: greenhouse, lever, ashby, workable, smartrecruiters, personio
+$ scoutjobs search --rss https://example.com/jobs.rss --query go         # any RSS or Atom job feed
+$ scoutjobs job add --company Stripe --title "Backend Engineer" --url https://... --remote hybrid --tags go,postgres
+$ scoutjobs job import jobs.json          # bulk add from any JSON list
+$ scoutjobs job list --open               # or --status applied, --q stripe, --json, --compact
+$ scoutjobs job show 3 --json             # job, dir, events, interviews
+$ scoutjobs job set 3 --status applied --note "via Greenhouse"
+$ scoutjobs job set 3 --score 78 --fit-notes "Go+Postgres strong; no k8s"
+$ scoutjobs job set 3 --contact hr@stripe.com
+$ scoutjobs job skip 4 --reason "onsite only" --signals '{"remote":"onsite"}'
+$ scoutjobs job rm 4
+----
+
+`search` matches every word of a query as a whole word, accepts several `--query` and `--board` flags, deduplicates by company plus title, and upserts on `--add` (an `=` after the id means already tracked). `--limit` and `--json --compact` keep the output small.
+
+== CV and e-mail
+
+[source,console]
+----
+$ scoutjobs cv files                      # what is in ~/.scoutjobs/cv
+$ scoutjobs cv export [3] [--file resume.md]   # resume.md to resume.pdf: job folder with an id, else ~/.scoutjobs/cv
+$ scoutjobs cv log --file resume.pdf --score 72 --ats 64 --summary "..." --gaps "a,b,c" [--job 3]
+$ scoutjobs cv list [--limit 20]
+$ scoutjobs email draft 3 [--to hr@...] [--subject "..."] [--body file.md] [--attach x.pdf]
+$ scoutjobs email show 3 [--json]         # the draft, and a mailto: link
+$ scoutjobs email send 3 --yes            # refuses without --yes
+$ scoutjobs email test [--to addr]        # probe: sends one line to yourself, checks IMAP login when imap_host is set
+$ scoutjobs email sync [--since 14d] [--dry-run] [--json]   # log inbox replies to applications over IMAP
+----
+
+== Decisions, preferences, learning
+
+[source,console]
+----
+$ scoutjobs decision log --job 4 --kind skip --reason "..." --signals '{...}'
+$ scoutjobs decision summary              # what learn-preferences reads
+$ scoutjobs pref set remote "remote or hybrid" --source stated [--confidence 1]
+$ scoutjobs pref list | rm <key> | render  # render rewrites preferences.md
+$ scoutjobs interview add 3 --stage technical --at 2026-10-20T14:00
+$ scoutjobs interview list | set <id> --outcome passed
+$ scoutjobs session log --kind mock_sysdesign --topic "rate limiter" --score 70
+$ scoutjobs session list
+$ scoutjobs learn add --skill Kubernetes --priority 1
+$ scoutjobs learn list | set <id> --status in_progress --hours 2
+----
+
+== Reports
+
+[source,console]
+----
+$ scoutjobs stats                         # funnel, weekly numbers, follow-ups due, stale
+$ scoutjobs brief [--compact]             # everything the daily briefing needs, as JSON
+----
+
+`brief` returns `stats`, `upcoming_interviews`, `new_jobs`, `ranked_jobs`, `drafted_jobs`, `learning`, `preferences`, `recent_activity` and `config` in one call.

@@ -1,0 +1,22 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+sequenceDiagram
+  actor U as You
+  participant A as Agent (apply-by-email)
+  participant C as scoutjobs CLI
+  participant S as Your SMTP server
+  U->>A: "send the Stripe application"
+  A->>C: scoutjobs job show 3 --json
+  C-->>A: dir, contact, kit files
+  alt cover-letter.md or resume missing
+    A-->>U: run /scoutjobs:cover or /scoutjobs:tailor first
+  end
+  A->>C: scoutjobs email draft 3 --to hr@stripe.com
+  C-->>A: email.json + email.eml written, message printed
+  A-->>U: From, To, Subject, attachments, full body
+  A->>U: Send it? (full sentence, waits)
+  U-->>A: yes
+  A->>C: scoutjobs email send 3 --yes
+  C->>S: STARTTLS / TLS, password from $SCOUTJOBS_SMTP_PASSWORD
+  S-->>C: 250 accepted
+  C-->>A: email-sent.eml saved, event email:sent, status applied
+  A-->>U: sent, follow-up timer started

@@ -1,0 +1,89 @@
+= Install
+:description: Build the CLI, link the skills into your agents, create the data directory.
+
+== Requirements
+
+* Go {go-version} or newer to build from source, or nothing: `install.sh` falls back to a release binary and Homebrew has a cask.
+* One AI coding agent: Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot or anything that reads `SKILL.md`.
+* Optional: an SMTP account for xref:apply-by-email.adoc[applying by e-mail], Node 22 for building this manual.
+
+== Everything at once
+
+[source,console]
+----
+$ git clone https://github.com/zoolcoder/scoutjobs && cd scoutjobs
+$ ./install.sh
+$ scoutjobs init
+----
+
+`install.sh` does three things:
+
+. Builds `bin/scoutjobs` and copies it to `~/.local/bin/scoutjobs`. Put `~/.local/bin` on `PATH`; every platform calls the CLI by name.
+. Symlinks `skills/` into every agent directory it finds: `~/.codex/skills`, `~/.cursor/skills`, `~/.gemini/skills`, `~/.copilot/skills` and `~/.agents/skills`. `SCOUTJOBS_PLATFORMS="codex cursor" ./install.sh` limits the list.
+. Writes one Codex custom prompt per command into `~/.codex/prompts/`, links the Cursor rule, and prints where to append the rules file for the other platforms (see xref:agents.adoc[]).
+
+`scoutjobs init` creates `~/.scoutjobs` with `config.yaml`, a `profile.md` template, `preferences.md`, an empty `cv/` folder and the SQLite database. `SCOUTJOBS_HOME` moves it.
+
+== Prebuilt binaries
+
+Without Go, `install.sh` downloads the latest release binary for macOS or Linux (amd64, arm64) into `~/.local/bin` (`SCOUTJOBS_BIN_DIR` to change it). The same binaries, plus Windows, are on https://github.com/zoolcoder/scoutjobs/releases[Releases], built by GoReleaser on every `v*` tag with `checksums.txt` next to them. Homebrew:
+
+[source,console]
+----
+$ brew install --cask zoolcoder/scoutjobs/scoutjobs   # tap lives in the repo, Casks/scoutjobs.rb
+----
+
+Linux packages (`deb`, `rpm`, `apk`, amd64 and arm64) sit next to the archives on the same release; they install the binary into `/usr/bin`:
+
+[source,console]
+----
+$ sudo dpkg -i scoutjobs_linux_amd64.deb              # Debian, Ubuntu
+$ sudo rpm -i scoutjobs_linux_amd64.rpm               # Fedora, RHEL, openSUSE
+$ sudo apk add --allow-untrusted scoutjobs_linux_amd64.apk   # Alpine
+----
+
+The binary alone gives you the CLI, dashboard, API and MCP server. Skills still come from a clone (`install.sh`) or the Claude Code plugin. `scoutjobs doctor` lists what is in place.
+
+== Claude Code
+
+The plugin adds slash commands and the subagents (`draft-reviewer`, `fit-scorer`, three interviewers):
+
+----
+/plugin marketplace add zoolcoder/scoutjobs
+/plugin install scoutjobs@scoutjobs
+----
+
+The CLI still has to be on `PATH`: run `./install.sh` or `make install` once.
+
+== Codex
+
+`./install.sh` (or `SCOUTJOBS_PLATFORMS=codex ./install.sh`) links the skills into `~/.codex/skills` and writes `~/.codex/prompts/scoutjobs-<name>.md` for every command, so `/scoutjobs-brief`, `/scoutjobs-send` and the others work in Codex. Append `adapters/codex/AGENTS.md` to `~/.codex/AGENTS.md` for the usage rules. `npx skills add zoolcoder/scoutjobs` is the alternative without a clone.
+
+== Cursor, Gemini CLI, Copilot
+
+Same `install.sh`. Each platform has a short rules file in `adapters/`:
+
+[cols="1,2"]
+|===
+| Platform | Rules file
+
+| Cursor | `adapters/cursor/scoutjobs.mdc`, linked into `.cursor/rules/` by the installer
+| Gemini CLI | `adapters/gemini/GEMINI.md`, append to `~/.gemini/GEMINI.md`
+| GitHub Copilot | `adapters/copilot/copilot-instructions.md`, append to `.github/copilot-instructions.md`
+| Agents without a shell | `adapters/cloud/AGENTS.md`, see xref:cloud.adoc[]
+|===
+
+== From source, by hand
+
+[source,console]
+----
+$ make build          # bin/scoutjobs
+$ make test           # go test ./...
+$ make lint           # go vet, golangci-lint when installed
+$ make dash           # build and serve on 127.0.0.1:7070
+$ make docs           # this manual into build/site
+----
+
+== Upgrade
+
+`git pull && ./install.sh`. The database migrates itself on the next command. Skills are symlinks, so they are current the moment the pull finishes.

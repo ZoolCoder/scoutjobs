@@ -1,0 +1,6 @@
+name: scoutjobs
+title: ScoutJobs
+# One unversioned component: the manual always describes the current release.
+version: ~
+nav:
+  - modules/ROOT/nav.adoc

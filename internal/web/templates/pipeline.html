@@ -1,0 +1,23 @@
+{{template "head" .}}
+{{with .Data}}
+<form class="search" method="get" action="/pipeline"><input name="q" value="{{.Query}}" placeholder="Search company, title, tags">{{if .Due}}<input type="hidden" name="due" value="1">{{end}}<button>Filter</button>
+<span class="chips">{{if .Due}}<a class="on" href="/pipeline{{if .Query}}?q={{.Query}}{{end}}">Due this week ×</a>{{else}}<a href="/pipeline?due=1{{if .Query}}&amp;q={{.Query}}{{end}}">Due this week</a>{{end}}</span>
+<span class="muted">{{.Count}} jobs{{if or .Query .Due}} · <a href="/pipeline">clear</a>{{end}}</span><a class="btn primary" href="/jobs/new">Add job</a></form>
+<div class="board">
+{{range .Columns}}
+<section class="col s-{{.Status}}">
+  <div class="col-h"><h2>{{title .Status}}</h2><span class="n">{{len .Jobs}}</span></div>
+  {{range .Jobs}}
+  <article class="jobcard">
+    <a class="cover" href="/jobs/{{.ID}}" aria-label="Open {{.Company}} · {{.Title}}"></a>
+    <div class="row"><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a>{{if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
+    <div class="ttl">{{.Title}}</div>
+    <div class="meta">{{if or .Remote .Location}}<span class="chip">{{template "ico-pin"}}{{.Remote}}{{if and .Remote .Location}} · {{end}}{{.Location}}</span>{{end}}<span class="chip">{{template "ico-clock"}}{{if .Deadline}}due {{.Deadline}}{{else}}updated {{day .UpdatedAt}}{{end}}</span>{{if .Source}}<span class="chip acc">{{.Source}}</span>{{end}}</div>
+    {{template "move" (dict_status .ID .Status "/pipeline")}}
+  </article>
+  {{else}}<p class="empty">{{if or $.Data.Query $.Data.Due}}No match here{{else}}No jobs in this stage<small>{{title .Status}} jobs appear here</small>{{end}}</p>{{end}}
+</section>
+{{end}}
+</div>
+{{end}}
+{{template "foot" .}}

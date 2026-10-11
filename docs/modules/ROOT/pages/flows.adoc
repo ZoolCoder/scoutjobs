@@ -1,0 +1,60 @@
+= All flow diagrams
+:description: Every ScoutJobs flow on one page.
+
+== Architecture
+
+[mermaid]
+----
+include::partial$diagrams/architecture.mmd[]
+----
+
+== Daily loop
+
+[mermaid]
+----
+include::partial$diagrams/daily-loop.mmd[]
+----
+
+== Job search
+
+[mermaid]
+----
+include::partial$diagrams/job-search.mmd[]
+----
+
+== CV adjustment
+
+[mermaid]
+----
+include::partial$diagrams/cv-adjustment.mmd[]
+----
+
+== Cover letter
+
+[mermaid]
+----
+include::partial$diagrams/cover-letter.mmd[]
+----
+
+== Apply by e-mail
+
+[mermaid]
+----
+include::partial$diagrams/apply-by-email.mmd[]
+----
+
+== Pipeline states
+
+[mermaid]
+----
+include::partial$diagrams/pipeline.mmd[]
+----
+
+== Cloud agent through the API
+
+[mermaid]
+----
+include::partial$diagrams/cloud-agent.mmd[]
+----
+
+The sources are Mermaid files under `docs/modules/ROOT/partials/diagrams/` in the repository.

@@ -1,0 +1,64 @@
+= Cloud and remote agents
+:description: Claude Code on the web, Codex cloud and hosted n8n cannot run the CLI. They use the JSON API over a tunnel.
+
+[mermaid]
+----
+include::partial$diagrams/cloud-agent.mmd[]
+----
+
+== On your machine, once
+
+[source,yaml]
+----
+# ~/.scoutjobs/config.yaml
+api_token: a-long-random-string
+----
+
+[source,console]
+----
+$ scoutjobs serve                                  # still binds 127.0.0.1:7070
+$ cloudflared tunnel --url http://127.0.0.1:7070  # or: tailscale serve 7070, ngrok http 7070, ssh -R
+----
+
+Give the agent the public URL and the token through its secrets store, not in a chat message that gets logged. The pages are unauthenticated, so use a tunnel that adds its own access control (Cloudflare Access, Tailscale) or expose only `/api/` through it. Do not bind the server to `0.0.0.0` on a shared network.
+
+== What the agent does with it
+
+The `adapters/cloud/AGENTS.md` file maps every skill step to an endpoint. The short version:
+
+[cols="2,3"]
+|===
+| Skill step | API call
+
+| start the session | `GET /api/brief`
+| profile, preferences, CV files, latest CV check | `GET /api/profile`
+| list or find jobs | `GET /api/jobs?status=new&q=stripe&open=1`
+| add a job | `POST /api/jobs`
+| one job, its folder and kit | `GET /api/jobs/\{id}`, `GET /api/jobs/\{id}/files`
+| read the posting or a draft | `GET /api/jobs/\{id}/files/posting.md`
+| write resume.md, cover-letter.md, research.md | `PUT /api/jobs/\{id}/files/cover-letter.md`
+| log a CV check | `POST /api/cv/checks`
+| status and notes | `POST /api/jobs/\{id}/status`, `POST /api/jobs/\{id}/note`
+| build the application e-mail | `POST /api/jobs/\{id}/email/draft`
+| send it | not on the API; you run `scoutjobs email send \{id} --yes` on your machine
+|===
+
+Writes are limited to `.md`, `.txt` and `.json`, 1 MB each, inside the job's own folder. Interviews, preferences, learning items and sessions stay CLI-only for now.
+
+== Example: cover letter from Claude Code on the web
+
+[source,console]
+----
+$ export SCOUTJOBS_API=https://xyz.trycloudflare.com SCOUTJOBS_TOKEN=...
+$ curl -s -H "Authorization: Bearer $SCOUTJOBS_TOKEN" "$SCOUTJOBS_API/api/jobs/3/files/posting.md"
+$ curl -s -X PUT -H "Authorization: Bearer $SCOUTJOBS_TOKEN" -H "Content-Type: text/markdown" \
+    --data-binary @cover-letter.md "$SCOUTJOBS_API/api/jobs/3/files/cover-letter.md"
+$ curl -s -X POST -H "Authorization: Bearer $SCOUTJOBS_TOKEN" -H "Content-Type: application/json" \
+    -d '{"to":"hr@stripe.com"}' "$SCOUTJOBS_API/api/jobs/3/email/draft"
+----
+
+The job page on your laptop shows the new draft and the e-mail preview the moment the PUT lands. You read it and send from the laptop.
+
+== n8n, Make, Zapier, cron
+
+Same API, same token. `integrations/n8n/` in the repository has the endpoint table and example workflows (new job from an RSS feed, follow-up reminder to Slack, weekly digest). Set `webhook_url` and every event is POSTed as JSON the other way. See xref:api.adoc[].

@@ -1,0 +1,48 @@
+name: Skill problem
+description: A skill invented facts, skipped a confirmation, followed text from a posting, or did not trigger.
+labels: [skill]
+body:
+  - type: markdown
+    attributes:
+      value: These reports become eval cases under `evals/`, so a reproducible prompt matters more than a long description.
+  - type: input
+    id: skill
+    attributes:
+      label: Skill
+      placeholder: cover-letter-generator, apply-by-email, job-fit, ...
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What went wrong
+      options:
+        - Claimed something not in my profile or CV
+        - Acted without asking (sent, wrote, changed status)
+        - Followed an instruction found in a posting or e-mail
+        - Did not trigger for a phrase that should start it
+        - Wrong or missing scoutjobs command
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: prompt
+    attributes:
+      label: What you said to the agent
+      description: The message that started it, redacted.
+    validations:
+      required: true
+  - type: textarea
+    id: reply
+    attributes:
+      label: What the agent did or replied
+      description: The relevant part of the reply and any `scoutjobs` commands it ran.
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and version
+      placeholder: Claude Code 2.x, Codex, Cursor, Gemini CLI, Copilot
+    validations:
+      required: true

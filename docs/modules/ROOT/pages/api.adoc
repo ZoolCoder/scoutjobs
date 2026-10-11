@@ -1,0 +1,82 @@
+= JSON API and webhook
+:description: The dashboard's JSON endpoints, the bearer token, and the outgoing webhook.
+
+The server started by `scoutjobs serve` answers `/api/*` with JSON. With `api_token` set in `config.yaml` every `/api/*` request needs `Authorization: Bearer <token>`; without it the API is open to whoever can reach the port, which should be nobody but you.
+
+== Endpoints
+
+[cols="1,3,3,3"]
+|===
+| Method | Path | Body or query | Returns
+
+| GET | `/api/brief` | | today: applied this week vs target, follow-ups due, stale, upcoming interviews, new and drafted jobs
+| GET | `/api/stats` | | funnel and rates, same as `scoutjobs stats --json`
+| GET | `/api/jobs` | `?status=new&q=stripe&open=1&limit=20` | job rows
+| POST | `/api/jobs` | `{"company","title","url","location","remote","source","posted_at","tags","salary_min","salary_max","currency","notes"}` | 201 created, 200 existing (same company and normalised title, or the same posting URL, returns the tracked row)
+| GET | `/api/jobs/\{id}` | | job, events, interviews
+| POST | `/api/jobs/\{id}/status` | `{"status":"applied","reason":"..."}` | updated job; skip, withdraw and decline also log a decision
+| POST | `/api/jobs/\{id}/note` | `{"note":"..."}` | 201
+| GET | `/api/jobs/\{id}/files` | | the application folder: `files` with name, size, modified; `kit` with resume, cover, ATS check, draft, sent, done of 4
+| GET | `/api/jobs/\{id}/files/\{name}` | | `{"name","size","body"}` for `.md`, `.txt`, `.json`, `.eml`; 404 otherwise
+| PUT | `/api/jobs/\{id}/files/\{name}` | raw text, or `{"body":"..."}` | 201 new, 200 replaced; `.md`, `.txt`, `.json` only, 1 MB max, name is reduced to its base name
+| POST | `/api/jobs/\{id}/export` | `{"file":"resume.md"}`, optional | 201 `{"file","bytes"}`: the Markdown rendered as a single-column Helvetica PDF next to it; logs `cv:export`
+| POST | `/api/jobs/\{id}/email/draft` | `{"to","subject","body","attach":["x.pdf"]}`, all optional | 201 with the message and the command to send it; needs `cover-letter.md`
+| GET | `/api/profile` | | `profile`, `preferences`, `cv_dir`, `cv_files`, `latest_check`
+| POST | `/api/cv/checks` | `{"file","score","ats_score","summary","gaps","job_id"}` | 201
+| GET | `/api/cv/checks` | `?limit=20` | check history
+| GET | `/api/events` | `?limit=50` | recent activity
+| POST | `/api/jobs/\{id}/skip` | `{"reason":"...","signals":{...}}` | `job skip`: status skipped plus the decision the learner reads
+| POST | `/api/search` | `{"queries":["go"],"boards":["greenhouse:acme"],"remote":true,"limit":40,"add":true}` | `scoutjobs search`: `postings`, `added`, `errors`; omitted queries and boards fall back to `config.yaml`
+| GET, POST | `/api/interviews` | `?job=3&all=1`; POST `{"job_id","stage","at","format","interviewer"}` | interviews (upcoming unless `all`); POST 201 and the job moves to `interview` when earlier
+| PATCH | `/api/interviews/\{id}` | `{"at","format","interviewer","prep_status","outcome","feedback","stage"}`, any subset | updated interview
+| GET, POST | `/api/sessions` | `?limit=30`; POST `{"kind","topic","score","notes"}` | practice sessions, newest first; POST 201
+| GET, POST | `/api/learning` | POST `{"skill","priority","resource","demand","notes"}` (upsert by skill) | learning items; POST 201
+| PATCH | `/api/learning/\{id}` | `{"status","resource","notes","hours","priority","demand"}`, `hours` is added | updated item
+| GET | `/api/preferences` | | stated and learned preferences
+| PUT, DELETE | `/api/preferences/\{key}` | PUT `{"value","confidence","evidence","source"}` | the preference; DELETE 204
+| GET, POST | `/api/decisions` | `?limit=50`; POST `{"job_id","kind","reason","signals"}` | decisions, newest first; POST 201
+|===
+
+Sending e-mail is not on the API by design; see xref:apply-by-email.adoc[].
+
+[source,console]
+----
+$ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7070/api/brief | jq .stats
+$ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+    -d '{"company":"Stripe","title":"Backend Engineer","url":"https://stripe.com/jobs/1","remote":"hybrid"}' \
+    http://127.0.0.1:7070/api/jobs
+----
+
+== Webhook
+
+Set `webhook_url` and every event is POSTed there as JSON, fire and forget:
+
+[source,json]
+----
+{"event":"status","job_id":12,"company":"Stripe","title":"Backend Engineer","note":"ranked -> applied","at":"2026-10-11T09:30:00Z"}
+----
+
+Events: `job:add`, `status`, `note`, `decision`, `cv_check`, `email:draft`, `email:sent`, `file:write`, `interview`, `session`, `learn`. Nothing is sent until the key is set.
+
+=== Verifying the sender
+
+Set `webhook_secret` as well and every POST carries two headers:
+
+----
+X-ScoutJobs-Timestamp: 1760173800
+X-ScoutJobs-Signature: sha256=<hex>
+----
+
+The signature is HMAC-SHA256 with the secret as key over `<timestamp>.<raw body>`. Recompute it on the receiver, compare with a constant-time check, and reject requests whose timestamp is older than a few minutes so a captured request cannot be replayed. In Node:
+
+[source,javascript]
+----
+const crypto = require("crypto");
+const expected = "sha256=" + crypto.createHmac("sha256", secret)
+  .update(`${req.headers["x-scoutjobs-timestamp"]}.${rawBody}`).digest("hex");
+const ok = expected.length === sig.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
+----
+
+== n8n
+
+`integrations/n8n/README.md` in the repository has importable workflows: a feed to `POST /api/jobs`, follow-up reminders from `GET /api/brief` to Slack, a weekly digest, and a webhook receiver.

@@ -1,0 +1,21 @@
+{{template "head" .}}
+{{with .Data}}{{$j := .Job}}
+<header class="top job">
+<div><a class="crumb" href="/jobs/{{$j.ID}}">← {{$j.Company}} · {{$j.Title}}</a>
+<div class="jobhead"><h1>{{.Name}}<small>{{tilde .Path}}</small></h1></div></div>
+<span class="now">{{$.Now}}</span>
+</header>
+<section class="panel">
+  {{if .Editable}}
+  <div class="panel-h"><h2>Draft</h2><span class="n">{{kb .Size}}</span>{{if .Saved}}<span class="badge filled">saved</span>{{end}}<span class="act muted">edit here, in your editor, or ask the agent to rewrite it</span></div>
+  <form class="edit" method="post" action="/jobs/{{$j.ID}}/files/{{.Name}}">
+    <textarea name="body" rows="24" spellcheck="true">{{.Body}}</textarea>
+    <div class="row"><button type="submit">Save {{.Name}}</button><a class="btn" href="/jobs/{{$j.ID}}/files/{{.Name}}">Discard changes</a></div>
+  </form>
+  {{else}}
+  <div class="panel-h"><h2>File</h2><span class="n">{{kb .Size}}</span><span class="act muted">read-only</span></div>
+  <pre class="doc">{{.Body}}</pre>
+  {{end}}
+</section>
+{{end}}
+{{template "foot" .}}

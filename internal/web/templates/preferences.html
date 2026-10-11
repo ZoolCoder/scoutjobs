@@ -1,0 +1,37 @@
+{{template "head" .}}
+{{with .Data}}
+{{$s := .Summary}}
+<div class="grid-2 wide-l">
+<section class="panel">
+<div class="panel-h"><h2>Learned preferences</h2><span class="n">{{len .Prefs}}</span><span class="act muted">set via <code>scoutjobs pref set</code></span></div>
+{{if .Prefs}}
+<table><thead><tr><th>Preference</th><th>Value</th><th>Source</th><th>Confidence</th><th>Updated</th></tr></thead><tbody>
+{{range .Prefs}}<tr><td><b>{{title .Key}}</b>{{if .Evidence}}<br><small class="muted">{{.Evidence}}</small>{{end}}</td><td>{{.Value}}</td><td><span class="badge {{.Source}}">{{.Source}}</span></td><td class="conf"><meter min="0" max="1" value="{{.Confidence}}"></meter><span class="mono">{{pct .Confidence}}</span></td><td class="mono">{{day .UpdatedAt}}</td></tr>{{end}}</tbody></table>
+<p class="muted small">Stated = you said it. Learned = inferred from your decisions, confirmed by you.</p>
+{{else}}<p class="empty">Not enough decisions yet. Skip, apply and decline a few jobs, then run <code>learn-preferences</code>.</p>{{end}}
+</section>
+<section class="panel">
+<div class="panel-h"><h2>Decision signals</h2></div>
+{{if $s.Decisions}}{{$total := len $s.Decisions}}
+<ul class="stat">
+  <li><span><b>Skipped</b><small>Didn't apply</small></span><strong>{{index $s.Counts "skip"}}</strong><meter class="bad" min="0" max="{{$total}}" value="{{index $s.Counts "skip"}}"></meter></li>
+  <li><span><b>Applied</b><small>Sent application</small></span><strong>{{index $s.Counts "apply"}}</strong><meter min="0" max="{{$total}}" value="{{index $s.Counts "apply"}}"></meter></li>
+  <li><span><b>Declined</b><small>Not a fit for you</small></span><strong>{{index $s.Counts "decline"}}</strong><meter class="info" min="0" max="{{$total}}" value="{{index $s.Counts "decline"}}"></meter></li>
+</ul>
+<h3>Top reasons</h3>
+<ul class="reasons">{{range $kind, $sigs := $s.Signals}}{{range $sig, $c := $sigs}}<li><span class="cnt">{{$c}}</span><span class="chip">{{$sig}}</span><small class="muted">{{$kind}}</small></li>{{end}}{{end}}
+{{range $kind, $rs := $s.Reasons}}{{range $rs}}<li><span class="cnt dim">“</span><span class="muted">{{.}}</span><small class="muted">{{$kind}}</small></li>{{end}}{{end}}</ul>
+<p class="callout info">Run <code>learn-preferences</code> after a few more decisions to refine these signals.</p>
+{{else}}<p class="empty">No decisions logged. Skills record them with <code>scoutjobs decision log</code>.</p>{{end}}
+</section>
+</div>
+<section class="panel">
+<div class="panel-h"><h2>Score gap</h2><span class="n">{{len $s.ScoreGap}}</span></div>
+<p class="muted small">Jobs where the fit score and your decision disagree: high score but skipped, or low score but applied. This is what the scorer learns from.</p>
+{{if $s.ScoreGap}}
+<table><thead><tr><th>Company</th><th>Title</th><th>Fit score</th><th>Your decision</th></tr></thead><tbody>
+{{range $s.ScoreGap}}<tr><td><a href="/jobs/{{.JobID}}">{{.Company}}</a></td><td class="muted">{{.Title}}</td><td>{{template "gauge" .FitScore}}</td><td><span class="badge {{if eq .Kind "skip"}}bad{{else}}ok{{end}}">{{if eq .Kind "skip"}}Skipped{{else}}Applied{{end}}</span></td></tr>{{end}}</tbody></table>
+{{else}}<p class="empty">No disagreements yet. They show up when you skip a high-scoring job or apply to a low-scoring one.</p>{{end}}
+</section>
+{{end}}
+{{template "foot" .}}

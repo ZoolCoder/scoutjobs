@@ -1,0 +1,44 @@
+name: Bug report
+description: The CLI, dashboard, API or MCP server does something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Redact employer names, postings and anything from `profile.md`. Never attach `scoutjobs.db`.
+  - type: textarea
+    id: doctor
+    attributes:
+      label: scoutjobs doctor output
+      description: Paste the full output of `scoutjobs doctor`, plus `scoutjobs version`.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command or page, what you expected, what you got. Error text verbatim.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. scoutjobs job add --company Acme --title "Go Engineer"
+        2. scoutjobs search --board workable:acme --query go
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [macOS, Linux, Windows]
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent, if one was involved
+      placeholder: Claude Code 2.x, Codex, Cursor, Gemini CLI, Copilot, n8n, none

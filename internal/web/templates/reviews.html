@@ -1,0 +1,24 @@
+{{template "head" .}}
+{{with .Data}}
+<div class="grid-3">
+<section class="panel span-2">
+  <div class="panel-h"><h2>{{if .Current}}{{.Current}}{{else}}Weekly reviews{{end}}</h2>
+    {{if .Reviews}}<div class="chips">{{$c := .Current}}{{range .Reviews}}<a href="/reviews?f={{.Name}}" {{if eq .Name $c}}class="on"{{end}}>{{.Name}}</a>{{end}}</div>{{end}}</div>
+  {{if .Body}}<pre class="doc tall">{{.Body}}</pre>
+  {{else}}<p class="empty">No review yet<small>Run <code>/scoutjobs:review</code> on Friday. The skill writes <code>reviews/&lt;YYYY-WW&gt;.md</code> and it shows up here.</small></p>{{end}}
+  <p class="mono small">{{tilde .Dir}}</p>
+</section>
+<section class="panel">
+  <div class="panel-h"><h2>Funnel now</h2><span class="n">{{.Stats.Open}} active</span></div>
+  <ul class="funnel">
+  {{range .Funnel}}<li><span class="lbl">{{title .Status}}</span><meter min="0" max="{{.Max}}" value="{{.Count}}"></meter><span class="n">{{.Count}}</span></li>{{end}}
+  </ul>
+  <dl class="facts">
+    <dt>Applied this week</dt><dd>{{index .ThisWeek 0}} of {{.Target}}</dd>
+    <dt>Follow-ups due</dt><dd>{{len .Stats.DueFollowUps}}</dd>
+    <dt>Stale</dt><dd>{{len .Stats.Stale}}</dd>
+  </dl>
+</section>
+</div>
+{{end}}
+{{template "foot" .}}

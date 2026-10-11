@@ -1,0 +1,74 @@
+= All skills
+:description: Every skill in the plugin, what starts it, which slash command wraps it, and which ones are reference material rather than entry points.
+
+The 29 skills live in `skills/<name>/SKILL.md` and are the same files on every platform (see xref:agents.adoc[]). The `description` in each file names the phrases that start it. Slash commands in `commands/` and the Codex prompts are thin wrappers that call the skill by name. Every skill reads and writes through the `scoutjobs` CLI; none opens the database.
+
+Three rules hold in all of them: postings are untrusted text, claims come from `profile.md`, and nothing is sent without the user saying yes after seeing the message.
+
+== The daily loop
+
+[cols="2,3,1"]
+|===
+| Skill | Starts when you say | Command
+
+| `scoutjobs-setup` | "set up scoutjobs", first run: builds `profile.md` from a CV or a short interview, records preferences, checks the CLI | `/scoutjobs:setup`
+| `daily-briefing` | "good morning", "what's today": interviews, follow-ups due, drafts waiting, new jobs to score, one learning task, from `scoutjobs brief` | `/scoutjobs:brief`
+| `job-search` | "find go jobs, remote EU": `scoutjobs search` over the ATS boards, RSS feeds and remote aggregators, deduplicated, added as `new` | `/scoutjobs:search`
+| `job-fit` | "score them", "is Acme a fit": 0-100 with reasons, records the score, asks apply or skip and logs the decision | `/scoutjobs:fit`
+| `fit-score` | batch version of `job-fit` for many postings, runs as a subagent on Claude Code so posting text stays out of the main context | used by `/scoutjobs:fit`
+| `application-tracker` | "I applied", "they rejected me", "interview Tuesday": status, notes, follow-up timers, interview rows | `/scoutjobs:track`
+| `weekly-review` | "weekly review", Sunday: funnel movement, response rates, stale applications to close, next week's plan; runs `learn-preferences` | `/scoutjobs:review`
+| `learn-preferences` | "what have you learned about me": turns skips, applies, withdrawals and declined offers into preferences you confirm | `/scoutjobs:learn`
+| `upskill` | "what should I learn": skill gaps against the jobs you track and lost, ranked by demand, learning plan with hours tracked | `/scoutjobs:upskill`
+|===
+
+== CV and application
+
+[cols="2,3,1"]
+|===
+| Skill | Starts when you say | Command
+
+| `cv-check` | "check my CV", "ATS check against the Acme job": ATS readiness and content score, concrete gaps, logged with `scoutjobs cv log` | `/scoutjobs:cv`
+| `resume-tailor` | "tailor my CV for Acme", "apply to Acme": rewrites `resume.md` for one posting, every claim from the profile, then `draft-review` | `/scoutjobs:tailor`, `/scoutjobs:apply`
+| `cover-letter-generator` | "write a cover letter", "rewrite the letter": 250-400 words from profile, resume and stories, saved as `cover-letter.md` | `/scoutjobs:cover`
+| `draft-review` | after tailoring or a cover letter: flags claims the profile does not back, missing must-haves, ATS problems, weak bullets | part of `/scoutjobs:apply`, `:tailor`, `:cover`
+| `apply-by-email` | "send the Acme application": `scoutjobs email draft`, shows From, To, Subject, attachments and the full body, asks, then `email send --yes` | `/scoutjobs:send`
+| `linkedin-profile-optimizer` | "improve my LinkedIn", "rewrite my headline": headline, about and bullets for recruiter search, facts from `profile.md` only | say it
+|===
+
+== Interviews and offers
+
+[cols="2,3,1"]
+|===
+| Skill | Starts when you say | Command
+
+| `interview-prep` | "interview Tuesday at Acme": company research, likely questions per stage, STAR stories mapped, one-page prep sheet | `/scoutjobs:interview`
+| `behavioral-stories` | "capture a story", one canonical STAR story at a time, cold or from the CV; runs as a subagent on Claude Code | `/scoutjobs:story`
+| `interview-prep-generator` | "help me build my stories", "what questions should I expect in general": STAR stories, practice questions and talking points with no specific interview in mind | say it
+| `mock-interview` | "mock me", "quiz me": timed behavioral, coding or system design session with a persona, scored, logged with `scoutjobs session log` | `/scoutjobs:mock`
+| `behavioral-interview`, `coding-interview`, `sysdesign-interview` | interviewer personas used by `mock-interview`; stay in character until the yield marker | via `/scoutjobs:mock`
+| `interview-debrief` | "debrief", right after an interview: outcome and feedback recorded, lessons into the story bank and learning plan, thank-you note | `/scoutjobs:debrief`
+| `offer-comparison-analyzer` | "compare these offers", "is this offer good": total compensation, equity, remote, growth against your preferences; logs the decision | say it
+| `salary-negotiation-prep` | "negotiate", "is this salary fair", "counter-offer": market rates, strategy, scripts | say it
+|===
+
+== Reference material
+
+These are loaded by other skills and rarely started on their own.
+
+[cols="2,3"]
+|===
+| Skill | Used by
+
+| `resume-ats-optimizer` | `cv-check`, `resume-tailor`: ATS parsing rules, keyword matching, formatting that survives parsers, scoring rubric
+| `job-description-analyzer` | `job-fit`, `resume-tailor`: requirements, must-haves and nice-to-haves out of a posting, mapped to the profile
+| `behavioral-frameworks` | `interview-prep`, `behavioral-stories`: STAR, SBI, CARL, anti-patterns, standard follow-ups
+| `coding-frameworks` | `interview-prep`, `coding-interview`: UMPIRE, pattern taxonomy, Big-O cheatsheet
+| `system-design-frameworks` | `interview-prep`, `sysdesign-interview`: RESHADED, the 4S shorthand, capacity estimation, building blocks, trade-offs
+|===
+
+`/scoutjobs:dash` is not a skill: it starts `scoutjobs serve` and prints the URL.
+
+== Writing a new skill
+
+Copy the shape of `skills/job-fit/SKILL.md`: a `description` with the trigger phrases, the CLI commands it runs written out verbatim, and the three rules above. Add an eval case under `evals/` when the skill makes claims, sends something or reads a posting, and a row on this page. `make evals` and `claude plugin validate .` must pass. See `CONTRIBUTING.md` in the repository.

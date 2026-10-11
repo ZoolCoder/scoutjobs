@@ -1,0 +1,46 @@
+= ScoutJobs
+:description: Your job search, on your machine: agent skills, a local dashboard and a CLI.
+
+[.hero]
+--
+ScoutJobs is a job-search operating system for the person looking for a job, driven by the AI coding agent you already use.
+
+Skills find postings, score them against your profile, check and tailor your CV, write the cover letter, send the application from your own mailbox, prepare you for interviews and learn from every decision you make. A single Go binary keeps the state in `~/.scoutjobs`: SQLite, Markdown files, a dashboard on localhost. No accounts, no keys, no telemetry.
+--
+
+[.cta]
+xref:quickstart.adoc[Get started] xref:install.adoc[Install] https://github.com/zoolcoder/scoutjobs[GitHub]
+
+== How it fits together
+
+[mermaid]
+----
+include::partial$diagrams/architecture.mmd[]
+----
+
+Three layers, one contract:
+
+[.cards]
+* *Skills* +
+Markdown instructions in the Agent Skills standard. Claude Code gets them as a plugin with slash commands and subagents; Codex, Cursor, Gemini CLI and Copilot read the same `SKILL.md` files. Skills never touch the database. They call the CLI.
+* *CLI* +
+`scoutjobs` owns the data: jobs, events, decisions, preferences, interviews, sessions, learning items, CV checks, e-mail drafts. Every read takes `--json`, so an agent and a human see the same thing.
+* *Dashboard and API* +
+`scoutjobs serve` renders the same data as pages with no JavaScript, and exposes it as a JSON API with a bearer token for n8n, cron and agents that run somewhere else.
+
+== What a week looks like
+
+[mermaid]
+----
+include::partial$diagrams/daily-loop.mmd[]
+----
+
+Every skip, apply, withdraw and declined offer is logged with your reason. `learn-preferences` turns those into preferences you confirm, and the scorer and tailoring skills read them. It gets better the longer you use it.
+
+== Where to go next
+
+* xref:quickstart.adoc[Quickstart]: from clone to first scored job in ten minutes.
+* xref:cv-and-cover-letter.adoc[CV and cover letter]: the adjustment loop, with the diagrams.
+* xref:apply-by-email.adoc[Apply by e-mail]: the only outbound path, and why it asks first.
+* xref:cloud.adoc[Cloud and remote agents]: use the API when the agent has no shell on your machine.
+* xref:troubleshooting.adoc[Troubleshooting]: `scoutjobs doctor` first, then https://github.com/ZoolCoder/scoutjobs/issues[GitHub Issues] for anything it does not fix. Contributions: https://github.com/ZoolCoder/scoutjobs/blob/main/CONTRIBUTING.md[CONTRIBUTING.md].

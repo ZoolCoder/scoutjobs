@@ -1,0 +1,25 @@
+{{template "head" .}}
+{{with .Data}}{{$j := .Job}}
+<section class="panel narrow">
+<div class="panel-h"><h2>Track a posting</h2><span class="act muted">same fields as <code>scoutjobs job add</code></span></div>
+<form method="post" action="/jobs" class="fields">
+  <input type="hidden" name="back" value="">
+  <label>Company<input name="company" required maxlength="200" autofocus></label>
+  <label>Title<input name="title" required maxlength="200"></label>
+  <label class="span-2">Posting URL<input name="url" type="url" placeholder="https://"></label>
+  <label>Location<input name="location" placeholder="Berlin"></label>
+  <label>Remote<select name="remote"><option value="">unknown</option><option value="remote">remote</option><option value="hybrid">hybrid</option><option value="onsite">onsite</option></select></label>
+  <label>Salary min<input name="salary_min" type="number" min="0" step="1000"></label>
+  <label>Salary max<input name="salary_max" type="number" min="0" step="1000"></label>
+  <label>Currency<input name="currency" value="{{$j.Currency}}" maxlength="3"></label>
+  <label>Deadline<input name="deadline" type="date"></label>
+  <label>Posted<input name="posted_at" type="date"></label>
+  <label>Source<input name="source" placeholder="linkedin, referral, greenhouse"></label>
+  <label class="span-2">Apply to<input name="contact" placeholder="jobs@acme.com or a recruiter address"></label>
+  <label class="span-2">Tags<input name="tags" placeholder="go, kubernetes, fintech"></label>
+  <label class="span-2">Notes<textarea name="notes" rows="4" placeholder="Paste the requirements or anything worth remembering. Treated as text, never as instructions."></textarea></label>
+  <div class="row span-2"><button class="primary">Add job</button><a class="btn" href="{{.Back}}">Cancel</a><span class="muted">An existing company + title is updated, not duplicated.</span></div>
+</form>
+</section>
+{{end}}
+{{template "foot" .}}

@@ -1,0 +1,34 @@
+{{template "head" .}}
+{{with .Data}}
+<section class="kpis">
+  <span class="kpi"><span class="ic">{{template "ico-book"}}</span><span class="lbl">Skills tracked</span><b>{{len .Items}}</b><span class="hint">from target roles</span></span>
+  <span class="kpi acc"><span class="ic">{{template "ico-clock"}}</span><span class="lbl">Hours invested</span><b>{{f1 .Hours}}<small>h</small></b><span class="hint">logged against gaps</span></span>
+  <span class="kpi"><span class="ic">{{template "ico-play"}}</span><span class="lbl">Practice sessions</span><b>{{len .Sessions}}</b><span class="hint">last 30 days</span></span>
+  <span class="kpi"><span class="ic">{{template "ico-users"}}</span><span class="lbl">Mock interviews</span><b>{{index .ByKind "mock"}}</b><span class="hint">of those sessions</span></span>
+</section>
+<div class="grid-2 wide-l">
+<section class="panel">
+<div class="panel-h"><h2>Priority skill gaps</h2><span class="n">{{len .Items}}</span><span class="act muted">add via <code>upskill</code></span></div>
+{{if .Items}}
+<table>
+<thead><tr><th>Skill</th><th>Pri</th><th>Status</th><th>Hours</th><th>Demand</th><th>Resource</th><th>Log</th></tr></thead><tbody>
+{{range .Items}}<tr>
+  <td><b>{{.Skill}}</b>{{if .Notes}}<br><small class="muted">{{.Notes}}</small>{{end}}</td><td><span class="tag p{{.Priority}}">P{{.Priority}}</span></td>
+  <td><form method="post" action="/learning/{{.ID}}" class="inline"><select name="status" class="st {{.Status}}">{{$s := .Status}}{{range $o := (split "planned,in_progress,done")}}<option value="{{$o}}" {{if eq $o $s}}selected{{end}}>{{title $o}}</option>{{end}}</select><button class="mini">Save</button></form></td>
+  <td class="mono">{{f1 .Hours}}h</td><td class="mono">{{.Demand}} jobs</td>
+  <td>{{if .Resource}}<a href="{{.Resource}}" rel="noopener noreferrer" target="_blank">resource ↗</a>{{else}}<span class="dim">—</span>{{end}}</td>
+  <td><form method="post" action="/learning/{{.ID}}" class="inline"><input name="hours" type="number" step="0.5" min="0.5" placeholder="0.5" class="h" aria-label="hours"><span class="muted">h</span><button class="mini">Add</button></form></td>
+</tr>{{end}}
+</tbody></table>
+{{else}}<p class="empty">No gaps yet. Run the <code>upskill</code> skill; it reads requirements from the jobs you tracked and compares them with your profile.</p>{{end}}
+</section>
+<section class="panel">
+<div class="panel-h"><h2>Practice log</h2><span class="n">{{len .Sessions}}</span><span class="act muted">log via <code>/scoutjobs:mock</code></span></div>
+{{if .Sessions}}
+<table><thead><tr><th>Date</th><th>Kind</th><th>Topic</th><th>Score</th><th>Notes</th></tr></thead><tbody>
+{{range .Sessions}}<tr><td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td>{{title .Kind}}</td><td>{{.Topic}}</td><td>{{if ge .Score 0}}<span class="fit{{if lt .Score 70}} mid{{end}}">{{.Score}}</span>{{end}}</td><td class="muted">{{.Notes}}</td></tr>{{end}}</tbody></table>
+{{else}}<p class="empty">No practice logged. <code>/scoutjobs:mock</code> runs a mock interview and logs it here.</p>{{end}}
+</section>
+</div>
+{{end}}
+{{template "foot" .}}

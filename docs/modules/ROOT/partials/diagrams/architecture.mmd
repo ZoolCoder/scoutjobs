@@ -1,0 +1,25 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+flowchart LR
+  subgraph agents["Agents"]
+    CC["Claude Code<br/>plugin: /scoutjobs:*"]
+    CX["Codex<br/>skills + /scoutjobs-* prompts"]
+    OT["Cursor, Gemini CLI,<br/>Copilot, any SKILL.md reader"]
+    CL["Cloud agents<br/>Claude Code web, Codex cloud"]
+  end
+  subgraph machine["Your machine"]
+    CLI["scoutjobs CLI"]
+    DB[("~/.scoutjobs<br/>SQLite + files")]
+    WEB["Dashboard<br/>127.0.0.1:7070"]
+    API["JSON API<br/>/api/* (bearer token)"]
+    SMTP["Your SMTP account"]
+  end
+  N8N["n8n / Make / cron"]
+  CC & CX & OT -->|"shell"| CLI
+  CLI --> DB
+  WEB --> DB
+  API --> DB
+  WEB --- API
+  CL -->|"https tunnel"| API
+  N8N -->|"https"| API
+  API -.->|"webhook_url"| N8N
+  CLI -->|"email send --yes"| SMTP

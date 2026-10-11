@@ -1,0 +1,17 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+flowchart TD
+  CV["~/.scoutjobs/cv/resume.pdf or resume.md"] --> C["cv-check  /scoutjobs:cv<br/>ATS score + quality score + gaps"]
+  PR["profile.md<br/>the only source of claims"] --> C
+  C --> LOG["scoutjobs cv log<br/>Profile & CV page, POST /api/cv/checks"]
+  C --> G{"structural gaps?<br/>(layout, missing sections)"}
+  G -->|yes| FIX["you fix the master CV once<br/>re-run cv-check"]
+  FIX --> C
+  G -->|no| J["pick a job<br/>posting.md in its folder"]
+  J --> T["resume-tailor  /scoutjobs:tailor id<br/>reorder, mirror keywords, rewrite summary"]
+  PR --> T
+  T --> RV["draft-reviewer<br/>unverified claim? back to tailor"]
+  RV -->|"changes"| T
+  RV -->|"ok"| RM["applications/company_title/resume.md"]
+  RM --> ATS["cv-check --job id<br/>keyword coverage against that posting"]
+  ATS -->|"below 70"| T
+  ATS -->|"70 or more"| K["kit step done<br/>(green on the job page)"]

@@ -1,0 +1,15 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+flowchart TD
+  B["/scoutjobs:brief<br/>scoutjobs brief --compact"] --> I{"interview in 48 h<br/>not ready?"}
+  I -->|yes| P["interview-prep<br/>prep sheet in the job folder"]
+  I -->|no| F{"follow-ups due?"}
+  F -->|yes| T["application-tracker<br/>send follow-up, add note"]
+  F -->|no| D{"drafts waiting?"}
+  D -->|yes| S["apply-by-email<br/>/scoutjobs:send id"]
+  D -->|no| N{"new jobs?"}
+  N -->|yes| R["job-fit<br/>score, apply or skip, log reason"]
+  N -->|no| Q{"fewer than 3<br/>ranked jobs?"}
+  Q -->|yes| J["job-search<br/>scoutjobs search --add"]
+  Q -->|no| L["upskill<br/>30 min on one learning item"]
+  P & T & S & R & J --> L
+  L --> W["Friday: weekly-review<br/>learn-preferences"]

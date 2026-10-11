@@ -1,0 +1,90 @@
+= CV and cover letter
+:description: How ScoutJobs checks your CV, tailors it per job, writes the cover letter, and keeps every claim true.
+
+Two rules shape everything on this page:
+
+. *`profile.md` is the only source of claims.* A skill may reorder, rephrase and emphasize, never invent. `draft-reviewer` sends back anything it cannot find in the profile.
+. *The master CV is fixed once, the tailored copy per job.* Structural problems (layout, missing sections, no numbers) are yours to fix in `~/.scoutjobs/cv/`. Per-job keyword and ordering work is `resume-tailor`'s, and lands in the job's application folder.
+
+== CV adjustment loop
+
+[mermaid]
+----
+include::partial$diagrams/cv-adjustment.mmd[]
+----
+
+=== Check
+
+----
+/scoutjobs:cv                 # master CV against your target roles
+/scoutjobs:cv --job 3         # a tailored resume against one posting
+----
+
+`cv-check` reads the file from `cv/` (or `resume.md` in the job folder), `profile.md` and `preferences.md`, and scores:
+
+[cols="1,1,3"]
+|===
+| Score | Weight | What it measures
+
+| ATS (0-100)
+| 30 / 10 / 35 / 15 / 10
+| parseable single-column layout and standard section titles; complete plain contact block; keyword coverage against the target roles or the posting (missing ones listed); consistent dates and titles; file name and length.
+
+| Quality (0-100)
+| 35 / 25 / 20 / 20
+| bullets with a verb and a number; relevance of the top third of page one; truth against `profile.md` (unverified claims flagged, never deleted); clarity.
+|===
+
+Up to eight gaps, most valuable first, each one actionable in a line, each marked as *structural* (you, once) or *per job* (`resume-tailor`). The result is logged:
+
+[source,console]
+----
+$ scoutjobs cv log --file resume.pdf --score 72 --ats 64 \
+    --summary "Solid impact bullets; two-column table drops in ATS parsers" \
+    --gaps "single column,add Kubernetes,quantify 3 bullets" --job 3
+----
+
+and shows on the Profile & CV page and, with `--job`, as the third step of that job's kit. The kit marks the step done at an ATS score of 70 or more.
+
+=== Tailor
+
+----
+/scoutjobs:tailor 3
+----
+
+`resume-tailor` reads `posting.md`, the master CV and `profile.md`, then:
+
+* rewrites the summary to mirror the role's three must-haves;
+* reorders Skills so the posting's keywords (acronym and spelled-out form) come first;
+* leads each role with the bullets that match, compresses the rest, keeps the dates;
+* never adds a tool, title or number that is not in `profile.md`.
+
+The draft goes to `draft-reviewer` (a subagent in Claude Code; the same checklist run by the main agent in Codex and others), which checks truth, keyword coverage and clarity and sends it back with changes until clean. Output: `applications/<company>_<title>/resume.md`. `scoutjobs cv export 3` (or the "Export resume.md as PDF" button on the job page) renders it as `resume.pdf`: single column, Helvetica, real text, nothing an ATS parser trips on. `scoutjobs email draft` attaches `resume.pdf` first, then `resume.docx`, then `resume.md`. The same command without an id renders the master `cv/resume.md`.
+
+Then `/scoutjobs:cv --job 3` closes the loop: keyword coverage of the tailored copy against that posting. Below 70, tailor again with the missing keywords in hand.
+
+== Cover letter
+
+[mermaid]
+----
+include::partial$diagrams/cover-letter.mmd[]
+----
+
+----
+/scoutjobs:cover 3            # write, or rewrite, the letter for job 3
+----
+
+`cover-letter-generator` starts from what `job-description-analyzer` extracted (must-haves, company facts, tone) and the tailored `resume.md`, so letter and resume make the same claims with the same words. Structure, 250-400 words:
+
+. Hook: one specific thing about this company or role, and the position.
+. Strongest match: the one experience that answers their first must-have, with a number.
+. Second match, and the honest line about a gap and how you are closing it (`learn add` items are fair game).
+. Call to action, availability, signature with the links from `profile.md`.
+
+STAR stories in `~/.scoutjobs/stories/` feed the middle paragraphs. `draft-reviewer` checks the letter the same way as the resume, plus whether it answers the posting rather than restating the CV. Output: `cover-letter.md` in the job folder, job status `drafted`. Read it. Rewrite with `/scoutjobs:cover 3` and a sentence about what to change ("more formal", "lead with the migration story").
+
+The letter becomes the body of the application e-mail in xref:apply-by-email.adoc[].
+
+== Doing it through the API
+
+Agents without a shell on your machine do the same loop with the xref:api.adoc[JSON API]: `GET /api/profile` for profile and CV list, `GET /api/jobs/3/files/posting.md`, `PUT /api/jobs/3/files/resume.md`, `PUT /api/jobs/3/files/cover-letter.md`, `POST /api/cv/checks`. The dashboard shows the result the moment it lands. See xref:cloud.adoc[].

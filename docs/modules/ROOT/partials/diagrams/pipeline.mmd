@@ -1,0 +1,27 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+stateDiagram-v2
+  [*] --> new: search / add
+  new --> ranked: job-fit
+  new --> drafted
+  new --> skipped
+  ranked --> drafted: resume-tailor + cover letter
+  ranked --> applied
+  ranked --> skipped
+  skipped --> ranked
+  drafted --> applied: email send --yes
+  drafted --> skipped
+  applied --> interview
+  applied --> rejected
+  applied --> no_response: stale_days
+  applied --> withdrawn
+  interview --> offer
+  interview --> rejected
+  interview --> withdrawn
+  offer --> hired
+  offer --> offer_declined
+  rejected --> applied: re-apply
+  no_response --> applied
+  no_response --> withdrawn
+  withdrawn --> applied
+  offer_declined --> offer
+  hired --> [*]

@@ -1,0 +1,19 @@
+{
+  "name": "ScoutJobs events",
+  "nodes": [
+    {"parameters": {"httpMethod": "POST", "path": "scoutjobs", "options": {}}, "name": "Webhook (set webhook_url to this)", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0]},
+    {"parameters": {"rules": {"values": [
+      {"conditions": {"options": {"caseSensitive": true, "typeValidation": "strict"}, "conditions": [{"leftValue": "={{ $json.body.event }}", "rightValue": "interview", "operator": {"type": "string", "operation": "equals"}}], "combinator": "and"}, "renameOutput": true, "outputKey": "interview"},
+      {"conditions": {"options": {"caseSensitive": true, "typeValidation": "strict"}, "conditions": [{"leftValue": "={{ $json.body.event }}", "rightValue": "status", "operator": {"type": "string", "operation": "equals"}}, {"leftValue": "={{ $json.body.note }}", "rightValue": "applied", "operator": {"type": "string", "operation": "endsWith"}}], "combinator": "and"}, "renameOutput": true, "outputKey": "applied"}
+    ]}, "options": {}}, "name": "Route", "type": "n8n-nodes-base.switch", "typeVersion": 3.2, "position": [220, 0]},
+    {"parameters": {"calendar": {"__rl": true, "mode": "list", "value": "primary"}, "start": "={{ $json.body.note.match(/\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/)?.[0] }}", "end": "={{ $json.body.note.match(/\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}/)?.[0] }}", "additionalFields": {"summary": "=Interview: {{ $json.body.company }} ({{ $json.body.title }})"}}, "name": "Google Calendar", "type": "n8n-nodes-base.googleCalendar", "typeVersion": 1.3, "position": [460, -100]},
+    {"parameters": {"amount": 10, "unit": "days"}, "name": "Wait 10 days", "type": "n8n-nodes-base.wait", "typeVersion": 1.1, "position": [460, 100]},
+    {"parameters": {"method": "POST", "url": "=http://127.0.0.1:7070/api/jobs/{{ $('Webhook (set webhook_url to this)').item.json.body.job_id }}/note", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true, "specifyBody": "json", "jsonBody": "{\"note\": \"follow-up reminder from n8n\"}", "options": {}}, "name": "Add follow-up note", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [680, 100]}
+  ],
+  "connections": {
+    "Webhook (set webhook_url to this)": {"main": [[{"node": "Route", "type": "main", "index": 0}]]},
+    "Route": {"main": [[{"node": "Google Calendar", "type": "main", "index": 0}], [{"node": "Wait 10 days", "type": "main", "index": 0}]]},
+    "Wait 10 days": {"main": [[{"node": "Add follow-up note", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

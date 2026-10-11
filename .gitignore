@@ -1,0 +1,17 @@
+/bin/
+/dist/
+*.db
+*.db-*
+.DS_Store
+# personal data never belongs in this repo
+/data/
+/profile*.md
+/preferences*.md
+
+# docs toolchain
+/node_modules/
+/build/
+/.cache/
+
+# plugin eval runs
+/evals/results/

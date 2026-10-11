@@ -1,0 +1,19 @@
+    {{#with site.keys.googleAnalytics}}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{this}}"></script>
+    <script>function gtag(){dataLayer.push(arguments)};window.dataLayer=window.dataLayer||[];gtag('js',new Date());gtag('config','{{this}}')</script>
+    {{/with}}
+    <script>
+    // Applied before first paint so a reader who has chosen light does not see a
+    // dark flash on every navigation. Stored choice wins; absent one, follow the
+    // system. Wrapped because a blocked localStorage (private mode, embedded
+    // webview) must not take the page down with it.
+    (function () {
+      try {
+        var stored = localStorage.getItem('zc-theme')
+        var theme = stored || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        document.documentElement.setAttribute('data-theme', theme)
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark')
+      }
+    })()
+    </script>

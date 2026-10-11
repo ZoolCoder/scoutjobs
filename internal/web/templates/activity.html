@@ -1,0 +1,13 @@
+{{template "head" .}}
+{{with .Data}}
+<section class="panel">
+<div class="panel-h"><h2>Event log</h2><span class="n">{{.Count}}</span>
+  <div class="chips">{{$k := .Kind}}<a href="/activity" {{if eq $k ""}}class="on"{{end}}>All</a>{{range .Kinds}}<a href="/activity?kind={{.}}" {{if eq . $k}}class="on"{{end}}>{{title .}}</a>{{end}}</div></div>
+{{if .Days}}
+<table class="log"><thead><tr><th>When</th><th>Kind</th><th>Job</th><th>Note</th></tr></thead><tbody>
+{{range .Days}}<tr class="sep"><td colspan="4">{{.Label}}</td></tr>
+{{range .Events}}<tr><td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><span class="badge {{kindcls .Kind}}">{{title .Kind}}</span></td><td>{{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small>{{else}}<span class="dim">—</span>{{end}}</td><td>{{.Note}}</td></tr>{{end}}{{end}}</tbody></table>
+{{else}}<p class="empty">Nothing recorded yet. Every status change, note, interview, decision and CV check lands here.</p>{{end}}
+</section>
+{{end}}
+{{template "foot" .}}

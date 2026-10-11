@@ -1,0 +1,72 @@
+= Configuration and data layout
+:description: Every key in config.yaml and every file under ~/.scoutjobs.
+
+== config.yaml
+
+All keys optional.
+
+[source,yaml]
+----
+follow_up_days: 10          # applied -> follow-up due
+stale_days: 60              # applied with no news -> weekly-review proposes no_response
+weekly_apply_target: 5
+fit_apply_floor: 60         # job-fit verdict: apply at or above, maybe below, skip far below
+currency: EUR               # new jobs: salaries converted to yearly figures in this currency (static rates), original kept in notes
+dashboard_addr: 127.0.0.1:7070
+theme: light                # light | dark | auto; the sidebar switch overrides per browser
+search_queries: senior backend engineer, go developer
+search_boards:              # greenhouse:stripe, lever:netlify, ashby:linear, workable:acme, smartrecruiters:Acme, personio:acme, rss:https://...
+search_remote: true         # also query Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas
+email_from:                 # you@example.com, used by scoutjobs email send
+smtp_host:                  # smtp.gmail.com:587 (STARTTLS) or host:465 (TLS)
+smtp_user:                  # defaults to email_from
+imap_host:                  # imap.gmail.com:993; enables scoutjobs email sync (993 = TLS, else STARTTLS)
+imap_user:                  # defaults to email_from
+api_token:                  # when set, /api/* requires "Authorization: Bearer <token>"
+webhook_url:                # every event is POSTed here as JSON
+webhook_secret:             # optional; signs every POST with HMAC-SHA256 (X-ScoutJobs-Signature)
+----
+
+The SMTP password is never a config key. It comes from `SCOUTJOBS_SMTP_PASSWORD` in the environment.
+
+== Environment
+
+[cols="1,2"]
+|===
+| Variable | Effect
+
+| `SCOUTJOBS_HOME` | data directory instead of `~/.scoutjobs`
+| `SCOUTJOBS_SMTP_PASSWORD` | SMTP password for `scoutjobs email send`
+| `SCOUTJOBS_IMAP_PASSWORD` | IMAP password for `scoutjobs email sync`; falls back to `SCOUTJOBS_SMTP_PASSWORD`
+| `SCOUTJOBS_PLATFORMS` | which agents `install.sh` links, for example `"codex cursor"`
+| `SCOUTJOBS_BIN_DIR` | where `install.sh` puts the binary; default `~/.local/bin`
+|===
+
+== Data layout
+
+----
+~/.scoutjobs/
+  config.yaml          above
+  profile.md           your facts; every resume claim must come from here
+  preferences.md       rendered from the preferences table; stated + learned with confidence
+  cv/                  resume.pdf / resume.md, portfolio and certificates; read, never uploaded
+  scoutjobs.db          SQLite: jobs, events, decisions, preferences, interviews, sessions, learning, cv checks
+  stories/             STAR story bank
+  applications/<company>_<title>/
+                       posting.md, resume.md, cover-letter.md, research.md, interview-prep.md,
+                       email.json, email.eml, email-sent.eml, debrief-<date>.md
+  reviews/             weekly reviews
+----
+
+[cols="1,2,2"]
+|===
+| What | Where | Who reads it
+
+| Facts about you | `profile.md` | every skill that writes a CV or cover letter
+| Your resume files | `cv/` | `cv-check`, `resume-tailor`, `scoutjobs-setup`
+| What you want | `preferences.md` and the preferences table | `job-fit`, `job-search`, `resume-tailor`
+| STAR stories | `stories/` | `interview-prep`, `mock-interview`, `cover-letter-generator`
+| Per-application drafts | `applications/<company>_<title>/` | you, before anything is sent
+|===
+
+Back up with `scoutjobs export > backup.json` or copy the directory. Never commit it anywhere: the repository's `.gitignore` already excludes databases and profile files.

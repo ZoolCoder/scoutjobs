@@ -1,0 +1,25 @@
+name: Feature request
+description: A board, a skill, a dashboard page, an API endpoint or anything else ScoutJobs should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do in your job search that ScoutJobs does not help with today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work. A new `scoutjobs` command, a skill step, a page, an endpoint.
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Fits the rules
+      options:
+        - label: It does not log in, create accounts, fill web forms or scrape sites that forbid it.
+          required: true
+        - label: It keeps data on the user's machine unless the user opts in.
+          required: true

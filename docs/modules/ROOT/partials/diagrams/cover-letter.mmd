@@ -1,0 +1,12 @@
+%%{init: {"theme": "neutral", "fontFamily": "Helvetica, Arial, sans-serif", "flowchart": {"htmlLabels": false, "curve": "basis"}}}%%
+flowchart TD
+  P["posting.md<br/>must-haves, tone, company facts"] --> A["job-description-analyzer<br/>talking points"]
+  A --> W["cover-letter-generator  /scoutjobs:cover id<br/>250-400 words: hook, match, gaps, call to action"]
+  PR["profile.md + stories/<br/>facts and STAR stories"] --> W
+  RS["resume.md (tailored)<br/>same claims, same keywords"] --> W
+  W --> R["draft-reviewer<br/>truth, tone, posting answered?"]
+  R -->|"changes"| W
+  R -->|"ok"| F["applications/company_title/cover-letter.md"]
+  F --> Y{"you read it"}
+  Y -->|"rewrite"| W
+  Y -->|"good"| D["status: drafted<br/>/scoutjobs:send uses it as the e-mail body"]

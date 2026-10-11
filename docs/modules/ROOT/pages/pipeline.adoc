@@ -1,0 +1,42 @@
+= Pipeline
+:description: The statuses a job moves through, who moves it, and what each move records.
+
+[mermaid]
+----
+include::partial$diagrams/pipeline.mmd[]
+----
+
+== Statuses
+
+[cols="1,3,2"]
+|===
+| Status | Meaning | Usually set by
+
+| `new` | found by `scoutjobs search`, pasted, or added through the API; not scored yet | `job-search`
+| `ranked` | scored 0-100 with fit notes; waiting for your apply or skip | `job-fit`
+| `drafted` | `resume.md` and `cover-letter.md` exist in the application folder | `/scoutjobs:apply`
+| `applied` | sent, by e-mail through ScoutJobs or by hand | `apply-by-email`, you
+| `interview` | at least one interview scheduled | `application-tracker`
+| `offer` | an offer is on the table | you
+| `hired` | accepted; closes the search | you
+| `skipped` | you passed; reason and signals logged as a decision | `job-fit`
+| `rejected` | they passed | you
+| `no_response` | nothing after `stale_days` (default 60) | `weekly-review`
+| `withdrawn` | you pulled out; reason logged | you
+| `offer_declined` | you declined; reason logged | you
+|===
+
+Skipped, rejected, no response, withdrawn and declined are *leaving* statuses: they close the job for the overview counts but keep its history, and every one of them can be reopened from the pipeline.
+
+== Moving a job
+
+* *Dashboard*: a button per next stage on the pipeline card and on the job page; *more* for any other status with a reason.
+* *CLI*: `scoutjobs job set 3 --status applied --note "via Greenhouse"`; `scoutjobs job skip 4 --reason "onsite only" --signals '{"remote":"onsite"}'`.
+* *API*: `POST /api/jobs/3/status` with `{"status":"applied","reason":"..."}`.
+* *Agent*: the `application-tracker` skill, which also schedules interviews and follow-ups.
+
+Every move writes an event, and a move into `skipped`, `withdrawn` or `offer_declined` also logs a decision with your reason. Those decisions are what `learn-preferences` reads: ten skips that all say "onsite" become a learned preference the scorer applies next time, after you confirm it.
+
+== Follow-ups and stale jobs
+
+`follow_up_days` (default 10) after `applied` the job shows up under follow-ups due in the brief and the overview. `stale_days` (default 60) later `weekly-review` proposes moving it to `no_response`.
