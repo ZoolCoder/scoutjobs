@@ -20,6 +20,7 @@ Add `--json` to any read command. `SCOUTJOBS_HOME` overrides the data directory.
 | `scoutjobs serve [--addr 127.0.0.1:7070]` | dashboard and JSON API
 | `scoutjobs mcp` | MCP server on stdio, every command as a tool; see xref:mcp.adoc[]
 | `scoutjobs doctor` | install health: PATH, data dir, unknown config keys, mail password in the environment, skills linked per agent, Codex prompts, dashboard up; `--online` adds one GET to GitHub and says whether a newer release exists; `--json` for agents
+| `scoutjobs update` | installs the latest release over this binary after a checksum check; `--check` only reports, `--yes` skips the question, `--version vX.Y.Z` picks a tag. Homebrew and distro-package installs are handed to their package manager. See xref:install.adoc#_updating[Updating]
 | `scoutjobs export` | full JSON dump, for backup
 |===
 
@@ -28,8 +29,10 @@ Add `--json` to any read command. `SCOUTJOBS_HOME` overrides the data directory.
 [source,console]
 ----
 $ scoutjobs search --query "senior go engineer" --remote --add        # remote boards, add as new
-$ scoutjobs search --board greenhouse:stripe --board lever:netlify     # ATS boards: greenhouse, lever, ashby, workable, smartrecruiters, personio
+$ scoutjobs search --board greenhouse:stripe --board lever:netlify     # ATS boards: greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr
+$ scoutjobs search --board https://jobs.ashbyhq.com/linear --query go   # a careers URL works as a board too
 $ scoutjobs search --rss https://example.com/jobs.rss --query go         # any RSS or Atom job feed
+$ scoutjobs job add --from https://boards.greenhouse.io/stripe/jobs/123  # one posting by URL: fields and description filled from the ATS
 $ scoutjobs job add --company Stripe --title "Backend Engineer" --url https://... --remote hybrid --tags go,postgres
 $ scoutjobs job import jobs.json          # bulk add from any JSON list
 $ scoutjobs job list --open               # or --status applied, --q stripe, --json, --compact
@@ -42,6 +45,10 @@ $ scoutjobs job rm 4
 ----
 
 `search` matches every word of a query as a whole word, accepts several `--query` and `--board` flags, deduplicates by company plus title, and upserts on `--add` (an `=` after the id means already tracked). `--limit` and `--json --compact` keep the output small.
+
+A board is `source:slug` or the careers URL you would paste from the browser: `boards.greenhouse.io/<slug>`, `jobs.lever.co/<slug>`, `jobs.ashbyhq.com/<slug>`, `apply.workable.com/<slug>`, `jobs.smartrecruiters.com/<company>`, `<slug>.jobs.personio.de`, `<slug>.recruitee.com`, `<slug>.bamboohr.com`, or any feed URL ending in `.rss`, `.xml`, `.atom` or `/feed`. `--remote` adds Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas and the current Hacker News "Who is hiring" thread. LinkedIn, Indeed, Glassdoor, XING and StepStone have no public API and forbid scraping: the error says so, and the posting text goes into `job add --notes` by hand.
+
+`job add --from <url>` fetches one posting from the same ATSes (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR) and fills every field you did not pass; the description lands in `notes` so the fit score has text to read. Flags you pass win over the fetched values.
 
 == CV and e-mail
 

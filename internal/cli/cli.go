@@ -25,7 +25,8 @@ Usage: scoutjobs <command> [subcommand] [flags]
   init                       create ~/.scoutjobs (config, profile, db)
   path                       print the data directory
   version                    print the version
-  job add|list [--compact]|show|set|skip|rm|import
+  update [--check] [--yes] [--version vX.Y.Z]   install the latest release over this binary (brew/deb/rpm installs are handed to their manager)
+  job add [--from url]|list [--compact]|show|set|skip|rm|import
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
   email draft|show|send   application e-mail from the cover letter; send needs --yes
@@ -60,6 +61,8 @@ func Run(args []string, out io.Writer) error {
 	case "version":
 		fmt.Fprintln(out, "scoutjobs", Version)
 		return nil
+	case "update":
+		return runUpdate(rest, out)
 	case "mcp":
 		return runMCP(os.Stdin, out)
 	case "doctor":
@@ -108,7 +111,7 @@ func Run(args []string, out io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(out, "ScoutJobs dashboard on http://%s  (data: %s)\n", *addr, s.Home)
-		return web.Serve(s, *addr, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency})
+		return web.Serve(s, *addr, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -312,12 +315,21 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		fs.StringVar(&j.Notes, "notes", "", "free text")
 		fs.StringVar(&j.Contact, "contact", "", "application e-mail address (recruiter or jobs@)")
 		fs.StringVar(&j.Status, "status", "", "initial status (default new)")
+		from := fs.String("from", "", "posting URL on a supported ATS (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR): fills the fields you leave empty")
 		asJSON := fs.Bool("json", false, "")
 		if err := fs.Parse(rest); err != nil {
 			return err
 		}
-		if j.Company == "" || j.Title == "" {
-			return errors.New("--company and --title are required")
+		if *from != "" {
+			if err := fillFromPosting(&j, *from); err != nil {
+				return err
+			}
+		}
+		if j.Company == "" {
+			return errors.New("--company is required")
+		}
+		if j.Title == "" {
+			return errors.New("--title is required")
 		}
 		job, created, err := s.UpsertJob(j)
 		if err != nil {
