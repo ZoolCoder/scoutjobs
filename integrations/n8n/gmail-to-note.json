@@ -1,0 +1,15 @@
+{
+  "name": "ScoutJobs Gmail replies to notes",
+  "nodes": [
+    {"parameters": {"pollTimes": {"item": [{"mode": "everyX", "value": 15, "unit": "minutes"}]}, "simple": true, "filters": {"q": "newer_than:1d -category:promotions (interview OR application OR unfortunately OR \"next steps\" OR from:greenhouse.io OR from:lever.co OR from:ashbyhq.com)"}, "options": {}}, "name": "Gmail trigger (recruiter mail)", "type": "n8n-nodes-base.gmailTrigger", "typeVersion": 1.2, "position": [0, 0]},
+    {"parameters": {"url": "http://127.0.0.1:7070/api/jobs?open=1&limit=200", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "options": {}}, "name": "GET /api/jobs?open=1", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "executeOnce": true, "position": [220, 0]},
+    {"parameters": {"jsCode": "// One output item per mail that matches an open job by sender domain or company name.\n// n8n splits the JSON array from /api/jobs into one item per job.\nconst list = $input.all().map(i => i.json);\nconst out = [];\nfor (const m of $('Gmail trigger (recruiter mail)').all()) {\n  const mail = m.json;\n  const from = String(mail.From || mail.from?.text || mail.from || '').toLowerCase();\n  const subject = String(mail.Subject || mail.subject || '');\n  const domain = (from.match(/@([a-z0-9.-]+)/) || [])[1] || '';\n  const hit = list.find(j => {\n    const c = String(j.company || '').toLowerCase();\n    const contactDomain = String(j.contact || '').toLowerCase().split('@')[1];\n    return (contactDomain && domain === contactDomain) || (c.length > 2 && (from.includes(c) || subject.toLowerCase().includes(c)));\n  });\n  if (!hit) continue;\n  const note = `mail from ${from.replace(/<.*>/, '').trim() || domain}: ${subject}`.slice(0, 300);\n  out.push({ json: { job_id: hit.id, note } });\n}\nreturn out;"}, "name": "Match job", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [440, 0]},
+    {"parameters": {"method": "POST", "url": "=http://127.0.0.1:7070/api/jobs/{{ $json.job_id }}/note", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify({ note: $json.note }) }}", "options": {}}, "name": "POST /api/jobs/{id}/note", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [660, 0]}
+  ],
+  "connections": {
+    "Gmail trigger (recruiter mail)": {"main": [[{"node": "GET /api/jobs?open=1", "type": "main", "index": 0}]]},
+    "GET /api/jobs?open=1": {"main": [[{"node": "Match job", "type": "main", "index": 0}]]},
+    "Match job": {"main": [[{"node": "POST /api/jobs/{id}/note", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}
