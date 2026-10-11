@@ -359,3 +359,19 @@ func TestJobPageShowsTheCoverLetterTemplateCheck(t *testing.T) {
 		t.Errorf("an edited letter no longer matches its DOCX: %s", b)
 	}
 }
+
+func TestCVGapsKeepsCommasInsideFindings(t *testing.T) {
+	in := "Structural: add email, phone and URLs, Tailor: lead with systems (Parcelo, Ledgerly) end to end, Profile gap (needs the user, do not invent): no contract work"
+	got := cvGaps(in)
+	want := []string{
+		"Structural: add email, phone and URLs",
+		"Tailor: lead with systems (Parcelo, Ledgerly) end to end",
+		"Profile gap (needs the user, do not invent): no contract work",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("cvGaps = %q, want %q", got, want)
+	}
+	if cvGaps("  ") != nil {
+		t.Fatal("blank gaps should be nil")
+	}
+}

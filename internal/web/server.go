@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -162,6 +163,7 @@ var funcs = template.FuncMap{
 		}
 		return parts
 	},
+	"gaps":      cvGaps,
 	"statuses":  func() []string { return store.Statuses },
 	"next":      func(st string) []string { return store.NextStatuses[st] },
 	"initial":   initial,
@@ -957,10 +959,9 @@ func (v *server) profile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	checks, _ := v.s.CVChecks(20)
-	prefs, _ := v.s.Preferences()
 	v.render(w, r, "profile.html", "profile", map[string]any{
 		"Profile": string(prof), "Filled": filled, "ProfilePath": filepath.Join(v.s.Home, "profile.md"),
-		"CVDir": cvDir, "Files": files, "Checks": checks, "Prefs": prefs, "Main": v.masterPanel(),
+		"CVDir": cvDir, "Files": files, "Checks": checks, "Main": v.masterPanel(),
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"),
 	})
 }
@@ -1239,4 +1240,23 @@ func (v *server) navCounts() navCounts {
 		n.Interviews = len(ivs)
 	}
 	return n
+}
+
+// gapStart matches the start of a CV-check finding, such as "Tailor:" or "Profile gap (".
+var gapStart = regexp.MustCompile(`^[A-Z][A-Za-z ]{0,30}[:(]`)
+
+// cvGaps splits a CV check's comma-joined findings, keeping commas inside a finding.
+func cvGaps(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		switch {
+		case p == "":
+		case len(out) == 0 || gapStart.MatchString(p):
+			out = append(out, p)
+		default:
+			out[len(out)-1] += ", " + p
+		}
+	}
+	return out
 }
