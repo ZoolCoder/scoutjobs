@@ -71,7 +71,9 @@ Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds
 |---|---|---|
 | "find go jobs, remote EU" | `job-search` | runs `scoutjobs search`: public ATS APIs and remote boards, deduplicated, added as `new` |
 | "check my CV" | `cv-check` | ATS readiness and content score, gaps against your target roles, logged to Profile & CV |
-| "score them" | `job-fit` | 0-100 with reasons, asks apply/skip, logs your decisions |
+| "score them" | `job-fit` | 0-100 with reasons, asks apply/skip, logs your decisions; hard failures become a veto outside the score |
+| "what can I honestly claim" | `fit-review` | `/scoutjobs:evidence`: every requirement mapped to profile evidence, strength and defensible wording in `fit-review.json` |
+| "is it ready to send" | `apply-by-email` | `/scoutjobs:check`: the quality gates (documents, review, coverage, grounding, duplicates, ATS text layer, filenames); `email send` refuses while one fails |
 | "apply to Stripe" | `resume-tailor`, `cover-letter-generator` | drafts in `~/.scoutjobs/applications/<job>/`, reviewed by `draft-reviewer` |
 | "rewrite the Stripe cover letter" | `cover-letter-generator` | `/scoutjobs:cover <id>`: rewrites the letter to the posting, reviewed again |
 | "ATS check vs the Stripe job" | `cv-check` | `/scoutjobs:cv --job <id>`: keyword coverage and layout against that posting |
@@ -85,7 +87,7 @@ Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds
 | Friday | `weekly-review` | funnel, response rate, stale cleanup, runs `learn-preferences` |
 | "what should I learn" | `upskill` | gaps ranked by demand in your tracked jobs, plan, hours tracked |
 
-The full list of the 29 skills, what triggers each and which ones are reference material is in the manual: [All skills](https://zoolcoder.github.io/scoutjobs/scoutjobs/skills.html).
+The full list of the 30 skills, what triggers each and which ones are reference material is in the manual: [All skills](https://zoolcoder.github.io/scoutjobs/scoutjobs/skills.html).
 
 ## Install per platform
 
@@ -300,6 +302,7 @@ webhook_secret:         # optional; signs every POST (X-ScoutJobs-Signature, HMA
 | GET | `/api/brief`, `/api/stats`, `/api/events` | the daily picture, the funnel, recent activity |
 | GET, POST | `/api/jobs`, `/api/jobs/{id}` | list, filter, add (upsert), one job with events and interviews |
 | POST | `/api/jobs/{id}/status`, `/api/jobs/{id}/note` | move, annotate; skip and withdraw log a decision |
+| GET | `/api/jobs/{id}/check` | the quality gates, same as `scoutjobs job check --json` |
 | GET | `/api/jobs/{id}/files` | the application folder and the "get selected" kit |
 | GET, PUT | `/api/jobs/{id}/files/{name}` | read a draft; write `.md`, `.txt`, `.json` (1 MB, inside the job folder) |
 | POST | `/api/jobs/{id}/export` | render `resume.md` in the job folder to `resume.pdf` |
@@ -317,7 +320,7 @@ Sending e-mail is not on the API. Full table with bodies in `integrations/n8n/RE
 ```bash
 make build     # bin/scoutjobs
 make test      # go test ./...
-make evals     # claude plugin eval: five cases, one per core skill (evals/README.md)
+make evals     # claude plugin eval: eight cases, core skills plus evidence review and gates (evals/README.md)
 make dash      # build and serve
 make lint      # go vet (+ golangci-lint if installed)
 make docs      # user manual into build/site (Antora, needs Node 22 and kroki.io for the diagrams)

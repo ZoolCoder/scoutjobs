@@ -7,6 +7,28 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Added
+- Evidence-backed fit review: `scoutjobs job fit <id>` validates and stores
+  `fit-review.json` (one row per requirement with evidence, strength,
+  confidence, defensible wording and risk; vetoes outside the score), sets
+  score, notes and the new `veto` field; `fit-review` skill and
+  `/scoutjobs:evidence`.
+- Application quality gates: `scoutjobs job check <id>` and
+  `GET /api/jobs/{id}/check` run documents, fit review, coverage, grounding,
+  duplicates, ATS text layer and filename gates; `email send --yes` and
+  `cv export <id>` refuse while one fails, `--skip-checks` overrides and logs
+  `check:skipped`; `scoutjobs job review <id> --verdict send|fix` records the
+  draft-reviewer verdict; `/scoutjobs:check`; the job page shows the gates and
+  the evidence table, the board shows a veto badge.
+- MCP tools `job_fit`, `job_check`, `job_review`; `job_set` takes `veto`.
+- Eval cases `fit-review-evidence`, `draft-review-invented-claim`,
+  `apply-check-blocks`.
+
+### Changed
+- `resume-tailor` and `cover-letter-generator` write from the agreed wording
+  in `fit-review.json`; `apply-by-email` runs `job check` first and reports
+  every failed gate instead of sending past it.
+
 ## [0.1.0] - 2026-10-11
 
 ### Added

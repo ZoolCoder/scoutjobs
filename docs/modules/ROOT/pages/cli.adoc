@@ -40,6 +40,10 @@ $ scoutjobs job show 3 --json             # job, dir, events, interviews
 $ scoutjobs job set 3 --status applied --note "via Greenhouse"
 $ scoutjobs job set 3 --score 78 --fit-notes "Go+Postgres strong; no k8s"
 $ scoutjobs job set 3 --contact hr@stripe.com
+$ scoutjobs job set 3 --veto "work permit: no sponsorship"   # hard failure outside the score; --veto '' clears it
+$ scoutjobs job fit 3 --file review.json   # evidence-backed review: writes fit-review.json, sets score, notes, veto
+$ scoutjobs job review 3 --verdict send|fix --notes "..."   # the draft-reviewer's verdict, read by the grounding gate
+$ scoutjobs job check 3 [--json]          # quality gates; exits 1 while a gate fails
 $ scoutjobs job skip 4 --reason "onsite only" --signals '{"remote":"onsite"}'
 $ scoutjobs job rm 4
 ----
@@ -48,6 +52,10 @@ $ scoutjobs job rm 4
 
 A board is `source:slug` or the careers URL you would paste from the browser: `boards.greenhouse.io/<slug>`, `jobs.lever.co/<slug>`, `jobs.ashbyhq.com/<slug>`, `apply.workable.com/<slug>`, `jobs.smartrecruiters.com/<company>`, `<slug>.jobs.personio.de`, `<slug>.recruitee.com`, `<slug>.bamboohr.com`, or any feed URL ending in `.rss`, `.xml`, `.atom` or `/feed`. `--remote` adds Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas and the current Hacker News "Who is hiring" thread. LinkedIn, Indeed, Glassdoor, XING and StepStone have no public API and forbid scraping: the error says so, and the posting text goes into `job add --notes` by hand.
 
+`job fit` takes the review JSON the `fit-review` skill produces: one row per material requirement with the posting's wording, `kind` (`must` or `nice`), `evidence`, `strength` (`direct`, `adjacent`, `partial`, `gap`), `confidence`, the defensible `wording` and the `risk`; `vetoes` with `rule` and `reason`; `score` and `notes`. Unknown values are refused. The file lands as `fit-review.json` in the application folder and the job's score, notes and veto follow it.
+
+`job check` runs seven gates and prints `PASS`, `WARN`, `FAIL` or `SKIP` per line: `documents` (tailored resume and cover letter present and not stubs), `fit_review` (no veto on the job or in the review), `coverage` (no must-have `gap`, every must-have `wording` appears in the drafts), `grounding` (a `review:send` event newer than the last edit of the drafts), `duplicates` (no paragraph twice, cover letter not identical to another application's), `ats_text` (`resume.pdf` has fonts and a text layer, is not encrypted, under 5 MB), `filenames` (ASCII, known types; warns on spaces, `final`, `(1)`). `email send --yes` runs the same gates and refuses on a failure; `cv export <id>` runs the review, coverage, grounding and duplicate gates. `--skip-checks` on either sends or exports anyway and logs `check:skipped` with the list on the job.
+
 `job add --from <url>` fetches one posting from the same ATSes (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR) and fills every field you did not pass; the description lands in `notes` so the fit score has text to read. Flags you pass win over the fetched values.
 
 == CV and e-mail
@@ -55,12 +63,12 @@ A board is `source:slug` or the careers URL you would paste from the browser: `b
 [source,console]
 ----
 $ scoutjobs cv files                      # what is in ~/.scoutjobs/cv
-$ scoutjobs cv export [3] [--file resume.md]   # resume.md to resume.pdf: job folder with an id, else ~/.scoutjobs/cv
+$ scoutjobs cv export [3] [--file resume.md] [--skip-checks]   # resume.md to resume.pdf: job folder with an id, else ~/.scoutjobs/cv
 $ scoutjobs cv log --file resume.pdf --score 72 --ats 64 --summary "..." --gaps "a,b,c" [--job 3]
 $ scoutjobs cv list [--limit 20]
 $ scoutjobs email draft 3 [--to hr@...] [--subject "..."] [--body file.md] [--attach x.pdf]
 $ scoutjobs email show 3 [--json]         # the draft, and a mailto: link
-$ scoutjobs email send 3 --yes            # refuses without --yes
+$ scoutjobs email send 3 --yes [--skip-checks]   # refuses without --yes, and while a quality gate fails
 $ scoutjobs email test [--to addr]        # probe: sends one line to yourself, checks IMAP login when imap_host is set
 $ scoutjobs email sync [--since 14d] [--dry-run] [--json]   # log inbox replies to applications over IMAP
 ----

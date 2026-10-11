@@ -30,7 +30,7 @@ make test      # go test ./...
 make lint      # go vet, golangci-lint
 make dash      # build and serve the dashboard on 127.0.0.1:7070
 make docs      # Antora manual into build/site (Node 22, kroki.io for diagrams)
-make evals     # claude plugin eval, five cases (evals/README.md)
+make evals     # claude plugin eval, eight cases (evals/README.md)
 claude plugin validate .
 ```
 
