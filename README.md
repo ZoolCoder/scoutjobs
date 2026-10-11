@@ -63,6 +63,8 @@ scoutjobs init           # creates ~/.scoutjobs with profile.md, preferences.md,
 scoutjobs serve          # dashboard at http://127.0.0.1:7070
 ```
 
+![The overview: next best move, the four numbers, pipeline health, upcoming interviews and drafts waiting](docs/modules/ROOT/images/overview.png)
+
 CLI only: `brew install --cask zoolcoder/scoutjobs/scoutjobs`, a `deb`, `rpm` or `apk` package, or a binary for macOS, Linux and Windows from [Releases](https://github.com/zoolcoder/scoutjobs/releases). `scoutjobs doctor` checks the install, `scoutjobs update` installs the next release (checksum verified; Homebrew and package installs are handed to their manager).
 
 Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds your profile from a CV, records what you want). After that the daily loop is:
@@ -292,6 +294,18 @@ api_token:              # when set, /api/* requires "Authorization: Bearer <toke
 webhook_url:            # every event is POSTed here as JSON (job added, status change, note, cv_check, ...)
 webhook_secret:         # optional; signs every POST (X-ScoutJobs-Signature, HMAC-SHA256) so the receiver can verify it
 ```
+
+## Dashboard
+
+`scoutjobs serve` is a second window onto the same `~/.scoutjobs` the CLI and the agents use: SQLite plus the application folders, rendered as plain HTML on every request, nothing cached and nothing stored in the browser but the theme. The agents write through the CLI; you watch the result here and edit drafts in place, and the agent reads your edit on its next turn.
+
+![The pipeline board: a column per stage, a fit gauge per card, a veto badge, drag and drop between stages](docs/modules/ROOT/images/pipeline.png)
+
+The job page carries the "Get selected" kit (tailor, cover letter, ATS check, send), the files in the application folder, the seven quality gates from `scoutjobs job check` with what blocks sending, and the evidence table from `fit-review.json`:
+
+![Ready to send: the seven gates and the evidence table, one row per requirement with evidence, strength and the wording the CV may use](docs/modules/ROOT/images/job-gates.png)
+
+Every page is described in the manual: [Dashboard](https://zoolcoder.github.io/scoutjobs/scoutjobs/dashboard.html).
 
 ## JSON API
 
