@@ -28,21 +28,21 @@
 {{if eq $tab "overview"}}
 {{with .Checklist}}<section class="panel" id="checklist">
   <div class="panel-h"><h2>Checklist</h2><span class="n">{{.Done}}/{{len .Items}}</span><span class="act muted">nothing is sent without you</span></div>
-  <ol class="checklist">{{range .Items}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Label}}</b>{{if .Detail}}<small title="{{.Detail}}">{{.Detail}}</small>{{end}}</div><span class="state">{{if eq .State "next"}}next{{else if eq .State "blocked"}}blocked{{else if eq .State "warn"}}check{{else if eq .State "done"}}done{{end}}</span>{{if .Href}}<a class="btn mini" href="{{.Href}}">{{.Act}}</a>{{end}}</li>{{end}}</ol>
+  <ol class="checklist">{{range .Items}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Label}}</b>{{if .Detail}}<small title="{{.Detail}}">{{.Detail}}</small>{{end}}{{with .Files}}<small class="prov" title="SHA-256 of the files this result covered">{{.}}</small>{{end}}</div><span class="state">{{if eq .State "next"}}next{{else if eq .State "blocked"}}blocked{{else if eq .State "warn"}}check{{else if eq .State "done"}}done{{end}}</span>{{if .Href}}<a class="btn mini" href="{{.Href}}">{{.Act}}</a>{{end}}</li>{{end}}</ol>
 </section>{{end}}
 {{with .RunP}}<section class="panel" id="run"{{if .Active}} data-run="/jobs/{{$j.ID}}/run"{{else if .Queued}} data-run="/jobs/{{$j.ID}}/run" data-queued="1"{{end}}>
   <div class="panel-h"><h2>Prepare application</h2>{{with .Run}}<span class="badge {{.State}}">{{.State}}</span>{{if .Agent}}<span class="n">{{.Agent}}</span>{{end}}{{end}}<span class="act muted">nothing is sent</span></div>
   {{with $.Data.RunErr}}<p class="callout bad">{{.}}</p>{{end}}
   {{with $.Data.RunP.Queued}}<p class="callout"><span class="spin" aria-hidden="true"></span> Waiting in the Prepare all queue, position {{.}}. It starts when the job before it finishes.</p>{{end}}
   {{if .Recovered}}<p class="callout">The last run stopped at <b>{{.Recovered}}</b>; that step is done now.{{with .Todo}} Next: {{(index . 0).Label}}.{{end}}</p>
-  {{with .Run}}<details class="runlog"><summary>Last run</summary><ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}</div></li>{{end}}</ol>{{if .Error}}<p class="small muted">{{.Error}}</p>{{end}}</details>{{end}}
-  {{else}}  {{with .Run}}{{template "runprog" .}}<ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}</div></li>{{end}}</ol>
+  {{with .Run}}<details class="runlog"><summary>Last run</summary><ol class="runsteps">{{range .Steps}}{{$n := .Name}}<li data-step="{{$n}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}{{with index $.Data.RunP.Now $n}}<small><span class="badge {{.}}">now {{.}}</span>{{with index $.Data.RunP.Stale $n}} {{.}}{{end}}</small>{{end}}</div></li>{{end}}</ol>{{if .Error}}<p class="small muted">{{.Error}}</p>{{end}}</details>{{end}}
+  {{else}}  {{with .Run}}{{template "runprog" .}}<ol class="runsteps">{{range .Steps}}{{$n := .Name}}<li data-step="{{$n}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}{{with index $.Data.RunP.Now $n}}<small><span class="badge {{.}}">now {{.}}</span>{{with index $.Data.RunP.Stale $n}} {{.}}{{end}}</small>{{end}}</div></li>{{end}}</ol>
   {{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
   {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
 {{end}}</pre></details>{{end}}{{end}}{{end}}
   {{if .Active}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run/cancel"><button class="mini" type="submit">Cancel run</button></form>
   {{else if .Agents}}<form class="runform" method="post" action="/jobs/{{$j.ID}}/run">
-    {{if .Todo}}<div class="runpick">{{range .Todo}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}</label>{{end}}</div>
+    {{if .Todo}}<div class="runpick">{{range .Todo}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}{{with index $.Data.RunP.Stale .Name}} <small class="muted">stale: {{.}}</small>{{end}}</label>{{end}}</div>
     {{else}}<p class="callout">Every step is done. Review the documents below, or redo a step.</p>{{end}}
     {{if .Done}}<p class="muted small">Already done: {{range $i, $d := .Done}}{{if $i}}, {{end}}{{$d.Label}}{{end}}.</p>
     <details class="redo"{{if not .Todo}} open{{end}}><summary>Redo a finished step</summary><div class="runpick">{{range .Done}}<label class="check"><input type="checkbox" name="redo" value="{{.Name}}"> {{.Label}}</label>{{end}}</div><small class="muted">Picked steps are written again; the previous file is replaced.</small></details>{{end}}

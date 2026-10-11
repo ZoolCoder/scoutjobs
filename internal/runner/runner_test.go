@@ -219,3 +219,62 @@ func TestParse(t *testing.T) {
 		t.Errorf("send accepted: %v", err)
 	}
 }
+
+func TestReplacedFinalFileReopensReviewAndATS(t *testing.T) {
+	rn, j := setup(t, "#!/bin/sh\ncat >/dev/null\n")
+	dir := apply.Dir(rn.Store, j)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Jane\n\nGo engineer."), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team, I build Go services."), 0o600)
+	_ = rn.Store.AddEvent(j.ID, "review:send", "checked")
+	_ = apply.StampReview(dir)
+	if _, _, err := apply.ExportPDF(dir, "resume.md", ""); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = rn.Store.AddCVCheck(store.CVCheck{File: "resume.pdf", Score: 80, ATSScore: 85, JobID: j.ID})
+	_ = apply.StampATS(dir, "resume.pdf")
+	if f := rn.Finished(j); f["review"] == "" || f["export"] == "" || f["ats"] == "" || len(rn.Stale(j)) > 0 {
+		t.Fatalf("all current: %v %v", f, rn.Stale(j))
+	}
+
+	_ = os.WriteFile(filepath.Join(dir, "resume.pdf"), []byte("%PDF-1.7 the styled final CV"), 0o600)
+	r, _, err := rn.Plan(j, Request{Steps: []string{"review", "export", "ats"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := states(r.Snapshot()); got != "review=pending export=skipped ats=pending" {
+		t.Errorf("the final PDF must be reviewed and scored, never overwritten: %s", got)
+	}
+	stale := rn.Stale(j)
+	if !strings.Contains(stale["review"], "resume.pdf") || !strings.Contains(stale["ats"], "resume.pdf") || stale["export"] != "" {
+		t.Errorf("stale: %v", stale)
+	}
+	if !strings.Contains(rn.Finished(j)["export"], "your own file") {
+		t.Errorf("export: %v", rn.Finished(j))
+	}
+	if p := Prompt(j, dir, "scoutjobs", rn.withSources(dir, Steps[3:4])); !strings.Contains(p, "Also review resume.pdf") {
+		t.Errorf("the reviewer must read the final PDF: %s", p)
+	}
+}
+
+func TestFormattedCVSourceIsNeverRenderedFromMarkdown(t *testing.T) {
+	rn, j := setup(t, "#!/bin/sh\ncat >/dev/null\n")
+	rn.CVSource, rn.CoverTemplate = "cv/Jane Doe CV.docx", "cv/cover-template.docx"
+	dir := apply.Dir(rn.Store, j)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Jane\n\nGo engineer."), 0o600)
+	p := Prompt(j, dir, "scoutjobs", rn.withSources(dir, Steps[1:3]))
+	if !strings.Contains(p, "Jane Doe CV.docx: tailor from it") || !strings.Contains(p, "Do not write resume.pdf") || !strings.Contains(p, "cover-template.docx: use it") {
+		t.Errorf("sources not in the prompt: %s", p)
+	}
+	if ok, why := rn.done(j, "export"); ok || !strings.Contains(why, "Jane Doe CV.docx") {
+		t.Errorf("export from a formatted source: %v %q", ok, why)
+	}
+	detail, warn, err := rn.local(j, "export")
+	if err != nil || !warn || !strings.Contains(detail, "not rendered from Markdown") {
+		t.Errorf("local export: %q %v %v", detail, warn, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "resume.pdf")); err == nil {
+		t.Error("no PDF may be rendered from the Markdown draft")
+	}
+}

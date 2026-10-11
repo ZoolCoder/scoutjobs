@@ -244,13 +244,15 @@ func gateGrounding(dir string, events []store.Event, drafts map[string]string) G
 	if err != nil {
 		return Gate{"grounding", Fail, "cannot read the review time " + latest.At, nil}
 	}
-	var stale []string
-	for n := range drafts {
-		if st, err := os.Stat(filepath.Join(dir, n)); err == nil && st.ModTime().After(at.Add(time.Second)) {
-			stale = append(stale, n)
+	stale, known := ReviewChanges(dir)
+	if !known { // a review recorded before provenance: compare modification times
+		for n := range drafts {
+			if st, err := os.Stat(filepath.Join(dir, n)); err == nil && st.ModTime().After(at.Add(time.Second)) {
+				stale = append(stale, n)
+			}
 		}
+		sort.Strings(stale)
 	}
-	sort.Strings(stale)
 	if len(stale) > 0 {
 		return Gate{"grounding", Fail, "edited after the last review: " + strings.Join(stale, ", "), stale}
 	}

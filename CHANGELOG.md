@@ -7,7 +7,20 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Added
+- Document provenance (#32): the draft review, each PDF export and the ATS
+  score record the SHA-256 of the files they covered in `provenance.json`.
+  A changed file makes the step stale: Prepare application runs it again, the
+  checklist and the last run show it, and `GET /api/jobs/{id}` returns the
+  files and hashes. Replacing the exported PDF with your own final CV reopens
+  the review and the ATS check, and a run never overwrites that file.
+- `cv_source` and `cover_template` in config.yaml: the CV and cover letter
+  every tailored document starts from. A PDF or Word source is never replaced
+  by a PDF rendered from Markdown.
+
 ### Fixed
+- The job page records the agent results a stopped run left behind, so the
+  run panel shows the steps as they stand now (#32).
 - Connecting Google without the OAuth client secret no longer fails at
   Google's token endpoint with a Gmail error (#33). Connect checks the client
   ID and secret first and names what is missing; a reconnect from the Calendar

@@ -31,8 +31,10 @@ type Config struct {
 	SearchBoards  []string `json:"search_boards"`
 	SearchRemote  bool     `json:"search_remote"`
 	Theme         string   `json:"theme"`
-	Agent         string   `json:"agent"`         // agent CLI for job run: claude | codex | custom | auto
-	AgentCommand  string   `json:"agent_command"` // any other agent: command that reads the prompt on stdin
+	Agent         string   `json:"agent"`          // agent CLI for job run: claude | codex | custom | auto
+	AgentCommand  string   `json:"agent_command"`  // any other agent: command that reads the prompt on stdin
+	CVSource      string   `json:"cv_source"`      // the CV tailored resumes start from, relative to the data dir
+	CoverTemplate string   `json:"cover_template"` // the cover letter whose format every letter keeps
 }
 
 func DefaultConfig() Config {
@@ -113,6 +115,10 @@ func LoadConfig(home string) Config {
 			c.Agent = strings.Trim(v, `"'`)
 		case "agent_command":
 			c.AgentCommand = strings.Trim(v, `"'`)
+		case "cv_source":
+			c.CVSource = strings.Trim(v, `"'`)
+		case "cover_template":
+			c.CoverTemplate = strings.Trim(v, `"'`)
 		case "theme":
 			if v == "dark" || v == "light" || v == "auto" {
 				c.Theme = v

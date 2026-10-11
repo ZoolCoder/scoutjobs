@@ -156,6 +156,9 @@ func (v *server) apiCVCheck(w http.ResponseWriter, r *http.Request) {
 		apiErr(w, 400, err)
 		return
 	}
+	if j, err := v.s.JobByID(c.JobID); c.JobID != 0 && err == nil {
+		_ = apply.StampATS(apply.Dir(v.s, j), filepath.Base(c.File))
+	}
 	c.ID = id
 	writeJSON(w, 201, c)
 }

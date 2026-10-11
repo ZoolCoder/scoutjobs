@@ -24,6 +24,10 @@ type runPanel struct {
 	// Recovered: the last run stopped at a step that is done now (fixed by hand or by a later run),
 	// so its error is history, not the current state.
 	Recovered string
+	// Stale: steps whose result covers files that changed since, with what changed
+	Stale map[string]string
+	// Now: how each step of the last run stands today, when that differs: recovered or stale
+	Now map[string]string
 }
 
 func (v *server) runPanel(j store.Job) *runPanel {
@@ -31,7 +35,7 @@ func (v *server) runPanel(j store.Job) *runPanel {
 	if m == nil {
 		return nil
 	}
-	p := &runPanel{Steps: runner.Steps, Finished: m.Finished(j)}
+	p := &runPanel{Steps: runner.Steps, Finished: m.Finished(j), Stale: m.Stale(j), Now: map[string]string{}}
 	for _, st := range runner.Steps {
 		if _, ok := p.Finished[st.Name]; ok {
 			p.Done = append(p.Done, st)
@@ -49,8 +53,13 @@ func (v *server) runPanel(j store.Job) *runPanel {
 		}
 		p.Run, p.Active = &snap, snap.State == runner.Running
 		for _, st := range snap.Steps {
-			if _, ok := p.Finished[st.Name]; ok && st.State == runner.Failed {
+			_, done := p.Finished[st.Name]
+			switch {
+			case done && st.State == runner.Failed:
 				p.Recovered = st.Label
+				p.Now[st.Name] = "recovered"
+			case p.Stale[st.Name] != "" && (st.State == runner.Done || st.State == runner.Skipped):
+				p.Now[st.Name] = "stale"
 			}
 		}
 	}
@@ -60,6 +69,20 @@ func (v *server) runPanel(j store.Job) *runPanel {
 		}
 	}
 	return p
+}
+
+// reconcileIdle records agent results left in the job folder and merges older folders when no run
+// is working on the job, so a stopped run's steps show as they stand now. It never sends anything
+// and never changes the job's stage beyond what the recorded results say.
+func (v *server) reconcileIdle(j store.Job) {
+	m := v.cfg.Runner
+	if m == nil {
+		return
+	}
+	if r := m.Latest(j.ID); r != nil && r.Snapshot().State == runner.Running {
+		return
+	}
+	m.Reconcile(j)
 }
 
 func (v *server) startRun(w http.ResponseWriter, r *http.Request) {

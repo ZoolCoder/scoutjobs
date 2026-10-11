@@ -205,6 +205,10 @@ type Runner struct {
 	Custom string // config.yaml agent_command
 	Agent  string // config.yaml agent: preferred agent name
 	From   string // email_from for the draft
+	// config.yaml cv_source and cover_template, relative to the data folder: the CV and cover
+	// letter whose layout every tailored document keeps
+	CVSource      string
+	CoverTemplate string
 }
 
 // Agents lists the agent CLIs found on this machine.
@@ -372,7 +376,7 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 	since := time.Now()
 	stop := make(chan struct{})
 	go rn.watch(run, j, group, since, stop)
-	err := rn.agent(ctx, run, ag, dir, Prompt(j, dir, rn.Exe, steps))
+	err := rn.agent(ctx, run, ag, dir, Prompt(j, dir, rn.Exe, rn.withSources(dir, steps)))
 	close(stop)
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -508,4 +512,34 @@ func Prompt(j store.Job, dir, exe string, steps []Step) string {
 		fmt.Fprintf(&b, "\n\n===== skill %s =====\n\n%s", s.Skill, skills.Text(s.Skill))
 	}
 	return b.String()
+}
+
+// withSources points the tailor and cover steps at the CV and cover letter named in config.yaml,
+// and the review at the final files the user put in the folder.
+func (rn *Runner) withSources(dir string, steps []Step) []Step {
+	home := rn.Store.Home
+	out := make([]Step, len(steps))
+	copy(out, steps)
+	for i, s := range out {
+		switch {
+		case s.Name == "tailor" && rn.CVSource != "":
+			out[i].Task += " Your CV source is " + filepath.Join(home, rn.CVSource) + ": tailor from it instead of cv/resume.md, keeping its layout."
+			if rn.formattedSource() {
+				out[i].Task += " It is not Markdown, so resume.md is only the reviewed text: keep its sections, order and wording style exactly as in the source, so the final file can be made from the source with the same changes. Do not write resume.pdf."
+			}
+		case s.Name == "cover" && rn.CoverTemplate != "":
+			out[i].Task += " Your cover letter template is " + filepath.Join(home, rn.CoverTemplate) + ": use it instead of cv/cover-letter.md and keep its greeting, paragraph count, sign-off and voice."
+		case s.Name == "review":
+			var own []string
+			for _, n := range apply.ReviewedFiles(dir) {
+				if !strings.HasSuffix(n, ".md") {
+					own = append(own, n)
+				}
+			}
+			if len(own) > 0 {
+				out[i].Task += " Also review " + strings.Join(own, ", ") + ": the final files the user put in the folder, which are what gets sent."
+			}
+		}
+	}
+	return out
 }

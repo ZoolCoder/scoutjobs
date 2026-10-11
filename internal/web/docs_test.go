@@ -282,3 +282,40 @@ func hasKind(events []store.Event, kind string) bool {
 	}
 	return false
 }
+
+func TestJobPageShowsProvenanceAndStaleResults(t *testing.T) {
+	s := testStore(t)
+	m := runner.NewManager(&runner.Runner{Store: s, Exe: "scoutjobs", Custom: "/bin/true"})
+	h, _ := Handler(s, Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5, Runner: m, APIToken: "secret"})
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Jane\n\n"+strings.Repeat("Go services. ", 40)), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team, "+strings.Repeat("I build Go services. ", 20)), 0o600)
+	// the agent left its verdict but the run stopped before recording it: the page load records it
+	_ = os.WriteFile(filepath.Join(dir, apply.ReviewResult), []byte(`{"verdict":"send","notes":"all claims in profile.md"}`), 0o600)
+	page := func() string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
+		return rec.Body.String()
+	}
+	b := page()
+	sum := apply.Short(apply.LoadProvenance(dir).Review.Files["resume.md"])
+	if !strings.Contains(b, "all claims in profile.md") || !strings.Contains(b, "resume.md "+sum) {
+		t.Fatalf("recorded review and its hashes: %s", b)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "resume.pdf"), []byte("%PDF-1.7 the styled final CV"), 0o600)
+	if b := page(); !strings.Contains(b, "stale, changed since the review: resume.pdf") || !strings.Contains(b, "stale: changed since the review: resume.pdf") {
+		t.Errorf("a replaced final file must reopen the review: %s", b)
+	}
+	req := httptest.NewRequest("GET", "/api/jobs/1", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if b := rec.Body.String(); !strings.Contains(b, `"review_changed":["resume.pdf"]`) || !strings.Contains(b, `"resume.md":"`) {
+		t.Errorf("api provenance: %s", b)
+	}
+	if j, _ := s.JobByID(1); j.Status == "applied" {
+		t.Error("reconciling never marks a job applied")
+	}
+}

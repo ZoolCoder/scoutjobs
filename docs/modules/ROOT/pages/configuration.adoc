@@ -25,7 +25,11 @@ imap_user:                  # defaults to email_from
 api_token:                  # when set, /api/* requires "Authorization: Bearer <token>"
 webhook_url:                # every event is POSTed here as JSON
 webhook_secret:             # optional; signs every POST with HMAC-SHA256 (X-ScoutJobs-Signature)
+cv_source:                  # the CV tailored resumes start from, e.g. "cv/Jane Doe CV.docx"; default cv/resume.md
+cover_template:             # the cover letter whose format every letter keeps; default cv/cover-letter.md
 ----
+
+`cv_source` and `cover_template` are relative to the data directory. When `cv_source` is a PDF or Word file, `resume.md` is only the reviewed text: the run never renders `resume.pdf` from it, and the export step asks you to save the final `resume.pdf`, made from your source, in the application folder.
 
 The SMTP password is never a config key. It comes from `SCOUTJOBS_SMTP_PASSWORD` in the environment.
 

@@ -577,6 +577,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	v.reconcileIdle(j)
 	events, _ := v.s.Events(id, 100)
 	ivs, _ := v.s.Interviews(id, false)
 	kit, dir, entries := apply.Status(v.s, j, events)
@@ -1082,7 +1083,7 @@ func (v *server) apiJob(w http.ResponseWriter, r *http.Request) {
 	}
 	events, _ := v.s.Events(id, 50)
 	ivs, _ := v.s.Interviews(id, false)
-	writeJSON(w, 200, map[string]any{"job": j, "events": events, "interviews": ivs})
+	writeJSON(w, 200, map[string]any{"job": j, "events": events, "interviews": ivs, "provenance": apply.ProvenanceOf(apply.Dir(v.s, j))})
 }
 
 func (v *server) apiSetStatus(w http.ResponseWriter, r *http.Request) {

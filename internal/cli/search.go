@@ -250,6 +250,11 @@ func runCV(s *store.Store, rest []string, out io.Writer) error {
 		if err != nil {
 			return err
 		}
+		if c.JobID != 0 {
+			if err := stampATS(s, c); err != nil {
+				return err
+			}
+		}
 		fmt.Fprintf(out, "logged cv check #%d %s score %d ats %d\n", id, c.File, c.Score, c.ATSScore)
 		return nil
 	case "list":
@@ -287,4 +292,13 @@ func cvFiles(home string) ([]string, string) {
 		}
 	}
 	return files, dir
+}
+
+// stampATS binds a CV check logged for a job to the bytes of the file it scored.
+func stampATS(s *store.Store, c store.CVCheck) error {
+	j, err := s.JobByID(c.JobID)
+	if err != nil {
+		return err
+	}
+	return apply.StampATS(apply.Dir(s, j), filepath.Base(c.File))
 }
