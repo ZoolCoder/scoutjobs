@@ -801,9 +801,15 @@ ul.reads li div{display:grid}ul.reads li .muted{font-size:12px}
 .dash .callout{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.5;max-height:calc(4.5em + 22px)}.dash .gaps{max-height:54px;overflow:hidden}
 .gaps{display:flex;flex-wrap:wrap;gap:6px}.gaps .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 ul.feed{list-style:none;margin:0;padding:0}
-ul.feed li{display:grid;grid-template-columns:120px auto minmax(0,1fr);gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px}
+ul.feed li{padding:6px 0;border-top:1px solid var(--line);font-size:13px;min-width:0}
 ul.feed li:first-child{border-top:0;padding-top:0}
-ul.feed li>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-ul.feed .mono{font-size:11.5px;color:var(--muted);white-space:nowrap}
+ul.feed li>span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ul.feed small{display:block;font-size:11.5px;color:var(--muted)}
+.dash .cv{grid-template-columns:auto minmax(0,1fr)}.dash .cv .file b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dash .cv .file .ic{display:none}
+.dash .panel>ul:not(.weeks){min-height:0;overflow:auto}.dash .panel>:not(ul){flex-shrink:0}
+@media (min-width:1281px) and (min-height:760px){
+  .dash{height:calc(100vh - 152px);grid-template-rows:auto minmax(0,1fr) minmax(0,1fr)}
+  .dash .panel{min-height:0;overflow:hidden}
+}
 @media (max-width:1280px){.c3,.c4,.c6{grid-column:span 6}.c5,.c7,.c8{grid-column:span 12}}
-@media (max-width:720px){.dash>*{grid-column:1/-1}.dash .kpis{grid-template-columns:1fr 1fr}ul.feed li{grid-template-columns:auto minmax(0,1fr)}ul.feed .badge{display:none}}
+@media (max-width:720px){.dash>*{grid-column:1/-1}.dash .kpis{grid-template-columns:1fr 1fr}}

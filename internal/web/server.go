@@ -488,19 +488,16 @@ func pathID(r *http.Request) (int64, error) {
 // ---- overview ----
 
 type overviewData struct {
-	Stats     store.Stats
-	Funnel    []funnelRow
-	Weekly    []weekBar
-	Upcoming  []store.Interview
-	Recent    []store.Event
-	Prefs     []store.Preference
-	Learning  []store.Learning
-	Sessions  []store.Session
-	TodoJobs  []store.Job
-	Decisions []store.Decision
-	Checks    []store.CVCheck
-	Target    int
-	Today     []todo
+	Stats    store.Stats
+	Funnel   []funnelRow
+	Weekly   []weekBar
+	Upcoming []store.Interview
+	Recent   []store.Event
+	Learning []store.Learning
+	TodoJobs []store.Job
+	Checks   []store.CVCheck
+	Target   int
+	Today    []todo
 }
 
 type funnelRow struct {
@@ -552,14 +549,8 @@ func (v *server) overview(w http.ResponseWriter, r *http.Request) {
 	d := overviewData{Stats: st, Funnel: funnel, Weekly: weekly, Target: v.cfg.WeeklyApplyTarget}
 	d.Upcoming, _ = v.s.Interviews(0, true)
 	d.Recent, _ = v.s.Events(0, 8)
-	d.Prefs, _ = v.s.Preferences()
-	if len(d.Prefs) > 6 {
-		d.Prefs = d.Prefs[:6]
-	}
 	d.Learning, _ = v.s.LearningItems()
-	d.Sessions, _ = v.s.Sessions(5)
 	d.TodoJobs, _ = v.s.ListJobs(store.JobFilter{Status: "drafted", Limit: 5})
-	d.Decisions, _ = v.s.Decisions(5)
 	d.Checks, _ = v.s.CVChecks(1)
 	d.Today = v.today(st, d.Upcoming)
 	v.render(w, r, "overview.html", "overview", d)
