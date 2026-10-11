@@ -7,6 +7,32 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-11
+
+### Added
+- Pipeline works like a Jira board: a job opens in a modal on top of the board
+  (stepper, quick actions, mail, activity, details) and stays open while you
+  move it. Full-screen focus mode (`f`), compact cards, and limits for large
+  pipelines: 50 cards per column with "Show all", closed stages collapsed to
+  strips, and a paged list view.
+- Gmail API: `scoutjobs gmail connect|status|disconnect` with your own OAuth
+  desktop client. ScoutJobs reads inbox metadata to match replies and uploads
+  drafts; it never sends. IMAP sync keeps working.
+- `scoutjobs email log` records a thread an agent found through its Gmail
+  connector; the `inbox-triage` skill uses it.
+- Inbox page, a Mail section per job, and "Write in Gmail", "Draft in Gmail"
+  and "Search Gmail" actions. The overview opens with a Today list.
+- Job page tabs: overview, mail, interviews, files, activity.
+- Interview prep checklist (six items) on the Interviews page, the calendar
+  and the API (`prep` on `PATCH /api/interviews/{id}`), plus a "How did it
+  go?" list for past interviews without an outcome.
+- Search: saved searches, result filters (remote only, exclude words, posted
+  within, minimum salary) and a description preview per result.
+- Google-style calendar with event cards, LinkedIn connections import, MCP
+  over HTTP, Gmail, Google Calendar and Google Drive connector skills, and n8n
+  workflows for search, fit alerts, follow-ups and Gmail.
+- Calendar `?new=<day>&job=<id>` preselects the job for a new interview.
+
 ## [0.2.0] - 2026-10-11
 
 ### Added
@@ -70,6 +96,7 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.1.0
