@@ -1059,3 +1059,43 @@ p.center{text-align:center}
 .moretags{display:contents}
 .moretags>summary{list-style:none;cursor:pointer}.moretags>summary::-webkit-details-marker{display:none}
 .moretags[open]>summary{display:none}
+/* job tabs */
+.mailsplit{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;margin-bottom:10px}
+.maillist{display:flex;flex-direction:column;gap:4px}
+.maillist a{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;color:var(--fg);border:1px solid transparent}
+.maillist a:hover{background:var(--subtle);text-decoration:none}
+.maillist a.on{background:var(--acc-sub);border-color:var(--acc-sub)}
+.maillist b{font-size:13.5px;font-weight:600;display:block}
+.maillist small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-size:12px;color:var(--muted)}
+.maillist .dot{width:8px;height:8px;border-radius:50%;background:var(--line2);margin-top:6px;flex:none}
+.maillist .dot.acc{background:var(--acc)}.maillist .dot.ok{background:var(--ok)}
+.mailpane{border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.mailpane>article{display:none}
+.mailpane>article:target,.mailpane:not(:has(article:target))>article:first-child{display:block}
+.mailpane h3{margin:0 0 10px;font-size:15px;font-weight:600}
+.mailpane .mailform{display:flex;flex-direction:column;gap:10px}
+.mailpane .mailform label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
+.mailpane .mailform input,.mailpane .mailform textarea{color:var(--fg);font-weight:400}
+.mailpane .runbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.mailpane .grow{flex:1}
+dl.mailhead{display:grid;grid-template-columns:70px minmax(0,1fr);gap:6px 10px;margin:0;font-size:13px}
+dl.mailhead dt{color:var(--muted)}dl.mailhead dd{margin:0}
+.panel-h .btn.act svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;margin-right:6px;vertical-align:-2px}
+.jobmain .ivcard{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:start}
+.jobmain .ivcard .cal{width:44px;height:48px}
+.jobmain .ivhead{margin-bottom:2px}
+.jobmain .ivmain>p{margin:0 0 8px}
+.jobmain .prepcheck{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:13px}
+.jobmain .prepcheck button{grid-column:1/-1;justify-self:start;margin-top:4px}
+.facts-acts{display:flex;gap:6px}
+ul.filelist>li{grid-template-columns:18px minmax(0,1fr) auto}
+ul.filelist b{font-weight:500;font-size:13.5px}
+h3.evday-h{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:16px 0 4px}
+.jobmain ul.evrows.tl>li{grid-template-columns:44px 30px minmax(0,1fr) auto;gap:12px}
+.evico{width:30px;height:30px;border-radius:8px;background:var(--subtle);display:inline-flex;align-items:center;justify-content:center}
+.evico svg{width:15px;height:15px;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.evico.assistant{background:var(--acc-sub)}.evico.assistant svg{stroke:var(--acc)}
+@media (max-width:900px){.mailsplit{grid-template-columns:1fr}.maillist{flex-direction:row;overflow-x:auto}.maillist a{min-width:200px}}
+@media (max-width:640px){.jobmain .ivcard{grid-template-columns:44px minmax(0,1fr)}.ivacts{grid-column:2}.jobmain .prepcheck{grid-template-columns:1fr}.jobmain ul.evrows.tl>li{grid-template-columns:40px minmax(0,1fr)}.jobmain ul.evrows.tl .evico,.jobmain ul.evrows.tl .badge{display:none}}
+.mailpane h3{text-transform:none;letter-spacing:normal;color:var(--fg)}
+.ivhead b::first-letter{text-transform:uppercase}

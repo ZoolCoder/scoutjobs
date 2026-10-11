@@ -94,51 +94,67 @@
 </section>
 </div>
 {{else if eq $tab "mail"}}
-{{with .Draft}}<section class="panel" id="draft">
-  <div class="panel-h"><h2>Application e-mail</h2><span class="act muted">written by the assistant; you send it</span></div>
-  <dl class="facts"><dt>To</dt><dd>{{if .To}}{{.To}}{{else}}<span class="muted">no recipient yet</span>{{end}}</dd><dt>Subject</dt><dd>{{.Subject}}</dd></dl>
-  <p class="pre mailbody">{{.Body}}</p>
-  <div class="runbar">{{if $.Data.CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{$.Data.Self}}"><button class="primary">{{$.Data.DraftLabel}}</button></form>{{end}}<a class="btn" href="{{mailto .}}">Open in mail app</a></div>
-</section>{{end}}
-{{if .Emails}}<section class="panel" id="emails">
-  <div class="panel-h"><h2>Suggested e-mails</h2><span class="n">{{len .Emails}}</span><span class="act muted">edit, then save as a draft; you send</span></div>
-  {{range .Emails}}<details class="proposal"{{if eq (len $.Data.Emails) 1}} open{{end}}><summary><b>{{.Label}}</b> <span class="muted small">{{.Why}}</span>{{if .Saved}} <span class="badge drafted">edited</span>{{end}}</summary>
-  <form class="mailform" method="post" data-busy="Saving…" action="/jobs/{{$j.ID}}/emails/{{.Kind}}">
-    <label>To <input name="to" value="{{.Msg.To}}" autocomplete="off"></label>
-    <label>Subject <input name="subject" value="{{.Msg.Subject}}" autocomplete="off"></label>
-    <label>Message <textarea name="body" rows="10">{{.Msg.Body}}</textarea></label>
-    <div class="runbar"><button class="mini" name="action" value="save">Save</button>{{if $.Data.CanGmail}}<button class="mini go" name="action" value="gmail">Save &amp; {{lower $.Data.DraftLabel}}</button>{{end}}<a class="btn mini" href="{{mailto .Msg}}">Open in mail app</a></div>
-  </form></details>{{end}}
-</section>{{end}}
-<section class="panel">
-  <div class="panel-h"><h2>Messages</h2><span class="n">{{len .Mails}}</span><a class="act" href="{{$p.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail</a></div>
-  {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="empty">No messages for this job yet<small>Replies show up here after you sync your inbox on the <a href="/inbox">Inbox</a> page.</small></p>{{end}}
+<section class="panel" id="emails">
+  <div class="panel-h"><h2>E-mails for this job</h2>{{if or .Emails .Draft}}<span class="n">{{if .Draft}}{{add (len .Emails) 1}}{{else}}{{len .Emails}}{{end}}</span>{{end}}<span class="act muted">written by the assistant; you review and send</span></div>
+  {{if or .Emails .Draft}}<div class="mailsplit">
+  <nav class="maillist" aria-label="suggested e-mails">
+    {{with .Draft}}<a href="#e-application"><span class="dot acc" aria-hidden="true"></span><span><b>Application e-mail</b><small>{{if .To}}To {{.To}}{{else}}No recipient yet{{end}}</small></span></a>{{end}}
+    {{range .Emails}}<a href="#e-{{.Kind}}"><span class="dot{{if .Saved}} ok{{end}}" aria-hidden="true"></span><span><b>{{.Label}}</b><small>{{.Why}}</small></span></a>{{end}}
+  </nav>
+  <div class="mailpane">
+    {{with .Draft}}<article id="e-application">
+      <h3>Application e-mail</h3>
+      <dl class="mailhead"><dt>To</dt><dd>{{if .To}}{{.To}}{{else}}<span class="muted">no recipient yet</span>{{end}}</dd><dt>Subject</dt><dd>{{.Subject}}</dd></dl>
+      <p class="pre mailbody">{{.Body}}</p>
+      <div class="runbar"><a class="btn" href="/jobs/{{$j.ID}}">Redo with AI on Overview</a><span class="grow"></span><a class="btn" href="{{mailto .}}">Open in mail app</a>{{if $.Data.CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft" data-busy="Saving…"><input type="hidden" name="back" value="{{$.Data.Self}}"><button class="primary">{{$.Data.DraftLabel}}</button></form>{{end}}</div>
+    </article>{{end}}
+    {{range .Emails}}<article id="e-{{.Kind}}">
+      <h3>{{.Label}}{{if .Saved}} <span class="badge drafted">edited</span>{{end}}</h3>
+      <form class="mailform" method="post" data-busy="Saving…" action="/jobs/{{$j.ID}}/emails/{{.Kind}}">
+        <label>To <input name="to" value="{{.Msg.To}}" autocomplete="off" placeholder="recruiter@company.com"></label>
+        <label>Subject <input name="subject" value="{{.Msg.Subject}}" autocomplete="off"></label>
+        <label>Message <textarea name="body" rows="11">{{.Msg.Body}}</textarea></label>
+        <div class="runbar"><button name="action" value="save">Save</button><span class="grow"></span><a class="btn" href="{{mailto .Msg}}">Open in mail app</a>{{if $.Data.CanGmail}}<button class="primary" name="action" value="gmail">Save as {{lower $.Data.DraftLabel}}</button>{{end}}</div>
+      </form>
+    </article>{{end}}
+  </div>
+  </div>
+  <p class="small muted">ScoutJobs never sends mail itself. Drafts go to your mailbox, and you press send.</p>
+  {{else}}<p class="empty">No e-mails to write yet<small>The assistant writes the application e-mail when it prepares this job, and suggests thank-you and follow-up notes later.</small></p>{{end}}
 </section>
-{{else if eq $tab "interviews"}}
 <section class="panel">
-  <div class="panel-h"><h2>Interviews</h2><span class="n">{{len .Interviews}}</span><a class="act" href="/calendar?new={{today}}&amp;job={{$j.ID}}">Schedule</a></div>
-  {{range .Interviews}}<article class="ivcard">
-    <div class="ivhead"><a class="mono" href="/calendar?view=week&amp;d={{day .At}}&amp;ev=i{{.ID}}">{{when .At}}</a><b>{{title .Stage}}</b>{{if .Format}}<span class="muted">{{.Format}}</span>{{end}}{{if .Interviewer}}<span class="muted">with {{.Interviewer}}</span>{{end}}<span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span>{{if .Outcome}}<span class="badge {{.Outcome}}">{{.Outcome}}</span>{{end}}</div>
-    {{template "prep-check" (prepArgs . $.Data.Self)}}
-    {{if .Feedback}}<p class="muted">{{.Feedback}}</p>{{end}}
-  </article>{{else}}<p class="empty">No interviews yet<small><a href="/calendar?new={{today}}&amp;job={{$j.ID}}">Schedule one</a> when the company gets back to you.</small></p>{{end}}
+  <div class="panel-h"><h2>Messages</h2><span class="n">{{len .Mails}}</span><a class="act" href="{{$p.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail ↗</a></div>
+  {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="empty">No messages for this job yet<small>Replies show up here after you check your inbox on the <a href="/inbox">Inbox</a> page.</small></p>{{end}}
 </section>
+{{else if eq $tab "interviews"}}{{$today := today}}
+<section class="panel">
+  <div class="panel-h"><h2>Upcoming interviews</h2><a class="act btn mini primary" href="/calendar?new={{$today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a></div>
+  {{$up := 0}}{{range .Interviews}}{{if ge .At $today}}{{$up = 1}}{{template "ivcard" (prepArgs . $.Data.Self)}}{{end}}{{end}}
+  {{if not $up}}<p class="empty">Nothing scheduled<small>Add the interview when the company gets back to you. Each one gets a short prep checklist.</small></p>{{end}}
+</section>
+{{$past := 0}}{{range .Interviews}}{{if lt .At $today}}{{$past = 1}}{{end}}{{end}}
+{{if $past}}<section class="panel">
+  <div class="panel-h"><h2>Past interviews</h2></div>
+  {{range .Interviews}}{{if lt .At $today}}{{template "ivcard" (prepArgs . $.Data.Self)}}{{end}}{{end}}
+</section>{{end}}
 {{else if eq $tab "files"}}
-<section class="panel">
-  <div class="panel-h"><h2>Files</h2><span class="n">{{len .Files}}</span></div>
-  {{if .Files}}{{$id := $j.ID}}<ul class="filelist">{{range .Files}}<li>{{template "ico-doc"}}<span>{{filelabel .}}<small class="muted">{{.}}</small></span>{{if hasSuffix . ".docx"}}<a class="btn mini" href="/jobs/{{$id}}/download/{{.}}">Download</a>{{else}}<a class="btn mini" href="/jobs/{{$id}}/files/{{.}}">Open</a>{{end}}</li>{{end}}</ul>
-  {{else}}<p class="empty">No files yet<small>The assistant saves the drafts here when it prepares this application.</small></p>{{end}}
-  {{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export" data-busy="Making the PDF…"><button class="mini" type="submit">Make resume PDF</button></form>{{end}}
-</section>
-{{else}}
+{{range .FileGroups}}{{if .Files}}<section class="panel">
+  <div class="panel-h"><h2>{{.Title}}</h2><span class="n">{{len .Files}}</span></div>
+  <ul class="filelist">{{range .Files}}<li>{{template "ico-doc"}}<span><b>{{.Label}}</b><small class="muted">{{with .Note}}{{.}} · {{end}}updated {{.Mod}}</small></span>
+    <span class="facts-acts">{{if .Preview}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}">Preview</a>{{end}}{{if .Editable}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}?edit=1">Edit</a>{{end}}{{if .Download}}<a class="btn mini" href="/jobs/{{$j.ID}}/download/{{.Name}}">Download</a>{{end}}</span></li>{{end}}</ul>
+</section>{{end}}{{end}}
+{{if not .Files}}<section class="panel"><div class="panel-h"><h2>Files</h2></div><p class="empty">No files yet<small>The assistant saves the drafts here when it prepares this application. <a href="/jobs/{{$j.ID}}">Start on Overview</a>.</small></p></section>{{end}}
+{{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export" data-busy="Making the PDF…"><button class="mini" type="submit">Make resume PDF again</button></form>{{end}}
+{{else}}{{$today := today}}
 <section class="panel">
   <div class="panel-h"><h2>Activity</h2><span class="n">{{len .Events}}</span></div>
-  <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Self}}"><input name="note" placeholder="Add a note" aria-label="note"><button class="primary">Add</button></form>
-  <ul class="evrows">{{range .Events}}{{$e := evrow .}}<li>
-    <span class="mono muted">{{day $e.At}}</span>
+  <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Self}}"><input name="note" placeholder="Add a note, e.g. called the recruiter, they liked my background" aria-label="note"><button class="primary">Add note</button></form>
+  {{$d := ""}}{{range .Events}}{{$e := evrow .}}{{if ne (day $e.At) $d}}{{if $d}}</ul>{{end}}{{$d = day $e.At}}<h3 class="evday-h">{{if eq $d $today}}Today{{else}}{{$d}}{{end}}</h3><ul class="evrows tl">{{end}}<li>
+    <span class="mono muted">{{hm $e.At}}</span>
+    <span class="evico {{$e.Group}}" aria-hidden="true">{{template "evico" $e.Group}}</span>
     <div class="what"><b>{{$e.Name}}</b>{{if $e.Long}}<details class="evnote"><summary>{{$e.Note}}</summary><p>{{$e.Note}}</p></details>{{else if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}</div>
     <span class="badge {{$e.Tone}}">{{title $e.Group}}</span>
-  </li>{{end}}</ul>
+  </li>{{end}}{{if $d}}</ul>{{else}}<p class="empty">Nothing yet<small>Status changes, drafts, e-mails and interviews for this job show up here.</small></p>{{end}}
 </section>
 {{end}}
 </div>
@@ -222,3 +238,16 @@
 </section>{{end}}
 
 {{define "checkrow"}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Label}}</b>{{if .Detail}}<small title="{{.Detail}}">{{.Detail}}</small>{{end}}{{with .Files}}<small class="prov" title="Fingerprints of the files this result covered">{{.}}</small>{{end}}</div>{{if .Href}}<a class="btn mini" href="{{.Href}}">{{.Act}}</a>{{end}}</li>{{end}}
+
+{{define "ivcard"}}{{$i := .I}}<article class="ivcard">
+  {{template "cal" $i.At}}
+  <div class="ivmain">
+    <div class="ivhead"><b>{{title $i.Stage}} interview</b>{{$up := ge $i.At today}}{{if $up}}<span class="badge {{$i.PrepStatus}}">prep {{$i.PrepCount}}/6</span>{{end}}{{if $i.Outcome}}<span class="badge {{$i.Outcome}}">{{title $i.Outcome}}</span>{{end}}</div>
+    <p class="small muted">{{hm $i.At}}{{if $i.Duration}} · {{$i.Duration}} min{{end}}{{with $i.Format}} · {{.}}{{end}}{{with $i.Interviewer}} · with {{.}}{{end}}{{with $i.Location}} · {{if isURL .}}<a href="{{.}}" rel="noopener noreferrer" target="_blank">join link ↗</a>{{else}}{{.}}{{end}}{{end}}</p>
+    {{if $up}}{{template "prep-check" .}}{{else if not $i.Outcome}}<p class="small muted">How did it go? Set the result from the <a href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">calendar</a>.</p>{{end}}
+    {{with $i.Feedback}}<p class="small"><b>Notes:</b> {{.}}</p>{{end}}
+  </div>
+  <div class="ivacts"><a class="btn mini" href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">Open in calendar</a></div>
+</article>{{end}}
+
+{{define "evico"}}{{if eq . "emails"}}{{template "ico-mail"}}{{else if eq . "interviews"}}{{template "ico-calendar"}}{{else if eq . "assistant"}}{{template "ico-spark"}}{{else if eq . "applications"}}{{template "ico-send"}}{{else if eq . "status"}}{{template "ico-columns"}}{{else if eq . "jobs"}}{{template "ico-search"}}{{else if eq . "notes"}}{{template "ico-doc"}}{{else}}{{template "ico-pulse"}}{{end}}{{end}}

@@ -109,6 +109,7 @@ var funcs = template.FuncMap{
 		return u
 	},
 	"hasSuffix": strings.HasSuffix,
+	"isURL":     func(s string) bool { return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://") },
 	"base":      filepath.Base,
 	"join":      strings.Join,
 	// mon and dom feed the calendar tile: "2026-10-14" -> "Oct", "14".
@@ -625,7 +626,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		self += "?tab=" + tab
 	}
 	p := v.panel(j, self, "/pipeline")
-	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
+	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "FileGroups": fileGroups(dir, files), "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),

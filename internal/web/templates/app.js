@@ -304,3 +304,16 @@ document.querySelectorAll('[data-open]').forEach(function (a) {
     });
   });
 })();
+
+// Job e-mails: mark the e-mail shown in the pane, the first one when none is picked.
+(function () {
+  var list = document.querySelector('.maillist');
+  if (!list) return;
+  function mark() {
+    var links = list.querySelectorAll('a');
+    var on = list.querySelector('a[href="' + location.hash + '"]') || links[0];
+    links.forEach(function (a) { a.classList.toggle('on', a === on); });
+  }
+  window.addEventListener('hashchange', mark);
+  mark();
+})();

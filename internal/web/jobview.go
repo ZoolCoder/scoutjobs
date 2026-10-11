@@ -1,6 +1,7 @@
 package web
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
@@ -114,4 +115,38 @@ func fileLabel(name string) string {
 		return l
 	}
 	return name
+}
+
+// fileNotes says in a few words what each application file is for.
+var fileNotes = map[string]string{
+	"resume.md": "Tailored to this job", "cover-letter.md": "Written for this job",
+	"resume.pdf": "Ready to send", "cover-letter.pdf": "Ready to send", "resume.docx": "For forms that want Word", "cover-letter.docx": "Built from your template",
+	"posting.md": "The original job description", "fit-review.json": "Why this job fits you", "ats-result.json": "How hiring software reads your resume",
+	"review-result.json": "What the review asked to fix", "provenance.json": "Which files the checks covered", "email.json": "The application e-mail",
+}
+
+// fileGroup is one heading on the Files tab.
+type fileGroup struct {
+	Title string
+	Files []fileRow
+}
+
+type fileRow struct {
+	doc
+	Note     string
+	Download bool
+}
+
+func fileGroups(dir string, names []string) []fileGroup {
+	groups := []fileGroup{{Title: "Your application"}, {Title: "Assistant notes"}}
+	for _, d := range docs(dir, names...) {
+		d.Label = fileLabel(d.Name)
+		row := fileRow{doc: d, Note: fileNotes[d.Name], Download: downloadable[filepath.Ext(d.Name)]}
+		i := 1
+		if strings.HasPrefix(d.Name, "resume") || strings.HasPrefix(d.Name, "cover-letter") {
+			i = 0
+		}
+		groups[i].Files = append(groups[i].Files, row)
+	}
+	return groups
 }
