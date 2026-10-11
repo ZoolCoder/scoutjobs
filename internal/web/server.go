@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -28,9 +29,10 @@ import (
 var assets embed.FS
 
 type server struct {
-	s   *store.Store
-	tpl *template.Template
-	cfg Config
+	s     *store.Store
+	tpl   *template.Template
+	cfg   Config
+	gmail gmailFlows
 }
 
 // Config is the subset of config.yaml the dashboard needs; cli passes it in to avoid an import cycle.
@@ -53,6 +55,7 @@ type MailHooks struct {
 	Status func() (source, account string) // source: gmail | imap | ""
 	Sync   func() (int, error)
 	Draft  func(jobID int64) (openURL string, err error)
+	Gmail  func() *gmail.Client // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
 }
 
 func day(s string) string {
@@ -231,6 +234,10 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/note", srv.addNote)
 	mux.HandleFunc("POST /jobs/{id}/export", srv.exportPDF)
 	mux.HandleFunc("POST /jobs/{id}/gmail-draft", srv.gmailDraft)
+	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
+	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
+	mux.HandleFunc("GET /gmail/callback", srv.gmailCallback)
+	mux.HandleFunc("POST /gmail/disconnect", srv.gmailDisconnect)
 	mux.HandleFunc("GET /inbox", srv.inbox)
 	mux.HandleFunc("POST /inbox/sync", srv.syncInbox)
 	mux.HandleFunc("GET /interviews", srv.interviews)

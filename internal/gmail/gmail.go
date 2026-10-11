@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -108,22 +107,16 @@ func randomString(n int) string {
 // Connect runs the installed-app flow: a one-shot listener on 127.0.0.1, the consent page in the
 // browser, PKCE so an intercepted code is useless. show receives the URL to open.
 func (c *Client) Connect(ctx context.Context, show func(authURL string)) (Token, error) {
-	c.defaults()
-	if c.ID == "" {
-		return Token{}, errors.New("gmail_client_id missing in config.yaml: create a Desktop OAuth client in Google Cloud and paste its id")
-	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return Token{}, err
 	}
 	defer ln.Close()
-	redirect := "http://" + ln.Addr().String() + "/callback"
-	state, verifier := randomString(16), randomString(48)
-	sum := sha256.Sum256([]byte(verifier))
-	q := url.Values{"client_id": {c.ID}, "redirect_uri": {redirect}, "response_type": {"code"}, "scope": {Scopes},
-		"access_type": {"offline"}, "prompt": {"consent"}, "state": {state},
-		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}, "code_challenge_method": {"S256"}}
-	show(c.AuthURL + "?" + q.Encode())
+	authURL, p, err := c.Begin("http://" + ln.Addr().String() + "/callback")
+	if err != nil {
+		return Token{}, err
+	}
+	show(authURL)
 
 	type result struct {
 		code string
@@ -135,18 +128,13 @@ func (c *Client) Connect(ctx context.Context, show func(authURL string)) (Token,
 			http.NotFound(w, r)
 			return
 		}
-		v := r.URL.Query()
-		switch {
-		case v.Get("state") != state:
-			http.Error(w, "state mismatch", http.StatusBadRequest)
-			done <- result{err: errors.New("oauth state mismatch")}
-		case v.Get("error") != "":
-			fmt.Fprintln(w, "Gmail was not connected. You can close this tab.")
-			done <- result{err: fmt.Errorf("google refused: %s", v.Get("error"))}
-		default:
+		code, err := p.Code(r.URL.Query())
+		if err != nil {
+			http.Error(w, "Gmail was not connected: "+err.Error(), http.StatusBadRequest)
+		} else {
 			fmt.Fprintln(w, "Gmail connected to ScoutJobs. You can close this tab.")
-			done <- result{code: v.Get("code")}
 		}
+		done <- result{code, err}
 	})}
 	go func() { _ = hs.Serve(ln) }()
 	defer func() { _ = hs.Close() }()
@@ -160,17 +148,7 @@ func (c *Client) Connect(ctx context.Context, show func(authURL string)) (Token,
 	if res.err != nil {
 		return Token{}, res.err
 	}
-	t, err := c.grant(ctx, url.Values{"grant_type": {"authorization_code"}, "code": {res.code}, "redirect_uri": {redirect}, "code_verifier": {verifier}})
-	if err != nil {
-		return Token{}, err
-	}
-	var prof struct {
-		EmailAddress string `json:"emailAddress"`
-	}
-	if err := c.call(ctx, t.AccessToken, "GET", "/profile", nil, &prof); err == nil {
-		t.Email = prof.EmailAddress
-	}
-	return t, c.save(t)
+	return c.Finish(ctx, p, res.code)
 }
 
 // grant posts to the token endpoint; refresh keeps the old refresh token when Google sends none.

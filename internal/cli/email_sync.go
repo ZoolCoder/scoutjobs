@@ -119,7 +119,11 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	return emit(out, *asJSON, map[string]any{"source": source, "inspected": len(mails), "replies": replies, "dry_run": *dry}, func() {
+	review := reviewCandidates(s, mails)
+	return emit(out, *asJSON, map[string]any{"source": source, "inspected": len(mails), "replies": replies, "review": review, "dry_run": *dry}, func() {
+		if len(review) > 0 {
+			defer fmt.Fprintf(out, "%d other messages may concern your search; --json lists them for inbox-triage\n", len(review))
+		}
 		if len(replies) == 0 {
 			fmt.Fprintf(out, "%d messages inspected, no new replies to applications\n", len(mails))
 			return
@@ -187,6 +191,78 @@ func syncReplies(s *store.Store, mails []mail.Mail, source string, dry bool) ([]
 		}
 	}
 	return replies, nil
+}
+
+// Candidate is an unmatched message that looks like it concerns the search: an ATS sender, an open
+// company's name, or application wording. inbox-triage judges these few instead of reading the inbox.
+type Candidate struct {
+	From      string `json:"from"`
+	Subject   string `json:"subject"`
+	Snippet   string `json:"snippet"`
+	Date      string `json:"date"`
+	Thread    string `json:"thread,omitempty"`
+	MessageID string `json:"message_id"`
+	Company   string `json:"company,omitempty"` // open job's company named in the message
+	Hint      string `json:"hint,omitempty"`    // rejected | interview from the wording
+}
+
+var atsDomains = []string{"greenhouse.io", "lever.co", "ashbyhq.com", "workablemail.com", "workable.com", "smartrecruiters.com",
+	"personio.de", "personio.com", "myworkday.com", "icims.com", "teamtailor.com", "recruitee.com", "join.com", "bamboohr.com", "jobvite.com", "successfactors.com"}
+
+var applicationWords = []string{"your application", "application for", "applying", "bewerbung", "candidature", "recruit", "hiring"}
+
+const maxCandidates = 30
+
+func reviewCandidates(s *store.Store, mails []mail.Mail) []Candidate {
+	jobs, _ := s.ListJobs(store.JobFilter{Open: true})
+	var out []Candidate
+	for _, m := range mails {
+		id := m.MessageID
+		if id == "" {
+			id = "uid:" + strconv.FormatUint(uint64(m.UID), 10)
+		}
+		if s.MailSeen(id) {
+			continue
+		}
+		if _, _, ok := matchReply(s, m); ok {
+			continue
+		}
+		text := strings.ToLower(m.From + "\n" + m.Subject + "\n" + m.Text)
+		c := Candidate{From: m.From, Subject: m.Subject, Snippet: trunc(m.Text, 200), Date: mailDate(m.Date), Thread: m.Thread,
+			MessageID: id, Hint: mail.Classify(m.Subject, m.Text)}
+		for _, j := range jobs {
+			if len(j.Company) >= 3 && strings.Contains(text, strings.ToLower(j.Company)) {
+				c.Company = j.Company
+				break
+			}
+		}
+		if c.Company == "" && !atsSender(m.From) && !containsAny(text, applicationWords) {
+			continue
+		}
+		if out = append(out, c); len(out) == maxCandidates {
+			break
+		}
+	}
+	return out
+}
+
+func atsSender(from string) bool {
+	d := mailDomain(from)
+	for _, a := range atsDomains {
+		if d == a || strings.HasSuffix(d, "."+a) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAny(s string, words []string) bool {
+	for _, w := range words {
+		if strings.Contains(s, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // mailDate turns an RFC 5322 Date header into RFC3339 so messages sort; unparseable dates stay as they are.

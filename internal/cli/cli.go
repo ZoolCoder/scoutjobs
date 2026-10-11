@@ -32,7 +32,9 @@ Usage: scoutjobs <command> [subcommand] [flags]
   email draft|show|send   application e-mail from the cover letter; send needs --yes
   email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
   email log <job>         record a message an agent's Gmail connector matched to a job
-  gmail connect|status|disconnect|draft <job>   Gmail API with your own OAuth client: read replies, create drafts (never sends)
+  gmail setup [--file client.json]|connect|status|disconnect|draft <job>
+                                     Gmail API with your own OAuth client: setup links the Google Cloud pages, imports the
+                                     downloaded client from ~/Downloads and connects; reads replies, creates drafts (never sends)
   decision log|summary
   pref set|list|rm|render|propose|review|confirm|reject
   interview add|list|set     --duration 45 --location <meeting link or address>
@@ -253,7 +255,8 @@ smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
 
-# Gmail API instead of IMAP (scoutjobs gmail connect): a Desktop OAuth client from your own Google Cloud project
+# Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Gmail on the dashboard's Inbox page); it stores
+# the client in gmail-client.json, so these two stay empty unless you prefer them here
 gmail_client_id:        # xxxx.apps.googleusercontent.com
 gmail_client_secret:    # the Desktop client's secret; or set $SCOUTJOBS_GMAIL_CLIENT_SECRET
 

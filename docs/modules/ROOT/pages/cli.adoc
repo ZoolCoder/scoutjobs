@@ -70,8 +70,13 @@ $ scoutjobs email draft 3 [--to hr@...] [--subject "..."] [--body file.md] [--at
 $ scoutjobs email show 3 [--json]         # the draft, and a mailto: link
 $ scoutjobs email send 3 --yes [--skip-checks]   # refuses without --yes, and while a quality gate fails
 $ scoutjobs email test [--to addr]        # probe: sends one line to yourself, checks IMAP login when imap_host is set
-$ scoutjobs email sync [--since 14d] [--dry-run] [--json]   # log inbox replies to applications over IMAP
+$ scoutjobs email sync [--since 14d] [--via gmail|imap] [--dry-run] [--json]   # log replies to applications; --json adds "review": unmatched mail that may concern the search
+$ scoutjobs gmail setup [--file client_secret_….json] [--no-connect]   # links the Google Cloud steps, imports the client JSON from ~/Downloads, connects
+$ scoutjobs gmail connect | status | disconnect
+$ scoutjobs gmail draft 3                 # the application e-mail as a Gmail draft; you send it from Gmail
 ----
+
+`gmail setup` stores the Desktop OAuth client in `gmail-client.json` (0600) in the data dir and the token in `gmail-token.json`. The dashboard's Inbox page does the same with Connect Gmail when it is opened on `127.0.0.1` or `localhost`.
 
 == Decisions, preferences, learning
 

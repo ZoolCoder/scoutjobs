@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
@@ -16,42 +18,128 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/web"
 )
 
+// gmailClient takes the OAuth client from config.yaml when set there, else from the file gmail setup imported.
 func gmailClient(s *store.Store, cfg Config) *gmail.Client {
-	secret := os.Getenv("SCOUTJOBS_GMAIL_CLIENT_SECRET")
-	if secret == "" {
-		secret = cfg.GmailSecret
+	id, secret := cfg.GmailClientID, cfg.GmailSecret
+	if id == "" {
+		c := gmail.LoadCredentials(s.Home)
+		id, secret = c.ID, c.Secret
 	}
-	return &gmail.Client{ID: cfg.GmailClientID, Secret: secret, Home: s.Home}
+	if env := os.Getenv("SCOUTJOBS_GMAIL_CLIENT_SECRET"); env != "" {
+		secret = env
+	}
+	return &gmail.Client{ID: id, Secret: secret, Home: s.Home}
+}
+
+// Google Cloud pages for a Desktop OAuth client, in the order setup needs them.
+const gmailSteps = `Gmail setup: a Desktop OAuth client in your own Google Cloud project (about 3 minutes, once).
+
+  1. Create a project (any name, e.g. scoutjobs):
+     https://console.cloud.google.com/projectcreate
+  2. Enable the Gmail API in it:
+     https://console.cloud.google.com/apis/library/gmail.googleapis.com
+  3. Configure the consent screen: Get started, app name ScoutJobs, audience External, your e-mail:
+     https://console.cloud.google.com/auth/overview
+     Then Audience > Publish app. In Testing mode Google drops the connection every 7 days.
+  4. Create the client: Application type Desktop app, Create, then Download JSON:
+     https://console.cloud.google.com/auth/clients/create
+
+Google will say it has not verified the app: it is your own app, so choose Advanced > Go to ScoutJobs.
+ScoutJobs reads inbox metadata and creates drafts. It never sends, labels or deletes.
+`
+
+// setupGmail imports the client from --file, or waits for Google's download to land in ~/Downloads.
+func setupGmail(s *store.Store, cfg Config, file string, wait time.Duration, out io.Writer) error {
+	if file == "" && gmailClient(s, cfg).ID != "" {
+		fmt.Fprintln(out, "gmail client already set up (--file <client_secret_….json> replaces it)")
+		return nil
+	}
+	if file == "" {
+		fmt.Fprint(out, gmailSteps)
+		dir := downloadsDir()
+		if file = gmail.FindDownload(dir, time.Time{}); file == "" {
+			fmt.Fprintf(out, "\nWaiting for client_secret_….json in %s (%s; or rerun with --file <path>)...\n", dir, wait)
+			deadline := time.Now().Add(wait)
+			for file == "" && time.Now().Before(deadline) {
+				time.Sleep(2 * time.Second)
+				file = gmail.FindDownload(dir, time.Time{})
+			}
+			if file == "" {
+				return errors.New("no client file arrived; rerun scoutjobs gmail setup --file <path to the downloaded JSON>")
+			}
+		}
+	}
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	c, err := gmail.ParseCredentials(b)
+	if err != nil {
+		return fmt.Errorf("%s: %w", file, err)
+	}
+	if err := gmail.SaveCredentials(s.Home, c); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "\nclient imported from %s into %s (0600); you can delete the download\n", file, filepath.Join(s.Home, gmail.ClientFile))
+	if cfg.GmailClientID != "" {
+		fmt.Fprintln(out, "note: gmail_client_id in config.yaml still wins; remove it to use the imported client")
+	}
+	return nil
+}
+
+func downloadsDir() string {
+	h, _ := os.UserHomeDir()
+	return filepath.Join(h, "Downloads")
+}
+
+func connectGmail(s *store.Store, cfg Config, out io.Writer) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	t, err := gmailClient(s, cfg).Connect(ctx, func(u string) {
+		fmt.Fprintf(out, "\nOpen this page, pick your Google account and allow access:\n\n  %s\n\nWaiting for Google (5 minutes)...\n", u)
+		openBrowser(u)
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "gmail connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
+	return nil
 }
 
 func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	cmd, rest := sub(rest)
 	c := gmailClient(s, cfg)
 	switch cmd {
-	case "connect":
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		t, err := c.Connect(ctx, func(u string) {
-			fmt.Fprintf(out, "Open this page, pick your Google account and allow access:\n\n  %s\n\nWaiting for Google (5 minutes)...\n", u)
-		})
-		if err != nil {
+	case "setup":
+		fs := flag.NewFlagSet("gmail setup", flag.ContinueOnError)
+		file := fs.String("file", "", "client JSON downloaded from Google Cloud; default: newest client_secret_*.json in ~/Downloads")
+		wait := fs.Duration("wait", 15*time.Minute, "how long to wait for the download")
+		noConnect := fs.Bool("no-connect", false, "import the client only")
+		if _, err := parse(fs, rest); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "gmail connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
-		return nil
+		if err := setupGmail(s, cfg, *file, *wait, out); err != nil {
+			return err
+		}
+		if *noConnect || c.Connected() && *file == "" {
+			return nil
+		}
+		return connectGmail(s, cfg, out)
+	case "connect":
+		return connectGmail(s, cfg, out)
 	case "status":
 		fs := flag.NewFlagSet("gmail status", flag.ContinueOnError)
 		asJSON := fs.Bool("json", false, "")
 		if _, err := parse(fs, rest); err != nil {
 			return err
 		}
-		res := map[string]any{"client_id": cfg.GmailClientID != "", "connected": c.Connected(), "account": c.Account(), "imap_host": cfg.IMAPHost}
+		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "imap_host": cfg.IMAPHost}
 		return emit(out, *asJSON, res, func() {
 			switch {
 			case c.Connected():
 				fmt.Fprintf(out, "gmail: connected as %s\n", orDash(c.Account()))
-			case cfg.GmailClientID == "":
-				fmt.Fprintln(out, "gmail: off (set gmail_client_id in config.yaml, then scoutjobs gmail connect)")
+			case c.ID == "":
+				fmt.Fprintln(out, "gmail: off (scoutjobs gmail setup connects it in a few minutes)")
 			default:
 				fmt.Fprintln(out, "gmail: client set, not connected (scoutjobs gmail connect)")
 			}
@@ -84,7 +172,7 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 			fmt.Fprintf(out, "draft created in Gmail for %s; review and send it there:\n  %s\n", j.Company, link)
 		})
 	}
-	return errors.New("usage: gmail connect | status | disconnect | draft <job>")
+	return errors.New("usage: gmail setup [--file client.json] | connect | status | disconnect | draft <job>")
 }
 
 // gmailDraft uploads the job's application e-mail (email.json from `email draft`) as a Gmail draft with
@@ -130,7 +218,7 @@ func mailSource(s *store.Store, cfg Config, via string) (string, error) {
 		if cfg.IMAPHost != "" {
 			return "imap", nil
 		}
-		return "", errors.New("no inbox to read: run scoutjobs gmail connect, or set imap_host in config.yaml")
+		return "", errors.New("no inbox to read: run scoutjobs gmail setup, or set imap_host in config.yaml")
 	}
 	return "", fmt.Errorf("--via %q: use gmail, imap or auto", via)
 }
@@ -157,7 +245,8 @@ func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 			}
 			return "", cfg.EmailFrom
 		},
-		Sync: func() (int, error) { return SyncMail(s, cfg) },
+		Sync:  func() (int, error) { return SyncMail(s, cfg) },
+		Gmail: func() *gmail.Client { return gmailClient(s, cfg) },
 		Draft: func(id int64) (string, error) {
 			j, err := s.JobByID(id)
 			if err != nil {
@@ -166,5 +255,21 @@ func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 			_, link, err := gmailDraft(s, cfg, j)
 			return link, err
 		},
+	}
+}
+
+// openBrowser is best effort: the URL is printed too, for SSH sessions and headless boxes.
+func openBrowser(u string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", u)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", u)
+	default:
+		cmd = exec.Command("xdg-open", u)
+	}
+	if cmd.Start() == nil {
+		go func() { _ = cmd.Wait() }()
 	}
 }

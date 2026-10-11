@@ -1,11 +1,29 @@
 {{template "head" .}}
 {{with .Data}}{{$kind := .Kind}}
 <div class="inbox-top">
-  <div class="src">{{if eq .Source "gmail"}}<span class="badge done">Gmail API</span> {{.Account}}{{else if eq .Source "imap"}}<span class="badge done">IMAP</span> {{.Account}}{{else}}<span class="badge todo">no inbox connected</span>{{end}}</div>
+  <div class="src">{{if eq .Source "gmail"}}<span class="badge done">Gmail API</span> {{.Account}} <form class="inline" method="post" action="/gmail/disconnect"><button class="mini">Disconnect</button></form>{{else if eq .Source "imap"}}<span class="badge done">IMAP</span> {{.Account}}{{else}}<span class="badge todo">no inbox connected</span>{{end}}</div>
   <span class="chips"><a {{if not $kind}}class="on" {{end}}href="/inbox">All</a>{{range .Kinds}}<a {{if eq . $kind}}class="on" {{end}}href="/inbox?kind={{.}}">{{.}}</a>{{end}}</span>
   {{if .CanSync}}<form method="post" action="/inbox/sync"><input type="hidden" name="back" value="/inbox"><button class="primary">Sync now</button></form>{{end}}
 </div>
 {{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
+{{if and .Gmail (ne .Source "gmail")}}<section class="panel gmail-setup">
+<div class="panel-h"><h2>Connect Gmail</h2><span class="muted">reads inbox metadata and creates drafts; never sends, labels or deletes</span></div>
+{{if .GmailClient}}<p>Your Google OAuth client is saved. Connect, pick your account and allow access; Google sends you back here.</p>
+<form method="post" action="/gmail/connect"><button class="primary">Connect Gmail</button></form>
+{{else}}<p>Once, about 3 minutes: a Desktop OAuth client in your own Google Cloud project, so your mail goes to no one else.</p>
+<ol class="setup">
+  <li><a href="https://console.cloud.google.com/projectcreate" rel="noopener noreferrer" target="_blank">Create a project</a>, any name.</li>
+  <li><a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" rel="noopener noreferrer" target="_blank">Enable the Gmail API</a> in it.</li>
+  <li><a href="https://console.cloud.google.com/auth/overview" rel="noopener noreferrer" target="_blank">Set up the consent screen</a>: app name ScoutJobs, audience External, your e-mail. Then Audience &rsaquo; <b>Publish app</b>; in Testing mode Google drops the connection every 7 days.</li>
+  <li><a href="https://console.cloud.google.com/auth/clients/create" rel="noopener noreferrer" target="_blank">Create an OAuth client</a> of type <b>Desktop app</b>, then Download JSON and add it here.</li>
+</ol>
+<form class="gmail-client" method="post" action="/gmail/client" enctype="multipart/form-data">
+  <label>Client file <input type="file" name="file" accept=".json,application/json"></label>
+  <label>or paste it <textarea name="client" rows="3" placeholder='{"installed":{"client_id":"….apps.googleusercontent.com", …}}'></textarea></label>
+  <button class="primary">Save client</button>
+</form>
+<p class="muted">Google warns that it has not verified the app: it is yours, so choose Advanced &rsaquo; Go to ScoutJobs. In a terminal, <code>scoutjobs gmail setup</code> does the same and picks the file up from Downloads. Saved to <code>{{.Home}}/gmail-client.json</code> (0600).</p>
+{{end}}</section>{{end}}
 {{if .Days}}
 {{range .Days}}<section class="panel"><div class="panel-h"><h2>{{if .Day}}{{when .Day}}{{else}}Undated{{end}}</h2><span class="n">{{len .Rows}}</span></div>
 <ul class="mails wide">{{range .Rows}}<li class="{{.Dir}}">
@@ -20,7 +38,7 @@
 <section class="panel"><div class="panel-h"><h2>No replies logged yet</h2></div>
 <p>Pick one way to fill this page:</p>
 <ol class="setup">
-  <li><b>Gmail API</b> (recommended). Create a Desktop OAuth client in your own Google Cloud project. Put <code>gmail_client_id</code> and <code>gmail_client_secret</code> in <code>config.yaml</code>, then run <code>scoutjobs gmail connect</code>. ScoutJobs reads your inbox and creates drafts. It never sends.</li>
+  <li><b>Gmail API</b> (recommended). Connect Gmail above, or run <code>scoutjobs gmail setup</code>. Replies are matched on this machine, so no agent has to read your mail.</li>
   <li><b>IMAP</b>. Set <code>imap_host: imap.gmail.com:993</code> and <code>SCOUTJOBS_IMAP_PASSWORD</code> (a Google app password), then run <code>scoutjobs email sync</code>.</li>
   <li><b>Agent connector</b>. In Claude with the Gmail connector, say “check my inbox”. The <code>inbox-triage</code> skill records matched threads with <code>scoutjobs email log</code>.</li>
 </ol></section>

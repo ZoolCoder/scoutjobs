@@ -126,7 +126,8 @@ func (v *server) inbox(w http.ResponseWriter, r *http.Request) {
 	if v.cfg.Mail.Status != nil {
 		src, account = v.cfg.Mail.Status()
 	}
-	v.render(w, r, "inbox.html", "inbox", map[string]any{"Days": days, "Total": len(ms), "Kind": kind, "Counts": counts,
+	gm := v.gmailClient()
+	v.render(w, r, "inbox.html", "inbox", map[string]any{"Gmail": gm != nil, "GmailClient": gm != nil && gm.ID != "", "Home": v.s.Home, "Days": days, "Total": len(ms), "Kind": kind, "Counts": counts,
 		"Kinds":  []string{"interview", "offer", "request", "rejected", "ack"},
 		"Source": src, "Account": account, "CanSync": src != "" && v.cfg.Mail.Sync != nil,
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err")})
