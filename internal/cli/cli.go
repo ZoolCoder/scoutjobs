@@ -28,7 +28,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   version                    print the version
   update [--check] [--yes] [--version vX.Y.Z]   install the latest release over this binary (brew/deb/rpm installs are handed to their manager)
   job add [--from url]|list [--compact]|show|set|skip|rm|import
-  job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--dry-run]
+  job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--keep-going] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
   email draft|show|send   application e-mail from the cover letter; send needs --yes
@@ -40,6 +40,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   decision log|summary
   pref set|list|rm|render|propose|review|confirm|reject
   interview add|list|set     --duration 45 --location <meeting link or address>
+  calendar sync              interviews to Google Calendar and back; interviews found there are tracked (the dashboard syncs every few minutes)
   linkedin import <zip|dir>  LinkedIn data export: profile for setup, connections for referrals
   contacts <job>|--company x who you know at a company (from the LinkedIn import)
   session log|list
@@ -109,6 +110,8 @@ func Run(args []string, out io.Writer) error {
 		return runLearn(s, rest, out)
 	case "gmail":
 		return runGmail(s, cfg, rest, out)
+	case "calendar":
+		return runCalendar(s, cfg, rest, out)
 	case "linkedin":
 		return runLinkedIn(s, rest, out)
 	case "contacts":
@@ -126,7 +129,11 @@ func Run(args []string, out io.Writer) error {
 		if err := fs.Parse(rest); err != nil {
 			return err
 		}
-		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
+		// older versions and some agents spelled application folders differently: merge them once at start
+		if n, err := apply.ReconcileAll(s); n > 0 || err != nil {
+			fmt.Fprintf(out, "merged %d file(s) from older application folders %v\n", n, errOrNil(err))
+		}
+		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, FitApplyFloor: cfg.FitApplyFloor, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -523,6 +530,8 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		return runJobReview(s, rest, out)
 	case "check":
 		return runJobCheck(s, rest, out)
+	case "acknowledge":
+		return runJobAcknowledge(s, rest, out)
 	case "run":
 		return runJobRun(s, rest, out)
 	case "rm":
@@ -539,7 +548,7 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, "removed #%d\n", j.ID)
 		return nil
 	}
-	return errors.New("usage: job add|list|show|set|fit|check|review|skip|rm")
+	return errors.New("usage: job add|list|show|set|fit|check|acknowledge|review|skip|rm")
 }
 
 func appDir(s *store.Store, j store.Job) string { return apply.Dir(s, j) }
@@ -1072,4 +1081,11 @@ func runExport(s *store.Store, out io.Writer) error {
 	sess, _ := s.Sessions(0)
 	learn, _ := s.LearningItems()
 	return emit(out, true, map[string]any{"jobs": jobs, "events": events, "decisions": decs, "preferences": prefs, "interviews": ivs, "sessions": sess, "learning": learn}, nil)
+}
+
+func errOrNil(err error) string {
+	if err == nil {
+		return ""
+	}
+	return "(" + err.Error() + ")"
 }

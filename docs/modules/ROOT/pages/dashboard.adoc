@@ -45,6 +45,8 @@ image::job-gates.png[Ready to send: seven gates all passing, and the evidence ta
 
 image::job-blocked.png[Three failing gates: a missing cover letter, a must-have without evidence, no reviewer verdict,1200]
 
+*Apply with gaps* appears when must-haves have no evidence. Tick each gap, say why you apply anyway, and press *Proceed with gaps*: the decision is logged as `check:acknowledged`, the fit review is not touched, and e-mail sending stays blocked. Once every other gate passes, *Proceed to official application* opens the posting, and *Yes, mark applied* records the submission with an optional note. Nothing is submitted for you.
+
 *Why this job fits* is `fit-review.json` as a table: the posting's wording for each requirement, whether it is a must or a nice-to-have, where in your profile the evidence is, how strong the match is (direct, adjacent, partial, gap), the wording the CV may use, and the risk a reviewer could raise. Below it the free-text notes, then interviews and the full history of the job. *People you know here* lists your LinkedIn connections at the company after `scoutjobs linkedin import`, for asking a referral.
 
 == Drafts viewer

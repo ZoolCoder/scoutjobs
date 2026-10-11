@@ -159,7 +159,7 @@ func (v *server) gmailDraft(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, withParam(dest, "err", "gmail is not connected"), http.StatusSeeOther)
 		return
 	}
-	link, err := v.cfg.Mail.Draft(id)
+	link, err := v.cfg.Mail.Draft(id, r.FormValue("kind"))
 	if err != nil {
 		http.Redirect(w, r, withParam(dest, "err", err.Error()), http.StatusSeeOther)
 		return

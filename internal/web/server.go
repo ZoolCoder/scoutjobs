@@ -40,6 +40,7 @@ type server struct {
 // Config is the subset of config.yaml the dashboard needs; cli passes it in to avoid an import cycle.
 type Config struct {
 	FollowUpDays, StaleDays, WeeklyApplyTarget int
+	FitApplyFloor                              int               // Prepare all and auto-prepare take jobs at or above it
 	APIToken                                   string            // when set, /api/* requires Authorization: Bearer <token>
 	Theme                                      string            // auto | dark | light; the theme cookie overrides it
 	EmailFrom                                  string            // sender for drafts built through the API; sending stays in the CLI
@@ -57,8 +58,8 @@ type Config struct {
 type MailHooks struct {
 	Status func() (source, account string) // source: gmail | imap | ""
 	Sync   func() (int, error)
-	Draft  func(jobID int64) (openURL string, err error)
-	Gmail  func() *gmail.Client // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
+	Draft  func(jobID int64, kind string) (openURL string, err error) // kind "" is the application e-mail
+	Gmail  func() *gmail.Client                                       // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
 }
 
 func day(s string) string {
@@ -85,8 +86,17 @@ var funcs = template.FuncMap{
 		return p
 	},
 	"kindcls": func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
-	"mailto":  func(m *mail.Message) string { return mail.Mailto(*m) },
-	"day":     day,
+	"mailto": func(m any) string {
+		switch m := m.(type) {
+		case *mail.Message:
+			return mail.Mailto(*m)
+		case mail.Message:
+			return mail.Mailto(m)
+		}
+		return ""
+	},
+	"day":       day,
+	"hasSuffix": strings.HasSuffix,
 	// mon and dom feed the calendar tile: "2026-10-14" -> "Oct", "14".
 	"mon": func(s string) string {
 		if t, err := time.Parse("2006-01-02", day(s)); err == nil {
@@ -193,10 +203,13 @@ func ServeContext(ctx context.Context, s *store.Store, addr string, cfg Config) 
 
 // ServeListener is ServeContext on a listener the caller opened, so it can report a busy port first.
 func ServeListener(ctx context.Context, l net.Listener, s *store.Store, cfg Config) error {
-	h, err := Handler(s, cfg)
+	srv, h, err := handler(s, cfg)
 	if err != nil {
 		l.Close()
 		return err
+	}
+	if cfg.Runner != nil {
+		go srv.autoPrepareLoop(ctx, 10*time.Minute)
 	}
 	hs := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
@@ -213,9 +226,14 @@ func ServeListener(ctx context.Context, l net.Listener, s *store.Store, cfg Conf
 
 // Handler builds the dashboard routes; tests drive it without a listener.
 func Handler(s *store.Store, cfg Config) (http.Handler, error) {
+	_, h, err := handler(s, cfg)
+	return h, err
+}
+
+func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	tpl, err := template.New("").Funcs(funcs).ParseFS(assets, "templates/*.html")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if cfg.Theme == "" {
 		cfg.Theme = "light"
@@ -235,11 +253,17 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /reviews", srv.reviews)
 	mux.HandleFunc("POST /jobs/{id}/status", srv.setStatus)
 	mux.HandleFunc("POST /jobs/{id}/note", srv.addNote)
+	mux.HandleFunc("POST /jobs/{id}/acknowledge", srv.acknowledgeGaps)
+	mux.HandleFunc("POST /jobs/{id}/applied", srv.markApplied)
 	mux.HandleFunc("POST /jobs/{id}/export", srv.exportPDF)
 	mux.HandleFunc("POST /jobs/{id}/run", srv.startRun)
 	mux.HandleFunc("POST /jobs/{id}/run/cancel", srv.cancelRun)
 	mux.HandleFunc("GET /jobs/{id}/run", srv.runState)
 	mux.HandleFunc("POST /jobs/{id}/gmail-draft", srv.gmailDraft)
+	mux.HandleFunc("GET /jobs/{id}/download/{name}", srv.jobDownload)
+	mux.HandleFunc("GET /jobs/{id}/view/{name}", srv.jobView)
+	mux.HandleFunc("POST /jobs/{id}/emails/{kind}", srv.saveEmail)
+	mux.HandleFunc("POST /jobs/prepare-all", srv.prepareAll)
 	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
 	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
 	mux.HandleFunc("GET /gmail/callback", srv.gmailCallback)
@@ -250,6 +274,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /interviews", srv.createInterview)
 	mux.HandleFunc("POST /interviews/{id}", srv.setInterview)
 	mux.HandleFunc("GET /calendar", srv.calendar)
+	mux.HandleFunc("POST /calendar/sync", srv.calendarSync)
 	mux.HandleFunc("GET /calendar.ics", srv.calendarFeed)
 	mux.HandleFunc("GET /calendar/event/{key}", srv.calendarEvent)
 	mux.HandleFunc("GET /learning", srv.learning)
@@ -257,6 +282,14 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /preferences", srv.preferences)
 	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
 	mux.HandleFunc("GET /profile", srv.profile)
+	mux.HandleFunc("GET /cv/{name}", srv.cvDownload)
+	mux.HandleFunc("GET /cv/view/{name}", srv.cvView)
+	mux.HandleFunc("GET /profile/files/{name}", srv.cvFile)
+	mux.HandleFunc("POST /profile/files/{name}", srv.saveCVFile)
+	mux.HandleFunc("POST /profile/prepare", srv.startMaster)
+	mux.HandleFunc("POST /profile/prepare/cancel", srv.cancelMaster)
+	mux.HandleFunc("GET /profile/prepare", srv.masterState)
+	mux.HandleFunc("POST /settings/auto-prepare", srv.setAutoPrepare)
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
@@ -285,6 +318,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("GET /api/brief", srv.apiBrief)
 	api.HandleFunc("GET /api/events", srv.apiEvents)
 	api.HandleFunc("GET /api/jobs/{id}/check", srv.apiCheck)
+	api.HandleFunc("POST /api/jobs/{id}/acknowledge", srv.apiAcknowledge)
 	api.HandleFunc("GET /api/jobs/{id}/contacts", srv.apiContacts)
 	api.HandleFunc("GET /api/jobs/{id}/files", srv.apiFiles)
 	api.HandleFunc("GET /api/jobs/{id}/files/{name}", srv.apiReadFile)
@@ -322,7 +356,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	if cfg.MCP != nil {
 		mux.Handle("/mcp", srv.mcpAuth(cfg.MCP))
 	}
-	return noStore(mux), nil
+	return srv, noStore(mux), nil
 }
 
 // static serves an embedded file. The stylesheet is never cached so an upgraded binary shows its new look at once.
@@ -352,6 +386,7 @@ type page struct {
 	Bare   bool // page renders its own header
 	Title  string
 	Active string
+	Nav    navCounts
 	Data   any
 	Cfg    Config
 	Now    string
@@ -405,7 +440,7 @@ func (v *server) render(w http.ResponseWriter, r *http.Request, name, active str
 			}
 		}
 	}
-	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Path: r.URL.RequestURI(), Sub: subtitles[active]}
+	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Path: r.URL.RequestURI(), Sub: subtitles[active], Nav: v.navCounts()}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := v.tpl.ExecuteTemplate(w, name, p); err != nil {
 		http.Error(w, err.Error(), 500)
@@ -567,8 +602,19 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 	p := v.panel(j, self, "/pipeline")
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
-		"Gates": gates, "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
-		"RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr")})
+		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
+		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
+		"Docs": docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx"), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
+		"CanGmail": v.cfg.Mail.Draft != nil && v.mailSource() == "gmail",
+		"Msg":      r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
+}
+
+// gmailLink keeps the "open your draft" link pointing at Gmail, whatever the query string says.
+func gmailLink(u string) string {
+	if strings.HasPrefix(u, "https://mail.google.com/") {
+		return u
+	}
+	return ""
 }
 
 func (v *server) jobFile(w http.ResponseWriter, r *http.Request) {
@@ -582,19 +628,22 @@ func (v *server) jobFile(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	name := filepath.Base(r.PathValue("name"))
-	if !apply.Textual[filepath.Ext(name)] {
+	p, ok := loadPage(apply.Dir(v.s, j), r.PathValue("name"))
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	dir := apply.Dir(v.s, j)
-	body, err := os.ReadFile(filepath.Join(dir, name))
-	if err != nil {
-		http.NotFound(w, r)
-		return
+	p.Back, p.BackLabel = fmt.Sprintf("/jobs/%d", id), j.Company+" · "+j.Title
+	p.Editable = apply.Writable[filepath.Ext(p.Name)]
+	// Markdown opens on the preview; plain text and JSON open in the editor, as before
+	p.Edit = p.Editable && (p.Kind != "md" || r.URL.Query().Get("edit") != "")
+	p.Saved = r.URL.Query().Get("saved") != ""
+	base := fmt.Sprintf("/jobs/%d/", id)
+	p.SaveURL, p.ViewURL, p.Download = base+"files/"+p.Name, base+"view/"+p.Name, base+"download/"+p.Name
+	if !downloadable[filepath.Ext(p.Name)] {
+		p.Download = ""
 	}
-	v.render(w, r, "file.html", "pipeline", map[string]any{"Job": j, "Name": name, "Body": string(body), "Size": int64(len(body)), "Path": filepath.Join(dir, name),
-		"Editable": apply.Writable[filepath.Ext(name)], "Saved": r.URL.Query().Get("saved") != ""})
+	v.render(w, r, "file.html", "pipeline", map[string]any{"F": p})
 }
 
 // saveFile is the textarea on the file page: drafts (.md, .txt, .json) are written back through apply.WriteFile.
@@ -784,6 +833,7 @@ func (v *server) setInterview(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	v.syncSoon()
 	http.Redirect(w, r, back(r, "/interviews"), http.StatusSeeOther)
 }
 
@@ -869,9 +919,10 @@ func (v *server) profile(w http.ResponseWriter, r *http.Request) {
 	}
 	cvDir := filepath.Join(v.s.Home, "cv")
 	type file struct {
-		Name string
-		Size int64
-		Mod  string
+		Name    string
+		Size    int64
+		Mod     string
+		Preview bool
 	}
 	var files []file
 	if entries, err := os.ReadDir(cvDir); err == nil {
@@ -883,14 +934,15 @@ func (v *server) profile(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			files = append(files, file{e.Name(), info.Size(), info.ModTime().Format("2006-01-02")})
+			files = append(files, file{e.Name(), info.Size(), info.ModTime().Format("2006-01-02"), previewKind(e.Name()) != "other"})
 		}
 	}
 	checks, _ := v.s.CVChecks(20)
 	prefs, _ := v.s.Preferences()
 	v.render(w, r, "profile.html", "profile", map[string]any{
 		"Profile": string(prof), "Filled": filled, "ProfilePath": filepath.Join(v.s.Home, "profile.md"),
-		"CVDir": cvDir, "Files": files, "Checks": checks, "Prefs": prefs,
+		"CVDir": cvDir, "Files": files, "Checks": checks, "Prefs": prefs, "Main": v.masterPanel(),
+		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"),
 	})
 }
 
@@ -1151,4 +1203,21 @@ func groupByDay(events []store.Event, now time.Time) []dayGroup {
 		out = append(out, dayGroup{Label: label, Events: []store.Event{e}})
 	}
 	return out
+}
+
+// navCounts are the live numbers beside the navigation links.
+type navCounts struct {
+	Preparing  int // jobs an agent is preparing or that wait in the queue
+	Interviews int // upcoming interviews
+}
+
+func (v *server) navCounts() navCounts {
+	var n navCounts
+	if v.cfg.Runner != nil {
+		n.Preparing = v.cfg.Runner.Busy()
+	}
+	if ivs, err := v.s.Interviews(0, true); err == nil {
+		n.Interviews = len(ivs)
+	}
+	return n
 }

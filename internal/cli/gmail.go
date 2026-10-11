@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/calsync"
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -105,7 +107,7 @@ func connectGmail(s *store.Store, cfg Config, out io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(out, "gmail connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
-	if !strings.Contains(t.Scope, gmail.CalendarScope) {
+	if !gmail.HasScope(t.Scope, gmail.CalendarScope) && !gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
 		fmt.Fprintln(out, "calendar was not allowed: the dashboard calendar shows only ScoutJobs events (connect again and tick Calendar to add yours)")
 	}
 	return nil
@@ -167,11 +169,12 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		if _, err := parse(fs, rest); err != nil {
 			return err
 		}
-		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "calendar": c.HasCalendar(), "imap_host": cfg.IMAPHost}
+		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "calendar": c.HasCalendar(),
+			"calendar_sync": c.CanWriteCalendar(), "imap_host": cfg.IMAPHost}
 		return emit(out, *asJSON, res, func() {
 			switch {
 			case c.Connected():
-				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), map[bool]string{true: "on (read-only)", false: "off"}[c.HasCalendar()])
+				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), calendarState(c))
 			case c.ID == "":
 				fmt.Fprintln(out, "gmail: off (scoutjobs gmail setup connects it in a few minutes)")
 			default:
@@ -189,18 +192,19 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	case "draft":
 		fs := flag.NewFlagSet("gmail draft", flag.ContinueOnError)
 		asJSON := fs.Bool("json", false, "")
+		kind := fs.String("kind", "", "application (default) | "+strings.Join(apply.ProposalKinds, " | "))
 		pos, err := parse(fs, rest)
 		if err != nil {
 			return err
 		}
 		if len(pos) == 0 {
-			return errors.New("usage: gmail draft <job>   (after scoutjobs email draft <job>)")
+			return errors.New("usage: gmail draft <job> [--kind followup|thanks|offer-accept|offer-negotiate|offer-decline]")
 		}
 		j, err := s.ResolveJob(pos[0])
 		if err != nil {
 			return err
 		}
-		d, link, err := gmailDraft(s, cfg, j)
+		d, link, err := gmailDraft(s, cfg, j, *kind)
 		if err != nil {
 			return err
 		}
@@ -213,9 +217,15 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 
 // gmailDraft uploads the job's application e-mail (email.json from `email draft`) as a Gmail draft with
 // the attachments. The Message-ID is recorded so replies match the job by thread later.
-func gmailDraft(s *store.Store, cfg Config, j store.Job) (gmail.Draft, string, error) {
+func gmailDraft(s *store.Store, cfg Config, j store.Job, kind string) (gmail.Draft, string, error) {
 	c := gmailClient(s, cfg)
 	m, _, err := loadDraft(s, j)
+	if kind != "" && kind != "application" {
+		if !apply.ValidKind(kind) {
+			return gmail.Draft{}, "", fmt.Errorf("unknown e-mail kind %q, want one of %s", kind, strings.Join(apply.ProposalKinds, ", "))
+		}
+		m, err = proposal(s, cfg, j, kind)
+	}
 	if err != nil {
 		return gmail.Draft{}, "", err
 	}
@@ -240,6 +250,19 @@ func gmailDraft(s *store.Store, cfg Config, j store.Job) (gmail.Draft, string, e
 	_ = s.RecordMail(m.MessageID, j.ID, "out", 0)
 	_ = s.AddEvent(j.ID, "email:gmail_draft", "to "+m.To+": "+m.Subject)
 	return d, "https://mail.google.com/mail/#drafts?compose=" + d.MessageID, nil
+}
+
+// proposal is the saved version of a proposed e-mail, else the one proposed now.
+func proposal(s *store.Store, cfg Config, j store.Job, kind string) (mail.Message, error) {
+	if m, err := apply.LoadProposal(apply.Dir(s, j), kind); err == nil {
+		return m, nil
+	}
+	for _, p := range apply.Proposals(s, j, cfg.FollowUpDays, time.Now()) {
+		if p.Kind == kind {
+			return p.Msg, nil
+		}
+	}
+	return mail.Message{}, fmt.Errorf("no %s e-mail is proposed for job %d now", kind, j.ID)
 }
 
 // mailSource picks where `email sync` reads: Gmail when connected, IMAP when imap_host is set.
@@ -308,12 +331,12 @@ func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 		},
 		Sync:  func() (int, error) { return SyncMail(s, cfg) },
 		Gmail: func() *gmail.Client { return gmailClient(s, cfg) },
-		Draft: func(id int64) (string, error) {
+		Draft: func(id int64, kind string) (string, error) {
 			j, err := s.JobByID(id)
 			if err != nil {
 				return "", err
 			}
-			_, link, err := gmailDraft(s, cfg, j)
+			_, link, err := gmailDraft(s, cfg, j, kind)
 			return link, err
 		},
 	}
@@ -333,4 +356,40 @@ func openBrowser(u string) {
 	if cmd.Start() == nil {
 		go func() { _ = cmd.Wait() }()
 	}
+}
+
+func calendarState(c *gmail.Client) string {
+	switch {
+	case c.CanWriteCalendar():
+		return "on (two-way sync)"
+	case c.HasCalendar():
+		return "read-only (scoutjobs gmail connect again to sync interviews)"
+	}
+	return "off"
+}
+
+// runCalendar syncs interviews with Google Calendar both ways; the dashboard does the same every few minutes.
+func runCalendar(s *store.Store, cfg Config, args []string, out io.Writer) error {
+	if len(args) == 0 || args[0] != "sync" {
+		return errors.New("usage: calendar sync [--json]")
+	}
+	fs := flag.NewFlagSet("calendar sync", flag.ContinueOnError)
+	asJSON := fs.Bool("json", false, "")
+	if _, err := parse(fs, args[1:]); err != nil {
+		return err
+	}
+	c := gmailClient(s, cfg)
+	if !c.HasCalendar() {
+		return errors.New("calendar is not connected: run scoutjobs gmail connect and allow Calendar")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	rep, err := calsync.Sync(ctx, s, c, time.Now())
+	if e := emit(out, *asJSON, rep, func() { fmt.Fprintln(out, rep.String()) }); e != nil {
+		return e
+	}
+	if err == nil && !c.CanWriteCalendar() {
+		fmt.Fprintln(os.Stderr, "calendar is read-only: interviews are read from it, not added; scoutjobs gmail connect again to allow that")
+	}
+	return err
 }

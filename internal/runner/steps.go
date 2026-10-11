@@ -30,7 +30,8 @@ func (rn *Runner) done(j store.Job, name string) (bool, string) {
 		if !ok || e.At < modTime(dir, "resume.md", "cover-letter.md") {
 			return false, "a review verdict on the current drafts"
 		}
-		return e.Kind == "review:send", e.Kind + " " + e.Note
+		// a fix verdict is a finished review too: the drafts were read and the findings are on the job
+		return true, e.Kind + " " + e.Note
 	case "export":
 		pdf := filepath.Join(dir, "resume.pdf")
 		st, err := os.Stat(pdf)
@@ -66,6 +67,9 @@ func (rn *Runner) fresh(j store.Job, name string, since time.Time) bool {
 	case "review":
 		e, ok := rn.lastEvent(j, "review:")
 		return ok && e.At >= stamp
+	case "ats":
+		e, ok := rn.lastEvent(j, "cv_check")
+		return ok && e.At >= stamp
 	}
 	return true
 }
@@ -81,39 +85,69 @@ func (rn *Runner) failed(j store.Job, name string, since time.Time) string {
 	return ""
 }
 
-// local runs a deterministic step.
-func (rn *Runner) local(j store.Job, name string) (string, error) {
+// local runs a deterministic step. warn is set when it finished but found blockers: they stop
+// sending, not the preparation, so the PDF and the local draft are still made.
+func (rn *Runner) local(j store.Job, name string) (detail string, warn bool, err error) {
 	dir := apply.Dir(rn.Store, j)
 	events, _ := rn.Store.Events(j.ID, 200)
 	switch name {
 	case "export":
-		if rep := apply.Check(rn.Store, j, events, apply.CheckOptions{Export: true}); !rep.OK() {
-			return "", errors.New(strings.Join(rep.Unresolved(), "; "))
-		}
 		dst, size, err := apply.ExportPDF(dir, "resume.md", "")
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		_ = rn.Store.AddEvent(j.ID, "cv:export", filepath.Base(dst))
-		return fmt.Sprintf("%s (%d KB)", filepath.Base(dst), size/1024), nil
+		detail := fmt.Sprintf("%s (%d KB)", filepath.Base(dst), size/1024)
+		if rep := apply.Check(rn.Store, j, events, apply.CheckOptions{Export: true}); !rep.OK() {
+			return detail + "; sending blocked by " + strings.Join(rep.Unresolved(), "; "), true, nil
+		}
+		return detail, false, nil
 	case "check":
 		rep := apply.Check(rn.Store, j, events, apply.CheckOptions{})
 		if !rep.OK() {
-			return "", errors.New(strings.Join(rep.Unresolved(), "; "))
+			return "sending blocked: " + strings.Join(rep.Unresolved(), "; "), true, nil
 		}
-		return fmt.Sprintf("%d gates pass, %d warnings", len(rep.Gates)-rep.Warned, rep.Warned), nil
+		return fmt.Sprintf("%d gates pass, %d warnings", len(rep.Gates)-rep.Warned, rep.Warned), false, nil
 	case "draft":
 		m, _, err := apply.Draft(rn.Store, j, rn.From, apply.DraftOptions{})
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		to := m.To
 		if to == "" {
 			to = "no recipient yet"
 		}
-		return "email.json to " + to + ", not sent", nil
+		return "email.json to " + to + ", not sent", false, nil
 	}
-	return "", fmt.Errorf("%s is not a local step", name)
+	return "", false, fmt.Errorf("%s is not a local step", name)
+}
+
+// Reconcile brings a job's state up to date before a run or on request: files left in a folder an
+// older version or an agent spelled differently are merged, and agent results not yet recorded are.
+func (rn *Runner) Reconcile(j store.Job) []string {
+	var notes []string
+	m, err := apply.Reconcile(rn.Store, j)
+	if len(m.Moved) > 0 {
+		notes = append(notes, "merged from an older folder: "+strings.Join(m.Moved, ", "))
+	}
+	if len(m.Conflicts) > 0 {
+		notes = append(notes, "kept both copies, compare them by hand: "+strings.Join(m.Conflicts, ", "))
+	}
+	if err != nil {
+		notes = append(notes, "folder merge: "+err.Error())
+	}
+	if err := rn.record(j); err != nil {
+		notes = append(notes, err.Error())
+	}
+	return notes
+}
+
+// record turns the agent's review and ATS result files into the review event and the CV check.
+func (rn *Runner) record(j store.Job) error {
+	events, _ := rn.Store.Events(j.ID, 200)
+	_, err1 := apply.RecordReview(rn.Store, j, events)
+	_, err2 := apply.RecordATS(rn.Store, j, events)
+	return errors.Join(err1, err2)
 }
 
 func (rn *Runner) lastEvent(j store.Job, prefix string) (store.Event, bool) {

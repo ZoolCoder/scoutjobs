@@ -21,12 +21,22 @@ Use AFTER job-description-analyzer to know what to emphasize.
 
 ## Core Capabilities
 
-- Reorder experience sections by relevance to target role
+- Reorder bullets within each role by relevance to the target role
 - Adjust professional summary for specific position
 - Add missing keywords from job description
 - Modify bullet points to match job requirements
 - Maintain authenticity while optimizing match
 - Create multiple targeted resume versions
+
+## Keep the Main CV's Format
+
+Every tailored resume starts from the main CV, `cv/resume.md` in the ScoutJobs home, and keeps its style and format:
+
+- Same name line and contact line
+- Same sections, with the same headings, heading levels and order; add or drop none
+- Same bullet style, date format and roughly the same length
+
+Change the content, not the shape: reorder and reword bullets, sharpen the summary and skills for this role. When `cv/resume.md` does not exist, follow the layout of the user's CV file in `cv/`. The quality gates warn when the sections or their order differ from the main CV.
 
 ## The Tailoring Philosophy
 
@@ -269,7 +279,7 @@ Before submitting any resume:
 6. ✅ Company/industry terminology is used correctly
 7. ✅ All claims are truthful
 8. ✅ File is named appropriately
-9. ✅ ATS formatting maintained
+9. ✅ Same sections, order and style as the main CV (`cv/resume.md`)
 10. ✅ Saved for interview prep reference
 
 ## Output Format

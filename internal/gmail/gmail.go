@@ -24,9 +24,9 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 )
 
-// Scopes: read for reply matching, compose for drafts, calendar read for interviews already in Google Calendar.
-// Compose cannot send without the user pressing Send; nothing here writes to the calendar.
-const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose " + CalendarScope
+// Scopes: read for reply matching, compose for drafts, calendar events to read the user's calendar and
+// keep the interviews ScoutJobs tracks in it. Compose cannot send without the user pressing Send.
+const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose " + CalendarEventsScope
 
 const TokenFile = "gmail-token.json"
 
@@ -218,11 +218,30 @@ func (c *Client) call(ctx context.Context, tok, method, path string, body, out a
 	return c.callURL(ctx, tok, method, c.APIBase+path, body, out)
 }
 
+// callURL repeats a request Gmail turned away for rate or a transient error, up to retries times with backoff.
 func (c *Client) callURL(ctx context.Context, tok, method, u string, body, out any) error {
+	var b []byte
+	if body != nil {
+		b, _ = json.Marshal(body)
+	}
+	for attempt := 0; ; attempt++ {
+		wait, err := c.once(ctx, tok, method, u, b, out, attempt)
+		if wait == 0 {
+			return err
+		}
+		if attempt == retries || Sleep(ctx, wait) != nil {
+			if rateLimited(err.Error()) || strings.Contains(err.Error(), " 429 ") {
+				return ErrRateLimited
+			}
+			return err
+		}
+	}
+}
+
+func (c *Client) once(ctx context.Context, tok, method, u string, body []byte, out any, attempt int) (time.Duration, error) {
 	var rd io.Reader
 	if body != nil {
-		b, _ := json.Marshal(body)
-		rd = bytes.NewReader(b)
+		rd = bytes.NewReader(body)
 	}
 	req, _ := http.NewRequestWithContext(ctx, method, u, rd)
 	req.Header.Set("Authorization", "Bearer "+tok)
@@ -231,18 +250,22 @@ func (c *Client) callURL(ctx context.Context, tok, method, u string, body, out a
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		path := strings.TrimPrefix(strings.SplitN(u, "?", 2)[0], c.APIBase)
-		return apiError(fmt.Errorf("google %s %s: %s %s", method, path, resp.Status, strings.TrimSpace(string(msg))))
+		err := fmt.Errorf("google %s %s: %s %s", method, path, resp.Status, strings.TrimSpace(string(msg)))
+		if wait := retryAfter(resp, string(msg), attempt); wait > 0 {
+			return wait, err
+		}
+		return 0, apiError(err)
 	}
 	if out == nil {
-		return nil
+		return 0, nil
 	}
-	return json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(out)
+	return 0, json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(out)
 }
 
 // Fetch lists inbox messages since the day, newest first, at most limit, as the reply matcher wants them.
@@ -280,15 +303,37 @@ func (c *Client) Fetch(ctx context.Context, since time.Time, limit int) ([]mail.
 		}
 		page = list.NextPageToken
 	}
+	// Messages read before come from the cache; new ones are paced under Gmail's per-user rate and
+	// cached as they arrive, so a sync stopped by the quota resumes where it stopped.
+	cache := c.loadCache()
 	out := make([]mail.Mail, 0, len(ids))
+	var err2 error
+	fetched := 0
 	for _, id := range ids {
+		if e, ok := cache[id]; ok {
+			out = append(out, e.mail())
+			continue
+		}
+		if fetched > 0 {
+			if err2 = Sleep(ctx, messageGap); err2 != nil {
+				break
+			}
+		}
+		fetched++
 		m, err := c.message(ctx, tok, id)
 		if err != nil {
-			return out, err
+			err2 = err
+			break
 		}
+		cache[id] = toCache(m)
 		out = append(out, m)
 	}
-	return out, nil
+	if fetched > 0 {
+		if err := c.saveCache(cache); err != nil && err2 == nil {
+			err2 = err
+		}
+	}
+	return out, err2
 }
 
 func (c *Client) message(ctx context.Context, tok, id string) (mail.Mail, error) {
@@ -361,7 +406,7 @@ func (c *Client) CreateDraft(ctx context.Context, raw []byte, thread string) (Dr
 	return Draft{ID: out.ID, MessageID: out.Message.ID, Thread: out.Message.ThreadID}, nil
 }
 
-// Disconnect revokes the grant at Google (best effort) and deletes the token file.
+// Disconnect revokes the grant at Google (best effort) and deletes the token file and the message cache.
 func (c *Client) Disconnect(ctx context.Context) error {
 	c.defaults()
 	if t, err := c.load(); err == nil && t.RefreshToken != "" {
@@ -371,6 +416,7 @@ func (c *Client) Disconnect(ctx context.Context) error {
 			resp.Body.Close()
 		}
 	}
+	_ = os.Remove(c.cachePath())
 	err := os.Remove(c.tokenPath())
 	if errors.Is(err, os.ErrNotExist) {
 		return nil

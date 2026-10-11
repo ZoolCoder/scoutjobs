@@ -7,6 +7,57 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-11
+
+### Added
+- Google Calendar sync both ways (`calendar sync`; the dashboard syncs every
+  few minutes): interviews scheduled in ScoutJobs are added without attendees,
+  so nobody is invited; calendar events that name a tracked company become
+  interviews; a move or a deletion follows on the other side. Only events
+  ScoutJobs created are ever written.
+- Main CV and cover letter on the Profile page, written by your agent; every
+  tailored resume and cover letter starts from them.
+- Documents panel per job: preview (Markdown, PDF, text), edit and download;
+  files that do not exist yet are not links.
+- Proposed e-mails per job: follow-up, interview thank-you, offer accept,
+  negotiate and decline. Saved or drafted in Gmail, never sent.
+- Prepare all and auto-prepare: a queue that prepares every open job above
+  your score floor, one at a time.
+- Live run progress on the job page; finished steps fold under Redo.
+- Job checklist: one list on the job page from fit to sent, with what is
+  done, what needs a look, what blocks sending and the one next step.
+- Grouped navigation (Apply, Interview, You) with live counts of jobs being
+  prepared and upcoming interviews.
+- `job run --keep-going` and a "Keep going if the review asks for fixes"
+  checkbox: a fix verdict is recorded as a warning and the PDF, gates and
+  e-mail draft are still prepared. Sending stays blocked.
+- Main CV from your own CV: a "Profile from your CV" step reads the PDF or
+  DOCX in `cv/`, adds what profile.md lacks (the old one is kept as
+  `profile.prev.md`), and the main CV keeps that file's sections, order and
+  style. Tailored resumes keep the main CV's layout; a new `format` gate warns
+  when they do not.
+- Apply with gaps (#30): for an employer portal, acknowledge each must-have
+  without evidence (`job acknowledge`, the job page, or
+  `POST /api/jobs/{id}/acknowledge`), open the official posting, then mark the
+  job applied. The decision is logged; the fit review, the drafts and the
+  e-mail send gate are unchanged, and a veto is never acknowledged.
+
+### Fixed
+- Prepare application no longer stalls (#29). Files left in a differently
+  spelled application folder are merged (conflicts kept and reported, never
+  overwritten), the agent's draft review and ATS score are read from
+  `review-result.json` and `ats-result.json` instead of relying on it to call
+  the CLI, quality gates block sending only and no longer stop the PDF or the
+  e-mail draft, and a failure that a later run fixed is shown as history
+  with the next step, not as the current error.
+- Gmail sync no longer fails with Google's raw 403 quota error (#27). Rate
+  limits and transient errors are retried with backoff, message reads are
+  paced under the per-user quota, and each message is read once: its metadata
+  is cached in `gmail-cache.json` (0600, deleted by `gmail disconnect`), so a
+  sync stopped by the quota resumes where it stopped. Replies found before the
+  stop are still logged, and the Inbox shows a short "wait a minute" message.
+- `doctor` no longer calls `agent` and `agent_command` unknown config keys.
+
 ## [0.4.0] - 2026-10-11
 
 ### Added
@@ -153,7 +204,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.1

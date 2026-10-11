@@ -85,17 +85,84 @@ func TestRunWritesDraftsAndSkipsThemNextTime(t *testing.T) {
 	}
 }
 
-func TestRunStopsAtTheFirstFailure(t *testing.T) {
+func TestGatesBlockSendingNotPreparation(t *testing.T) {
 	rn, j := setup(t, fakeAgent)
 	got := run(t, rn, j, Request{Steps: []string{"tailor", "cover", "export", "check", "draft"}})
-	if got.State != Failed || !strings.HasPrefix(got.Error, "export: ") || !strings.Contains(got.Error, "no reviewer verdict") {
-		t.Fatalf("%s %q", got.State, got.Error)
+	if got.State != Done || states(got) != "tailor=done cover=done export=warn check=warn draft=done" {
+		t.Fatalf("%s %q %s", got.State, got.Error, states(got))
 	}
-	if states(got) != "tailor=done cover=done export=failed check=skipped draft=skipped" {
-		t.Errorf("%s", states(got))
+	if d := got.Steps[3].Detail; !strings.Contains(d, "sending blocked") || !strings.Contains(d, "no reviewer verdict") {
+		t.Errorf("check detail %q", d)
 	}
-	if _, err := os.Stat(filepath.Join(apply.Dir(rn.Store, j), apply.DraftName)); err == nil {
-		t.Error("drafted after a failed step")
+	dir := apply.Dir(rn.Store, j)
+	for _, f := range []string{"resume.pdf", apply.DraftName} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			t.Errorf("%s not prepared: %v", f, err)
+		}
+	}
+	events, _ := rn.Store.Events(j.ID, 200)
+	if rep := apply.Check(rn.Store, j, events, apply.CheckOptions{}); rep.OK() {
+		t.Error("the send gate must still fail")
+	}
+}
+
+// reviewAgent writes the review as a result file and never calls scoutjobs, like an agent that forgets.
+const reviewAgent = `#!/bin/sh
+cat > prompt.txt
+grep -q "Step [0-9], draft review" prompt.txt && printf '{"verdict":"fix","notes":"claims a Kafka migration not in profile.md"}' > review-result.json
+grep -q "Step [0-9], ats check" prompt.txt && printf '{"score":71,"ats":82,"summary":"clean","gaps":["add Terraform"]}' > ats-result.json
+true
+`
+
+func TestRunnerRecordsAgentResultsAndKeepsGoing(t *testing.T) {
+	rn, j := setup(t, reviewAgent)
+	dir := apply.Dir(rn.Store, j)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Jane\n\nGo engineer."), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team, I build Go services."), 0o600)
+	time.Sleep(1100 * time.Millisecond) // events and file times have second precision
+
+	got := run(t, rn, j, Request{Steps: []string{"review", "export"}})
+	if got.State != Failed || !strings.Contains(got.Error, "Kafka") || !strings.Contains(got.Error, "keep going") {
+		t.Fatalf("a fix verdict stops by default: %s %q", got.State, got.Error)
+	}
+	got = run(t, rn, j, Request{Steps: []string{"review", "export", "ats"}, Force: true, KeepGoing: true})
+	if got.State != Done || states(got) != "review=warn export=warn ats=done" {
+		t.Fatalf("keep going: %s %q %s", got.State, got.Error, states(got))
+	}
+	checks, _ := rn.Store.CVChecks(5)
+	if len(checks) != 1 || checks[0].ATSScore != 82 || checks[0].JobID != j.ID || checks[0].Gaps != "add Terraform" {
+		t.Errorf("ats result not recorded: %+v", checks)
+	}
+}
+
+func TestPlanMergesALegacyFolder(t *testing.T) {
+	rn, j := setup(t, fakeAgent)
+	dir := apply.Dir(rn.Store, j)
+	legacy := filepath.Join(filepath.Dir(dir), "acme-go-engineer")
+	_ = os.MkdirAll(legacy, 0o755)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(legacy, "resume.md"), []byte("# Jane\n\nold folder"), 0o600)
+	_ = os.WriteFile(filepath.Join(legacy, "notes.md"), []byte("legacy notes"), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "notes.md"), []byte("newer notes"), 0o600)
+
+	got := run(t, rn, j, Request{Steps: []string{"tailor"}})
+	if states(got) != "tailor=skipped" || !strings.Contains(strings.Join(got.Log, "\n"), "acme-go-engineer/resume.md") {
+		t.Fatalf("legacy resume not picked up: %s %v", states(got), got.Log)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, "notes.md")); string(b) != "newer notes" {
+		t.Errorf("newer file overwritten: %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(legacy, "notes.md")); string(b) != "legacy notes" {
+		t.Errorf("conflicting legacy file lost: %q", b)
+	}
+	events, _ := rn.Store.Events(j.ID, 50)
+	var conflict bool
+	for _, e := range events {
+		conflict = conflict || e.Kind == "files:conflict"
+	}
+	if !conflict {
+		t.Error("conflict not reported")
 	}
 }
 

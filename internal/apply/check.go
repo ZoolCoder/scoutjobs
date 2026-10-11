@@ -35,6 +35,7 @@ type Report struct {
 	Gates  []Gate `json:"gates"`
 	Failed int    `json:"failed"`
 	Warned int    `json:"warned"`
+	Acked  int    `json:"acknowledged,omitempty"`
 }
 
 // OK is true when nothing blocks.
@@ -55,6 +56,9 @@ func (r Report) Unresolved() []string {
 // `cv export` can produce the PDF the ATS gate later inspects.
 type CheckOptions struct {
 	Export bool
+	// AllowAcknowledged lets an acknowledged coverage gap stop counting as a failure (portal
+	// applications); email send never sets it.
+	AllowAcknowledged bool
 }
 
 var (
@@ -85,6 +89,7 @@ func Check(s *store.Store, j store.Job, events []store.Event, o CheckOptions) Re
 	if !o.Export {
 		add(gateDocuments(dir, drafts))
 	}
+	add(gateFormat(s.Home, drafts["resume.md"]))
 	add(gateFitReview(j, review, reviewErr))
 	add(gateCoverage(review, reviewErr, drafts))
 	add(gateGrounding(dir, events, drafts))
@@ -92,6 +97,9 @@ func Check(s *store.Store, j store.Job, events []store.Event, o CheckOptions) Re
 	if !o.Export {
 		add(gateATS(dir))
 		add(gateFilenames(dir))
+	}
+	if o.AllowAcknowledged {
+		r.allowAcknowledged(events, review, drafts)
 	}
 	return r
 }
@@ -114,6 +122,52 @@ func gateDocuments(dir string, drafts map[string]string) Gate {
 		return Gate{"documents", Fail, "required documents missing: " + strings.Join(missing, ", "), missing}
 	}
 	return Gate{"documents", Pass, "tailored resume and cover letter present", nil}
+}
+
+// gateFormat keeps every tailored resume in the layout of the main CV: same sections, same order,
+// same heading levels. Tailoring changes the content, not the shape.
+func gateFormat(home, resume string) Gate {
+	main, err := os.ReadFile(filepath.Join(home, "cv", "resume.md"))
+	if err != nil || resume == "" {
+		return Gate{"format", Pass, "no main CV to compare with", nil}
+	}
+	want, got := Outline(string(main)), Outline(resume)
+	var diff []string
+	have := map[string]bool{}
+	for _, h := range got {
+		have[h] = true
+	}
+	for _, h := range want {
+		if !have[h] {
+			diff = append(diff, "missing section "+h)
+		}
+		delete(have, h)
+	}
+	for _, h := range got {
+		if have[h] {
+			diff = append(diff, "section not in the main CV "+h)
+		}
+	}
+	if len(diff) == 0 && strings.Join(want, "|") != strings.Join(got, "|") {
+		diff = append(diff, "sections are in a different order than the main CV")
+	}
+	if len(diff) > 0 {
+		return Gate{"format", Warn, "resume.md does not follow the layout of cv/resume.md", diff}
+	}
+	return Gate{"format", Pass, "same sections and order as the main CV", nil}
+}
+
+// Outline is the section headings of a Markdown CV below the name, with their level: "## Experience".
+func Outline(md string) []string {
+	var out []string
+	for _, l := range strings.Split(md, "\n") {
+		l = strings.TrimSpace(l)
+		if strings.HasPrefix(l, "##") {
+			level, text, _ := strings.Cut(l, " ")
+			out = append(out, level+" "+strings.ToLower(strings.TrimSpace(text)))
+		}
+	}
+	return out
 }
 
 func gateFitReview(j store.Job, review FitReview, err error) Gate {
@@ -142,6 +196,11 @@ func gateCoverage(review FitReview, err error, drafts map[string]string) Gate {
 	if gaps := review.Gaps(); len(gaps) > 0 {
 		return Gate{"coverage", Fail, fmt.Sprintf("%d must-have requirement(s) without evidence", len(gaps)), gaps}
 	}
+	return gateWording(review, drafts)
+}
+
+// gateWording wants the agreed wording of every evidenced must-have in the drafts.
+func gateWording(review FitReview, drafts map[string]string) Gate {
 	if len(drafts) == 0 {
 		return Gate{"coverage", Warn, "no markdown drafts to match the agreed wording against", nil}
 	}

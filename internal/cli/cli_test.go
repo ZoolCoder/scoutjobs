@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -185,8 +186,9 @@ func TestEmailDraftAndSend(t *testing.T) {
 	if !strings.Contains(out, `"status": "new"`) || !strings.Contains(out, "email:draft") || strings.Contains(out, "email:sent") || !strings.Contains(out, "check:skipped") {
 		t.Errorf("job after failed send: %s", out)
 	}
-	if err := Run([]string{"cv", "export", "1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "not exported") {
-		t.Errorf("export must stop before a reviewer verdict: %v", err)
+	// a local PDF is preparation: it is written with a warning, and sending stays blocked
+	if out := run(t, "cv", "export", "1"); !strings.Contains(out, "sending stays blocked") || !strings.Contains(out, "reviewer") {
+		t.Errorf("export before a reviewer verdict: %s", out)
 	}
 	run(t, "job", "review", "1", "--verdict", "send", "--notes", "all claims in profile")
 	out = run(t, "cv", "export", "1", "--json")
@@ -382,6 +384,33 @@ func TestJobFitReviewAndCheck(t *testing.T) {
 	}
 }
 
+func TestJobAcknowledgeGaps(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SCOUTJOBS_HOME", home)
+	run(t, "init")
+	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev", "--url", "https://acme.test/jobs/1")
+	run(t, "job", "fit", "1", "--review", `{"requirements":[{"requirement":"Commissioning","kind":"must","strength":"gap"}],"score":55}`)
+	var b bytes.Buffer
+	if err := Run([]string{"job", "acknowledge", "1"}, &b); err == nil || !strings.Contains(b.String(), "- Commissioning") {
+		t.Errorf("without --yes: %v %s", err, b.String())
+	}
+	dir := filepath.Join(home, "applications", "acme_go-dev")
+	body := strings.Repeat("Built Go services with Postgres and shipped them weekly. ", 5)
+	os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Me\n\n"+body), 0o600)
+	os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team,\n\n"+body), 0o600)
+	out := run(t, "job", "acknowledge", "1", "--notes", "adjacent experience", "--yes")
+	if !strings.Contains(out, "https://acme.test/jobs/1") || !strings.Contains(out, "sending stays blocked") {
+		t.Errorf("acknowledge: %s", out)
+	}
+	b.Reset()
+	if err := Run([]string{"job", "check", "1", "--allow-acknowledged"}, &b); !strings.Contains(b.String(), "ACK   coverage") {
+		t.Errorf("check: %v %s", err, b.String())
+	}
+	if err := Run([]string{"job", "check", "1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "coverage") {
+		t.Errorf("plain check keeps the gap: %v", err)
+	}
+}
+
 func TestPrefReviewCommands(t *testing.T) {
 	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
 	run(t, "init")
@@ -395,5 +424,15 @@ func TestPrefReviewCommands(t *testing.T) {
 	var b bytes.Buffer
 	if err := Run([]string{"pref", "reject", "stack_avoid"}, &b); err == nil {
 		t.Error("rejected a proposal that is no longer pending")
+	}
+}
+
+// Every key the config template offers, set or commented out, must be one doctor knows (#27).
+func TestDoctorKnowsEveryTemplateKey(t *testing.T) {
+	key := regexp.MustCompile(`^#? ?([a-z_]+):`)
+	for _, line := range strings.Split(configTemplate, "\n") {
+		if m := key.FindStringSubmatch(line); m != nil && !configKeys[m[1]] {
+			t.Errorf("doctor would call %q unknown", m[1])
+		}
 	}
 }

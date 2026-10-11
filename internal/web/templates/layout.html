@@ -13,16 +13,19 @@
 <div class="shell">
 <aside class="side">
   <a class="brand" href="/">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
-  <nav>
+  <nav aria-label="main">
     <a href="/" {{if eq .Active "overview"}}class="on" aria-current="page"{{end}}>{{template "ico-grid"}}Overview</a>
-    <a href="/pipeline" {{if eq .Active "pipeline"}}class="on" aria-current="page"{{end}}>{{template "ico-columns"}}Pipeline</a>
+    <p class="navh">Apply</p>
+    <a href="/search" {{if eq .Active "search"}}class="on" aria-current="page"{{end}}>{{template "ico-search"}}Find jobs</a>
+    <a href="/pipeline" {{if eq .Active "pipeline"}}class="on" aria-current="page"{{end}}>{{template "ico-columns"}}Pipeline{{with .Nav.Preparing}}<span class="nb live" title="{{.}} job(s) being prepared or queued"><span class="spin" aria-hidden="true"></span>{{.}}</span>{{end}}</a>
     <a href="/inbox" {{if eq .Active "inbox"}}class="on" aria-current="page"{{end}}>{{template "ico-inbox"}}Inbox</a>
-    <a href="/search" {{if eq .Active "search"}}class="on" aria-current="page"{{end}}>{{template "ico-search"}}Search</a>
-    <a href="/interviews" {{if eq .Active "interviews"}}class="on" aria-current="page"{{end}}>{{template "ico-clock"}}Interviews</a>
+    <p class="navh">Interview</p>
+    <a href="/interviews" {{if eq .Active "interviews"}}class="on" aria-current="page"{{end}}>{{template "ico-clock"}}Interviews{{with .Nav.Interviews}}<span class="nb" title="upcoming">{{.}}</span>{{end}}</a>
     <a href="/calendar" {{if eq .Active "calendar"}}class="on" aria-current="page"{{end}}>{{template "ico-calendar"}}Calendar</a>
     <a href="/learning" {{if eq .Active "learning"}}class="on" aria-current="page"{{end}}>{{template "ico-book"}}Learning</a>
-    <a href="/preferences" {{if eq .Active "preferences"}}class="on" aria-current="page"{{end}}>{{template "ico-sliders"}}Preferences</a>
+    <p class="navh">You</p>
     <a href="/profile" {{if eq .Active "profile"}}class="on" aria-current="page"{{end}}>{{template "ico-user"}}Profile &amp; CV</a>
+    <a href="/preferences" {{if eq .Active "preferences"}}class="on" aria-current="page"{{end}}>{{template "ico-sliders"}}Preferences</a>
     <a href="/reviews" {{if eq .Active "reviews"}}class="on" aria-current="page"{{end}}>{{template "ico-bars"}}Reviews</a>
     <a href="/activity" {{if eq .Active "activity"}}class="on" aria-current="page"{{end}}>{{template "ico-pulse"}}Activity</a>
   </nav>

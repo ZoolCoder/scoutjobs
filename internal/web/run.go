@@ -15,9 +15,15 @@ import (
 type runPanel struct {
 	Agents   []string
 	Steps    []runner.Step
+	Todo     []runner.Step // steps without output yet, offered by default
+	Done     []runner.Step // finished steps, offered only to redo
 	Finished map[string]string
 	Run      *runner.Status
 	Active   bool
+	Queued   int // position in the Prepare all queue, 0 when not waiting
+	// Recovered: the last run stopped at a step that is done now (fixed by hand or by a later run),
+	// so its error is history, not the current state.
+	Recovered string
 }
 
 func (v *server) runPanel(j store.Job) *runPanel {
@@ -26,6 +32,13 @@ func (v *server) runPanel(j store.Job) *runPanel {
 		return nil
 	}
 	p := &runPanel{Steps: runner.Steps, Finished: m.Finished(j)}
+	for _, st := range runner.Steps {
+		if _, ok := p.Finished[st.Name]; ok {
+			p.Done = append(p.Done, st)
+		} else {
+			p.Todo = append(p.Todo, st)
+		}
+	}
 	for _, a := range m.Agents() {
 		p.Agents = append(p.Agents, a.Name)
 	}
@@ -35,6 +48,16 @@ func (v *server) runPanel(j store.Job) *runPanel {
 			snap.Log = snap.Log[n-60:]
 		}
 		p.Run, p.Active = &snap, snap.State == runner.Running
+		for _, st := range snap.Steps {
+			if _, ok := p.Finished[st.Name]; ok && st.State == runner.Failed {
+				p.Recovered = st.Label
+			}
+		}
+	}
+	for i, id := range m.Waiting() {
+		if id == j.ID {
+			p.Queued = i + 1
+		}
 	}
 	return p
 }
@@ -49,7 +72,9 @@ func (v *server) startRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = r.ParseForm()
-	req := runner.Request{Steps: r.Form["step"], Agent: r.FormValue("agent"), Force: r.FormValue("force") != ""}
+	// a finished step is only run again when picked under "Redo", which forces it
+	redo := r.Form["redo"]
+	req := runner.Request{Steps: append(r.Form["step"], redo...), Agent: r.FormValue("agent"), Force: r.FormValue("force") != "" || len(redo) > 0, KeepGoing: r.FormValue("keep") != ""}
 	msg := ""
 	if len(req.Steps) == 0 {
 		msg = "pick at least one step"
@@ -83,6 +108,10 @@ func (v *server) runState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := v.runPanel(j)
+	if p != nil && p.Queued > 0 && !p.Active {
+		writeJSON(w, 200, map[string]any{"state": "queued", "position": p.Queued})
+		return
+	}
 	if p == nil || p.Run == nil {
 		writeJSON(w, 404, map[string]string{"error": "no run"})
 		return
@@ -116,10 +145,11 @@ func (v *server) apiRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Steps  any    `json:"steps"` // "tailor,cover", ["tailor","cover"] or "safe"
-		Agent  string `json:"agent"`
-		Force  bool   `json:"force"`
-		DryRun bool   `json:"dry_run"`
+		Steps     any    `json:"steps"` // "tailor,cover", ["tailor","cover"] or "safe"
+		Agent     string `json:"agent"`
+		Force     bool   `json:"force"`
+		KeepGoing bool   `json:"keep_going"`
+		DryRun    bool   `json:"dry_run"`
 	}
 	if r.ContentLength != 0 {
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&in); err != nil {
@@ -144,7 +174,7 @@ func (v *server) apiRun(w http.ResponseWriter, r *http.Request) {
 		apiErr(w, 400, err)
 		return
 	}
-	run, err := v.cfg.Runner.Start(j, runner.Request{Steps: steps, Agent: in.Agent, Force: in.Force, DryRun: in.DryRun})
+	run, err := v.cfg.Runner.Start(j, runner.Request{Steps: steps, Agent: in.Agent, Force: in.Force, KeepGoing: in.KeepGoing, DryRun: in.DryRun})
 	if err != nil {
 		code := 400
 		if run != nil {

@@ -42,6 +42,7 @@
 </section>
 
 <aside class="stack calside">
+{{if .Msg}}<p class="callout ok small">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad small">{{.Err}}</p>{{end}}
 {{with .Detail}}{{$e := .Event}}
 <section class="panel evcard {{$e.Class}}">
   <div class="panel-h"><h2>{{title $e.Kind}}</h2><a class="act" href="/calendar?view={{$v.View}}&amp;d={{$v.D}}" aria-label="close">✕</a></div>
@@ -56,10 +57,11 @@
   <div class="evacts">
     {{if .Open}}<a class="btn primary" href="{{.Track}}">Track as interview</a>
     <a class="btn" href="{{.Open}}" target="_blank" rel="noopener noreferrer">{{template "ico-calendar"}}Open in Google Calendar</a>
-    {{else}}<a class="btn primary" href="{{.Google}}" target="_blank" rel="noopener noreferrer">{{template "ico-calendar"}}Add to Google Calendar</a>
+    {{else if .Google}}<a class="btn primary" href="{{.Google}}" target="_blank" rel="noopener noreferrer">{{template "ico-calendar"}}Add to Google Calendar</a>
     <a class="btn" href="{{.ICS}}">Download .ics</a>{{end}}
   </div>
-  {{if .Open}}<p class="small muted">From your Google Calendar, read-only. {{if .Job.ID}}It mentions {{.Job.Company}}; track it to get the prep checklist and follow-ups.{{else}}Track it as an interview to pick the job it belongs to.{{end}}</p>{{end}}
+  {{if .Synced}}<p class="small muted">In your Google Calendar too: a change made here or there shows on both.</p>{{end}}
+  {{if .Open}}<p class="small muted">From your Google Calendar. {{if .Job.ID}}It mentions {{.Job.Company}}; track it to get the prep checklist and follow-ups.{{else}}Track it as an interview to pick the job it belongs to.{{end}}</p>{{end}}
   {{with .Interview}}
   <h3 class="sec">Reschedule</h3>
   <form class="fields" method="post" action="/interviews/{{.ID}}">
@@ -68,7 +70,7 @@
     <label>Time<input type="time" name="time" value="{{$e.Start}}"></label>
     <label>Length<select name="duration">{{$d := printf "%d" .Duration}}{{range $v.Mins}}<option value="{{.}}" {{if eq . $d}}selected{{end}}>{{.}} min</option>{{end}}</select></label>
     <label>Where<input name="location" value="{{.Location}}" placeholder="Meet link, address"></label>
-    <div class="row span-2"><button class="primary">Save</button><span class="muted">Re-add it to Google Calendar after moving it.</span></div>
+    <div class="row span-2"><button class="primary">Save</button>{{if not $.Detail.Synced}}<span class="muted">Re-add it to Google Calendar after moving it.</span>{{end}}</div>
   </form>
   <h3 class="sec">Prep checklist</h3>
   {{template "prep-check" (prepArgs . (printf "/calendar?view=%s&d=%s&ev=%s" $v.View $v.D $e.Key))}}
@@ -109,21 +111,26 @@
     <li><i class="dot c-deadline"></i>Deadlines<span class="n">{{index .Counts "deadline"}}</span></li><li><i class="dot c-follow"></i>Follow-ups<span class="n">{{index .Counts "followup"}}</span></li>
     {{if eq .GoogleCal "on"}}<li><i class="dot c-google"></i>Google Calendar<span class="n">{{index .Counts "google"}}</span></li>{{end}}
   </ul>
-  {{if .GoogleErr}}<p class="callout bad small">Google Calendar: {{.GoogleErr}}</p>
-  {{else if eq .GoogleCal "reconnect"}}<div class="small"><p>Show your Google Calendar here too, read-only. Enable the <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">Calendar API</a> in your Google Cloud project, then reconnect and allow Calendar.</p>
+  {{if .GoogleErr}}<p class="callout bad small">Google Calendar: {{.GoogleErr}}</p>{{end}}
+  {{if eq .GoogleCal "on"}}<form class="row" method="post" action="/calendar/sync"><input type="hidden" name="back" value="/calendar?view={{.View}}&amp;d={{.D}}"><button class="mini">Sync now</button>
+  <span class="small muted">Interviews go to your Google Calendar; interviews found there come here. Every few minutes, both ways.</span></form>
+  {{else if eq .GoogleCal "readonly"}}<div class="small"><p>Your Google Calendar shows here read-only. Reconnect and allow Calendar events to add your interviews to it and keep both in sync.</p>
   <form method="post" action="/gmail/connect"><button class="mini primary">Reconnect Google</button></form></div>
-  {{else if eq .GoogleCal "setup"}}<p class="small muted">Connect Google on the <a href="/inbox">Inbox</a> page to see your Google Calendar here, read-only.</p>{{end}}
+  {{else if eq .GoogleCal "reconnect"}}<div class="small"><p>Sync your interviews with your Google Calendar. Enable the <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">Calendar API</a> in your Google Cloud project, then reconnect and allow Calendar.</p>
+  <form method="post" action="/gmail/connect"><button class="mini primary">Reconnect Google</button></form></div>
+  {{else if eq .GoogleCal "setup"}}<p class="small muted">Connect Google on the <a href="/inbox">Inbox</a> page to sync your interviews with your Google Calendar.</p>{{end}}
   <p class="small muted">{{index .Counts "interview"}} interviews ahead.</p>
 </section>
 
 <section class="panel">
-  <div class="panel-h"><h2>Google Calendar</h2></div>
+  <div class="panel-h"><h2>{{if eq .GoogleCal "on"}}Calendar feed{{else}}Google Calendar{{end}}</h2></div>
+  {{if eq .GoogleCal "on"}}<p class="small muted">Apple Calendar and Outlook can subscribe to this feed of interviews, deadlines and follow-ups.</p>{{else}}
   <ol class="steps">
     <li><b>One event</b><small>Open it here and press <em>Add to Google Calendar</em>. Google shows the event filled in; nothing is saved until you click Save there.</small></li>
     <li><b>Everything at once</b><small><a href="{{.FeedDownload}}">Download scoutjobs.ics</a>, then in Google Calendar: Settings › Import &amp; export › Import.</small></li>
     <li><b>Stay in sync</b><small>Subscribe to the feed below with Settings › Add calendar › From URL. Google fetches it from its own servers, so the address must be public: run <code>serve</code> behind a tunnel. Apple Calendar and Outlook on this machine can subscribe to it as it is.</small></li>
     <li><b>Through your agent</b><small>With the Google Calendar connector, the <code>calendar-sync</code> skill creates and updates the events for you.</small></li>
-  </ol>
+  </ol>{{end}}
   <label class="feed">Feed<input readonly value="{{.FeedURL}}" aria-label="calendar feed URL"></label>
   <p class="small muted">{{.FeedNote}}</p>
 </section>

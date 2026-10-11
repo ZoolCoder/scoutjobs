@@ -143,7 +143,7 @@ func (v *server) gmailDisconnect(w http.ResponseWriter, r *http.Request) {
 }
 
 func calendarNote(t gmail.Token) string {
-	if strings.Contains(t.Scope, gmail.CalendarScope) {
+	if gmail.HasScope(t.Scope, gmail.CalendarScope) || gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
 		return "; your Google Calendar shows on the Calendar page"
 	}
 	return "; Calendar was not allowed, so connect again and tick it to see your events here"
