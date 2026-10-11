@@ -13,7 +13,10 @@ Input: a tracked job with a contact address, `cover-letter.md` and `resume.*` in
 
 ```bash
 scoutjobs job show <id> --json
+scoutjobs job check <id>
 ```
+
+`job check` runs the quality gates and prints one line per gate: `documents` (tailored resume and cover letter present), `fit_review` (no veto on the job or in `fit-review.json`), `coverage` (no must-have gap, every agreed wording is in the drafts), `grounding` (the `draft-reviewer` logged `send` after the last edit), `duplicates` (no repeated paragraph, letter not reused from another application), `ats_text` (`resume.pdf` has a text layer, is not encrypted), `filenames` (ASCII, known types, no `final (1)`). A `FAIL` line blocks `email send`; fix the cause (re-run the skill the line names) and check again. Report every unresolved failure to the user in its own words; never summarise them away. `WARN` lines are advice. Only the user may decide to send past a failure, and then the command is `email send <id> --yes --skip-checks`, which logs `check:skipped` with the list on the job.
 
 - No `cover-letter.md` in `dir`: run `cover-letter-generator` first (or `/scoutjobs:cover <id>`).
 - No `resume.pdf` or `resume.md` in `dir`: run `resume-tailor` first. Prefer a PDF; if only Markdown exists, run `scoutjobs cv export <id>` (single-column Helvetica PDF, ATS-safe) so `resume.pdf` is attached instead of the Markdown.
@@ -39,7 +42,7 @@ Show the user: From, To, Subject, attachment names, the full body. Then ask, in 
 scoutjobs email send <id> --yes
 ```
 
-Without `--yes` the CLI refuses, so a slip cannot send. Success logs `email:sent`, moves the job to `applied`, and the follow-up timer starts. Then suggest `scoutjobs job set <id> --note "applied by e-mail"` details if any and the `application-tracker` skill for what comes next.
+Without `--yes` the CLI refuses, so a slip cannot send. With `--yes` the gates run once more and a failure stops the send with the list; the message does not leave the machine. Success logs `email:sent`, moves the job to `applied`, and the follow-up timer starts. Then suggest `scoutjobs job set <id> --note "applied by e-mail"` details if any and the `application-tracker` skill for what comes next.
 
 If the user prefers their own mail app: `scoutjobs email show <id> --json` returns a `mailto:` link (attachments must be added by hand); the dashboard job page offers the same link.
 

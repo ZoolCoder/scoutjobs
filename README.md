@@ -17,8 +17,8 @@ Your job search, on your machine. An open-source job-search operating system for
 
 - **Skills** (Agent Skills standard) for the whole loop: find jobs, score fit, check your CV, tailor resume and cover letter, track applications, prep and mock interviews, debrief, negotiate, upskill.
 - **A learning loop**: every skip, apply, withdraw and declined offer is logged with your reason. `learn-preferences` turns those into preferences you confirm, and the scorer and tailoring skills read them. It gets better the longer you use it.
-- **A dashboard**: a single Go binary, SQLite, no Node, no JavaScript, no external assets, bound to localhost. Overview with your next best move, pipeline board where every card opens the job and moves to the next stage with one click, a per-job "get selected" checklist (tailored CV, cover letter, ATS check), drafts you can edit in place, a "due this week" filter, an add-job form and a board search page, weekly reviews next to the live funnel, interviews, learning progress, preferences it learned, profile and CV health, activity log. Light by default, dark and auto available.
-- **A built-in job search**: `scoutjobs search` queries public ATS boards (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio), any RSS feed and remote aggregators (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas) without an API key, deduplicates by posting URL and normalised title, converts salaries to your currency, and adds results to the pipeline.
+- **A dashboard**: a single Go binary, SQLite, no Node, no JavaScript, no external assets, bound to localhost. Overview with your next best move, pipeline board where every card opens the job and moves to the next stage with one click or a drag, a per-job "get selected" checklist (tailored CV, cover letter, ATS check), drafts you can edit in place, a "due this week" filter, an add-job form and a board search page, weekly reviews next to the live funnel, interviews, learning progress, preferences it learned, profile and CV health, activity log. Light by default, dark and auto available.
+- **A built-in job search**: `scoutjobs search` queries public ATS boards (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR) by slug or careers URL, any RSS feed and remote aggregators (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas, HN Who is hiring) without an API key, imports a single posting by URL (`job add --from`), deduplicates by posting URL and normalised title, converts salaries to your currency, and adds results to the pipeline.
 - **Apply by e-mail**: `scoutjobs email draft|send` builds the application from your cover letter and tailored resume and sends it through your own SMTP account. The CLI refuses without `--yes`, and the skill asks you first. Every job page also offers a `mailto:` link for your own mail app.
 - **Automation hooks**: a JSON API on the dashboard and an outgoing webhook for n8n, Make, Zapier or cron. See `integrations/n8n/`.
 - **Every platform**: Claude Code (plugin with slash commands and subagents), Codex (skills plus generated `/scoutjobs-*` prompts), Cursor, Gemini CLI, GitHub Copilot, and anything else that reads `SKILL.md`. Agents without a shell on your machine (Claude Code web, Codex cloud, hosted n8n) use the same features through the JSON API.
@@ -63,7 +63,9 @@ scoutjobs init           # creates ~/.scoutjobs with profile.md, preferences.md,
 scoutjobs serve          # dashboard at http://127.0.0.1:7070
 ```
 
-CLI only: `brew install --cask zoolcoder/scoutjobs/scoutjobs`, a `deb`, `rpm` or `apk` package, or a binary for macOS, Linux and Windows from [Releases](https://github.com/zoolcoder/scoutjobs/releases). `scoutjobs doctor` checks the install.
+![The overview: next best move, the four numbers, pipeline health, upcoming interviews and drafts waiting](docs/modules/ROOT/images/overview.png)
+
+CLI only: `brew install --cask zoolcoder/scoutjobs/scoutjobs`, a `deb`, `rpm` or `apk` package, or a binary for macOS, Linux and Windows from [Releases](https://github.com/zoolcoder/scoutjobs/releases). `scoutjobs doctor` checks the install, `scoutjobs update` installs the next release (checksum verified; Homebrew and package installs are handed to their manager).
 
 Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds your profile from a CV, records what you want). After that the daily loop is:
 
@@ -71,7 +73,9 @@ Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds
 |---|---|---|
 | "find go jobs, remote EU" | `job-search` | runs `scoutjobs search`: public ATS APIs and remote boards, deduplicated, added as `new` |
 | "check my CV" | `cv-check` | ATS readiness and content score, gaps against your target roles, logged to Profile & CV |
-| "score them" | `job-fit` | 0-100 with reasons, asks apply/skip, logs your decisions |
+| "score them" | `job-fit` | 0-100 with reasons, asks apply/skip, logs your decisions; hard failures become a veto outside the score |
+| "what can I honestly claim" | `fit-review` | `/scoutjobs:evidence`: every requirement mapped to profile evidence, strength and defensible wording in `fit-review.json` |
+| "is it ready to send" | `apply-by-email` | `/scoutjobs:check`: the quality gates (documents, review, coverage, grounding, duplicates, ATS text layer, filenames); `email send` refuses while one fails |
 | "apply to Stripe" | `resume-tailor`, `cover-letter-generator` | drafts in `~/.scoutjobs/applications/<job>/`, reviewed by `draft-reviewer` |
 | "rewrite the Stripe cover letter" | `cover-letter-generator` | `/scoutjobs:cover <id>`: rewrites the letter to the posting, reviewed again |
 | "ATS check vs the Stripe job" | `cv-check` | `/scoutjobs:cv --job <id>`: keyword coverage and layout against that posting |
@@ -85,7 +89,7 @@ Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds
 | Friday | `weekly-review` | funnel, response rate, stale cleanup, runs `learn-preferences` |
 | "what should I learn" | `upskill` | gaps ranked by demand in your tracked jobs, plan, hours tracked |
 
-The full list of the 29 skills, what triggers each and which ones are reference material is in the manual: [All skills](https://zoolcoder.github.io/scoutjobs/scoutjobs/skills.html).
+The full list of the 30 skills, what triggers each and which ones are reference material is in the manual: [All skills](https://zoolcoder.github.io/scoutjobs/scoutjobs/skills.html).
 
 ## Install per platform
 
@@ -131,8 +135,9 @@ Skills never touch the database. They call `scoutjobs`, which is also what you u
 
 ```bash
 scoutjobs search --query "senior go engineer" --remote --add        # remote boards, add as new
-scoutjobs search --board greenhouse:stripe --board lever:netlify     # company ATS boards: greenhouse, lever, ashby, workable, smartrecruiters, personio
+scoutjobs search --board greenhouse:stripe --board https://jobs.lever.co/netlify   # company ATS boards by slug or careers URL
 scoutjobs search --rss https://example.com/jobs.rss --query go         # any RSS or Atom job feed
+scoutjobs job add --from https://boards.greenhouse.io/stripe/jobs/123  # one posting by URL, description into notes
 scoutjobs job add --company Stripe --title "Backend Engineer" --url ... --remote hybrid --tags go,postgres
 scoutjobs job import jobs.json       # bulk add from any JSON list (n8n, scrapers you own)
 scoutjobs job list --open            # or --status applied, --q stripe, --json
@@ -290,6 +295,18 @@ webhook_url:            # every event is POSTed here as JSON (job added, status 
 webhook_secret:         # optional; signs every POST (X-ScoutJobs-Signature, HMAC-SHA256) so the receiver can verify it
 ```
 
+## Dashboard
+
+`scoutjobs serve` is a second window onto the same `~/.scoutjobs` the CLI and the agents use: SQLite plus the application folders, rendered as plain HTML on every request, nothing cached and nothing stored in the browser but the theme. The agents write through the CLI; you watch the result here and edit drafts in place, and the agent reads your edit on its next turn.
+
+![The pipeline board: a column per stage, a fit gauge per card, a veto badge, drag and drop between stages](docs/modules/ROOT/images/pipeline.png)
+
+The job page carries the "Get selected" kit (tailor, cover letter, ATS check, send), the files in the application folder, the seven quality gates from `scoutjobs job check` with what blocks sending, and the evidence table from `fit-review.json`:
+
+![Ready to send: the seven gates and the evidence table, one row per requirement with evidence, strength and the wording the CV may use](docs/modules/ROOT/images/job-gates.png)
+
+Every page is described in the manual: [Dashboard](https://zoolcoder.github.io/scoutjobs/scoutjobs/dashboard.html).
+
 ## JSON API
 
 `scoutjobs serve` answers `/api/*` with JSON; with `api_token` set it requires `Authorization: Bearer <token>`.
@@ -299,6 +316,7 @@ webhook_secret:         # optional; signs every POST (X-ScoutJobs-Signature, HMA
 | GET | `/api/brief`, `/api/stats`, `/api/events` | the daily picture, the funnel, recent activity |
 | GET, POST | `/api/jobs`, `/api/jobs/{id}` | list, filter, add (upsert), one job with events and interviews |
 | POST | `/api/jobs/{id}/status`, `/api/jobs/{id}/note` | move, annotate; skip and withdraw log a decision |
+| GET | `/api/jobs/{id}/check` | the quality gates, same as `scoutjobs job check --json` |
 | GET | `/api/jobs/{id}/files` | the application folder and the "get selected" kit |
 | GET, PUT | `/api/jobs/{id}/files/{name}` | read a draft; write `.md`, `.txt`, `.json` (1 MB, inside the job folder) |
 | POST | `/api/jobs/{id}/export` | render `resume.md` in the job folder to `resume.pdf` |
@@ -316,7 +334,7 @@ Sending e-mail is not on the API. Full table with bodies in `integrations/n8n/RE
 ```bash
 make build     # bin/scoutjobs
 make test      # go test ./...
-make evals     # claude plugin eval: five cases, one per core skill (evals/README.md)
+make evals     # claude plugin eval: eight cases, core skills plus evidence review and gates (evals/README.md)
 make dash      # build and serve
 make lint      # go vet (+ golangci-lint if installed)
 make docs      # user manual into build/site (Antora, needs Node 22 and kroki.io for the diagrams)
@@ -341,7 +359,7 @@ Something broken, a skill that invented a fact or acted without asking, a board 
 | File | What it covers |
 |---|---|
 | [SUPPORT.md](SUPPORT.md) | where to ask what, what to include, response time |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | development setup, the rules every change keeps, pull request checklist |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | development setup, the rules every change keeps, git flow and pull request checklist |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | expected behaviour and how conduct reports are handled |
 | [GOVERNANCE.md](GOVERNANCE.md) | roles, how decisions are made, release policy |
 | [SECURITY.md](SECURITY.md) | what counts as a vulnerability, private reporting, response times |

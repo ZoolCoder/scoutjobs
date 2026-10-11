@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   status TEXT NOT NULL DEFAULT 'new',
   tags TEXT NOT NULL DEFAULT '',
   notes TEXT NOT NULL DEFAULT '',
+  contact TEXT NOT NULL DEFAULT '',
+  veto TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -197,7 +199,7 @@ func (s *Store) migrate() error {
 		return err
 	}
 	// columns added after 0.1; sqlite has no ADD COLUMN IF NOT EXISTS
-	for _, stmt := range []string{`ALTER TABLE jobs ADD COLUMN contact TEXT NOT NULL DEFAULT ''`} {
+	for _, stmt := range []string{`ALTER TABLE jobs ADD COLUMN contact TEXT NOT NULL DEFAULT ''`, `ALTER TABLE jobs ADD COLUMN veto TEXT NOT NULL DEFAULT ''`} {
 		if _, err := s.DB.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}
@@ -247,15 +249,16 @@ type Job struct {
 	Tags      string `json:"tags"`
 	Notes     string `json:"notes"`
 	Contact   string `json:"contact"` // where the application goes: recruiter or jobs@ address
+	Veto      string `json:"veto"`    // hard eligibility failure, kept outside the fit score; empty when none
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
 
-const jobCols = `id,key,company,title,url,location,remote,salary_min,salary_max,currency,source,posted_at,deadline,fit_score,fit_notes,status,tags,notes,contact,created_at,updated_at`
+const jobCols = `id,key,company,title,url,location,remote,salary_min,salary_max,currency,source,posted_at,deadline,fit_score,fit_notes,status,tags,notes,contact,veto,created_at,updated_at`
 
 func scanJob(r interface{ Scan(...any) error }) (Job, error) {
 	var j Job
-	err := r.Scan(&j.ID, &j.Key, &j.Company, &j.Title, &j.URL, &j.Location, &j.Remote, &j.SalaryMin, &j.SalaryMax, &j.Currency, &j.Source, &j.PostedAt, &j.Deadline, &j.FitScore, &j.FitNotes, &j.Status, &j.Tags, &j.Notes, &j.Contact, &j.CreatedAt, &j.UpdatedAt)
+	err := r.Scan(&j.ID, &j.Key, &j.Company, &j.Title, &j.URL, &j.Location, &j.Remote, &j.SalaryMin, &j.SalaryMax, &j.Currency, &j.Source, &j.PostedAt, &j.Deadline, &j.FitScore, &j.FitNotes, &j.Status, &j.Tags, &j.Notes, &j.Contact, &j.Veto, &j.CreatedAt, &j.UpdatedAt)
 	return j, err
 }
 
@@ -385,8 +388,8 @@ func (s *Store) ListJobs(f JobFilter) ([]Job, error) {
 
 // JobPatch holds optional field updates; nil means unchanged.
 type JobPatch struct {
-	Status, URL, Location, Remote, Currency, Source, PostedAt, Deadline, FitNotes, Tags, Notes, Contact *string
-	FitScore, SalaryMin, SalaryMax                                                                      *int64
+	Status, URL, Location, Remote, Currency, Source, PostedAt, Deadline, FitNotes, Tags, Notes, Contact, Veto *string
+	FitScore, SalaryMin, SalaryMax                                                                            *int64
 }
 
 func (s *Store) UpdateJob(id int64, p JobPatch) error {
@@ -397,7 +400,7 @@ func (s *Store) UpdateJob(id int64, p JobPatch) error {
 	var sets []string
 	var args []any
 	set := func(col string, v any) { sets = append(sets, col+"=?"); args = append(args, v) }
-	strs := map[string]*string{"status": p.Status, "url": p.URL, "location": p.Location, "remote": p.Remote, "currency": p.Currency, "source": p.Source, "posted_at": p.PostedAt, "deadline": p.Deadline, "fit_notes": p.FitNotes, "tags": p.Tags, "notes": p.Notes, "contact": p.Contact}
+	strs := map[string]*string{"status": p.Status, "url": p.URL, "location": p.Location, "remote": p.Remote, "currency": p.Currency, "source": p.Source, "posted_at": p.PostedAt, "deadline": p.Deadline, "fit_notes": p.FitNotes, "tags": p.Tags, "notes": p.Notes, "contact": p.Contact, "veto": p.Veto}
 	for col, v := range strs {
 		if v != nil {
 			set(col, *v)
@@ -425,6 +428,13 @@ func (s *Store) UpdateJob(id int64, p JobPatch) error {
 	}
 	if p.FitScore != nil && *p.FitScore != before.FitScore {
 		_ = s.AddEvent(id, "scored", fmt.Sprintf("fit %d", *p.FitScore))
+	}
+	if p.Veto != nil && *p.Veto != before.Veto {
+		if *p.Veto == "" {
+			_ = s.AddEvent(id, "veto:cleared", before.Veto)
+		} else {
+			_ = s.AddEvent(id, "veto", *p.Veto)
+		}
 	}
 	return nil
 }

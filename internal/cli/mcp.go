@@ -46,8 +46,8 @@ var mcpTools = []mcpTool{
 		p("open", "boolean", "only open applications", "open"),
 		p("limit", "integer", "max rows", "limit")}, true},
 	{"job_show", "One job with its events, interviews and application folder.", []string{"job", "show"}, []mcpProp{jobRef}, true},
-	{"job_add", "Track a posting. Same company and title upserts.", []string{"job", "add"}, []mcpProp{
-		req("company", "string", "", "company"), req("title", "string", "", "title"), p("url", "string", "", "url"),
+	{"job_add", "Track a posting. Same company and title upserts. from=<posting url> on Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee or BambooHR fills the fields you leave out, description into notes.", []string{"job", "add"}, []mcpProp{
+		p("from", "string", "posting URL on a supported ATS", "from"), p("company", "string", "required unless from is given", "company"), p("title", "string", "required unless from is given", "title"), p("url", "string", "", "url"),
 		p("location", "string", "", "location"), p("remote", "string", "remote|hybrid|onsite|unknown", "remote"),
 		p("source", "string", "linkedin|greenhouse|lever|ashby|manual|...", "source"), p("posted", "string", "YYYY-MM-DD", "posted"),
 		p("deadline", "string", "YYYY-MM-DD", "deadline"), p("currency", "string", "", "currency"),
@@ -59,11 +59,16 @@ var mcpTools = []mcpTool{
 		p("url", "string", "", "url"), p("location", "string", "", "location"), p("remote", "string", "", "remote"), p("source", "string", "", "source"),
 		p("posted", "string", "", "posted"), p("deadline", "string", "", "deadline"), p("currency", "string", "", "currency"),
 		p("salary_min", "integer", "", "salary-min"), p("salary_max", "integer", "", "salary-max"), p("tags", "string", "", "tags"),
-		p("notes", "string", "replace the notes", "notes"), p("contact", "string", "", "contact"), p("note", "string", "append an event note", "note")}, false},
+		p("notes", "string", "replace the notes", "notes"), p("contact", "string", "", "contact"), p("veto", "string", "hard eligibility failure that blocks sending; empty clears it", "veto"), p("note", "string", "append an event note", "note")}, false},
+	{"job_fit", "Store the evidence-backed fit review: one row per material requirement (requirement, kind must|nice, evidence, strength direct|adjacent|partial|gap, confidence, wording, risk), vetoes outside the score, score 0-100, notes. Writes fit-review.json and sets score, notes and veto on the job.", []string{"job", "fit"}, []mcpProp{jobRef,
+		req("review", "string", `json: {"requirements":[{"requirement":"...","kind":"must","evidence":"profile.md: ...","strength":"direct","confidence":"high","wording":"...","risk":"..."}],"vetoes":[{"rule":"...","reason":"..."}],"score":72,"notes":"..."}`, "review")}, true},
+	{"job_check", "Run the application quality gates (documents, fit review, coverage, grounding, duplicates, ATS text layer, filenames). Fails while a gate fails.", []string{"job", "check"}, []mcpProp{jobRef}, true},
+	{"job_review", "Log the draft-reviewer verdict for the grounding gate: send when every claim is backed by the profile, fix otherwise.", []string{"job", "review"}, []mcpProp{jobRef,
+		req("verdict", "string", "send | fix", "verdict"), p("notes", "string", "what was checked, or what must change", "notes")}, false},
 	{"job_skip", "Skip a job with the reason the preference learner reads.", []string{"job", "skip"}, []mcpProp{jobRef,
 		req("reason", "string", "why, in the user's words", "reason"), p("signals", "string", `json object, e.g. {"remote":"onsite","stack":["java"]}`, "signals")}, false},
-	{"search", "Search company boards (greenhouse, lever, ashby) and remote boards. add=true tracks the matches as status new.", []string{"search", "--compact"}, []mcpProp{
-		p("query", "array", "keyword queries; every word of a query must appear", "query"), p("board", "array", "greenhouse:<slug> | lever:<slug> | ashby:<slug> | workable:<slug> | smartrecruiters:<company> | personio:<slug> | rss:<url>", "board"),
+	{"search", "Search company boards (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr, rss) and remote boards. add=true tracks the matches as status new.", []string{"search", "--compact"}, []mcpProp{
+		p("query", "array", "keyword queries; every word of a query must appear", "query"), p("board", "array", "source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, or the careers page URL", "board"),
 		p("remote", "boolean", "also query the remote boards", "remote"), p("limit", "integer", "max postings", "limit"), p("add", "boolean", "add matches to the tracker", "add")}, true},
 	{"cv_files", "Resume files in the cv folder.", []string{"cv", "files"}, nil, true},
 	{"cv_log", "Log a CV check result.", []string{"cv", "log"}, []mcpProp{req("file", "string", "file name inside cv/", "file"),

@@ -2,19 +2,26 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
     commit-message:
       prefix: ci
   - package-ecosystem: gomod
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
     commit-message:
       prefix: build
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: monthly
     commit-message:
       prefix: build
+    ignore:
+      # 1.x breaks the Antora build (`block.$!= is not a function`)
+      - dependency-name: asciidoctor-kroki
+        update-types: ["version-update:semver-major"]

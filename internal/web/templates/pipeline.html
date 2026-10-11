@@ -3,14 +3,15 @@
 <form class="search" method="get" action="/pipeline"><input name="q" value="{{.Query}}" placeholder="Search company, title, tags">{{if .Due}}<input type="hidden" name="due" value="1">{{end}}<button>Filter</button>
 <span class="chips">{{if .Due}}<a class="on" href="/pipeline{{if .Query}}?q={{.Query}}{{end}}">Due this week ×</a>{{else}}<a href="/pipeline?due=1{{if .Query}}&amp;q={{.Query}}{{end}}">Due this week</a>{{end}}</span>
 <span class="muted">{{.Count}} jobs{{if or .Query .Due}} · <a href="/pipeline">clear</a>{{end}}</span><a class="btn primary" href="/jobs/new">Add job</a></form>
+<p class="muted dnd-hint">Drag a card onto a stage, or use the buttons on the card.</p>
 <div class="board">
 {{range .Columns}}
-<section class="col s-{{.Status}}">
+<section class="col s-{{.Status}}" data-drop="{{.Status}}">
   <div class="col-h"><h2>{{title .Status}}</h2><span class="n">{{len .Jobs}}</span></div>
   {{range .Jobs}}
-  <article class="jobcard">
+  <article class="jobcard" data-id="{{.ID}}" data-status="{{.Status}}" data-company="{{.Company}}">
     <a class="cover" href="/jobs/{{.ID}}" aria-label="Open {{.Company}} · {{.Title}}"></a>
-    <div class="row"><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a>{{if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
+    <div class="row"><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
     <div class="ttl">{{.Title}}</div>
     <div class="meta">{{if or .Remote .Location}}<span class="chip">{{template "ico-pin"}}{{.Remote}}{{if and .Remote .Location}} · {{end}}{{.Location}}</span>{{end}}<span class="chip">{{template "ico-clock"}}{{if .Deadline}}due {{.Deadline}}{{else}}updated {{day .UpdatedAt}}{{end}}</span>{{if .Source}}<span class="chip acc">{{.Source}}</span>{{end}}</div>
     {{template "move" (dict_status .ID .Status "/pipeline")}}
@@ -19,5 +20,8 @@
 </section>
 {{end}}
 </div>
+{{if .Hidden}}<div class="dropbar" aria-hidden="true"><span class="muted">Drop here to close:</span>{{range .Hidden}}<span class="drop s-{{.}}" data-drop="{{.}}">{{title .}}</span>{{end}}</div>{{end}}
+<p id="board-live" class="sr-only" aria-live="polite"></p>
+<script src="/board.js" defer></script>
 {{end}}
 {{template "foot" .}}

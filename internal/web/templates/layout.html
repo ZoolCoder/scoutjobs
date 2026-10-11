@@ -11,23 +11,23 @@
 <body>
 <div class="shell">
 <aside class="side">
-  <a class="brand" href="/">{{template "mark"}}<span class="word">Job<b>Quest</b></span></a>
+  <a class="brand" href="/">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
   <nav>
-    <a href="/" {{if eq .Active "overview"}}class="on"{{end}}>{{template "ico-grid"}}Overview</a>
-    <a href="/pipeline" {{if eq .Active "pipeline"}}class="on"{{end}}>{{template "ico-columns"}}Pipeline</a>
-    <a href="/search" {{if eq .Active "search"}}class="on"{{end}}>{{template "ico-search"}}Search</a>
-    <a href="/interviews" {{if eq .Active "interviews"}}class="on"{{end}}>{{template "ico-calendar"}}Interviews</a>
-    <a href="/learning" {{if eq .Active "learning"}}class="on"{{end}}>{{template "ico-book"}}Learning</a>
-    <a href="/preferences" {{if eq .Active "preferences"}}class="on"{{end}}>{{template "ico-sliders"}}Preferences</a>
-    <a href="/profile" {{if eq .Active "profile"}}class="on"{{end}}>{{template "ico-user"}}Profile &amp; CV</a>
-    <a href="/reviews" {{if eq .Active "reviews"}}class="on"{{end}}>{{template "ico-bars"}}Reviews</a>
-    <a href="/activity" {{if eq .Active "activity"}}class="on"{{end}}>{{template "ico-pulse"}}Activity</a>
+    <a href="/" {{if eq .Active "overview"}}class="on" aria-current="page"{{end}}>{{template "ico-grid"}}Overview</a>
+    <a href="/pipeline" {{if eq .Active "pipeline"}}class="on" aria-current="page"{{end}}>{{template "ico-columns"}}Pipeline</a>
+    <a href="/search" {{if eq .Active "search"}}class="on" aria-current="page"{{end}}>{{template "ico-search"}}Search</a>
+    <a href="/interviews" {{if eq .Active "interviews"}}class="on" aria-current="page"{{end}}>{{template "ico-calendar"}}Interviews</a>
+    <a href="/learning" {{if eq .Active "learning"}}class="on" aria-current="page"{{end}}>{{template "ico-book"}}Learning</a>
+    <a href="/preferences" {{if eq .Active "preferences"}}class="on" aria-current="page"{{end}}>{{template "ico-sliders"}}Preferences</a>
+    <a href="/profile" {{if eq .Active "profile"}}class="on" aria-current="page"{{end}}>{{template "ico-user"}}Profile &amp; CV</a>
+    <a href="/reviews" {{if eq .Active "reviews"}}class="on" aria-current="page"{{end}}>{{template "ico-bars"}}Reviews</a>
+    <a href="/activity" {{if eq .Active "activity"}}class="on" aria-current="page"{{end}}>{{template "ico-pulse"}}Activity</a>
   </nav>
   <div class="side-foot">
-    <div class="theme" aria-label="theme">
-      <a href="/theme?set=light&amp;back={{.Path}}" {{if eq .Theme "light"}}class="on"{{end}}>light</a>
-      <a href="/theme?set=dark&amp;back={{.Path}}" {{if eq .Theme "dark"}}class="on"{{end}}>dark</a>
-      <a href="/theme?set=auto&amp;back={{.Path}}" {{if eq .Theme "auto"}}class="on"{{end}} title="follow system">auto</a>
+    <div class="theme" role="group" aria-label="theme">
+      <a href="/theme?set=light&amp;back={{.Path}}" {{if eq .Theme "light"}}class="on" aria-current="true"{{end}}>light</a>
+      <a href="/theme?set=dark&amp;back={{.Path}}" {{if eq .Theme "dark"}}class="on" aria-current="true"{{end}}>dark</a>
+      <a href="/theme?set=auto&amp;back={{.Path}}" {{if eq .Theme "auto"}}class="on" aria-current="true"{{end}} title="follow system">auto</a>
     </div>
     <div class="led"><i></i><span>Local workspace<small>data stays on this device</small></span></div>
   </div>
@@ -42,7 +42,7 @@
 
 {{define "foot"}}
 </main>
-<footer>Nothing leaves this machine · <code>scoutjobs serve</code> · JSON API on <code>/api/*</code></footer>
+<footer>Nothing leaves this machine · <code>scoutjobs serve</code> · JSON API on <code>/api/*</code>{{if .Cfg.Version}} · <a href="https://github.com/zoolcoder/scoutjobs/releases" rel="noopener noreferrer" target="_blank" title="releases; scoutjobs update installs the latest">v{{.Cfg.Version}}</a>{{end}}</footer>
 </div>
 </div>
 </body>

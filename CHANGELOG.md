@@ -7,6 +7,42 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-11
+
+### Added
+- `scoutjobs update`: installs the next release in place (checksum verified;
+  Homebrew and package installs are handed to their manager).
+- Pipeline board: drag a card onto another stage, or onto the closing stages
+  shown under the board while dragging; the add-job form fills itself from a
+  posting URL, and `scoutjobs job add --from <url>` does the same on the CLI.
+- Search accepts a careers page URL in place of `source:slug`, and adds
+  Recruitee, BambooHR and the Hacker News "Who is hiring" thread.
+- Evidence-backed fit review: `scoutjobs job fit <id>` validates and stores
+  `fit-review.json` (one row per requirement with evidence, strength,
+  confidence, defensible wording and risk; vetoes outside the score), sets
+  score, notes and the new `veto` field; `fit-review` skill and
+  `/scoutjobs:evidence`.
+- Application quality gates: `scoutjobs job check <id>` and
+  `GET /api/jobs/{id}/check` run documents, fit review, coverage, grounding,
+  duplicates, ATS text layer and filename gates; `email send --yes` and
+  `cv export <id>` refuse while one fails, `--skip-checks` overrides and logs
+  `check:skipped`; `scoutjobs job review <id> --verdict send|fix` records the
+  draft-reviewer verdict; `/scoutjobs:check`; the job page shows the gates and
+  the evidence table, the board shows a veto badge.
+- MCP tools `job_fit`, `job_check`, `job_review`; `job_set` takes `veto`.
+- Eval cases `fit-review-evidence`, `draft-review-invented-claim`,
+  `apply-check-blocks`.
+
+### Changed
+- `resume-tailor` and `cover-letter-generator` write from the agreed wording
+  in `fit-review.json`; `apply-by-email` runs `job check` first and reports
+  every failed gate instead of sending past it.
+- Git flow: `develop` is the integration branch, `main` the released state;
+  CI runs the full matrix only for `main`.
+
+### Fixed
+- Dark theme contrast, focus rings and readability across the dashboard.
+
 ## [0.1.0] - 2026-10-11
 
 ### Added
@@ -34,5 +70,6 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.1.0

@@ -20,7 +20,7 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
-//go:embed templates/*.html templates/style.css templates/mark.svg
+//go:embed templates/*.html templates/style.css templates/mark.svg templates/board.js
 var assets embed.FS
 
 type server struct {
@@ -39,6 +39,7 @@ type Config struct {
 	SearchRemote                               bool              // search page default for the remote boards
 	Currency                                   string            // default on the add-job form
 	SearchBaseURL                              map[string]string // test override per search source
+	Version                                    string            // shown in the footer next to the release link
 }
 
 func day(s string) string {
@@ -181,6 +182,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
+	mux.HandleFunc("GET /board.js", static("templates/board.js", "text/javascript; charset=utf-8", false))
 	mux.HandleFunc("GET /logo.svg", static("templates/mark.svg", "image/svg+xml", true))
 	mux.HandleFunc("GET /favicon.svg", static("templates/mark.svg", "image/svg+xml", true))
 
@@ -193,6 +195,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("GET /api/stats", srv.apiStats)
 	api.HandleFunc("GET /api/brief", srv.apiBrief)
 	api.HandleFunc("GET /api/events", srv.apiEvents)
+	api.HandleFunc("GET /api/jobs/{id}/check", srv.apiCheck)
 	api.HandleFunc("GET /api/jobs/{id}/files", srv.apiFiles)
 	api.HandleFunc("GET /api/jobs/{id}/files/{name}", srv.apiReadFile)
 	api.HandleFunc("PUT /api/jobs/{id}/files/{name}", srv.apiWriteFile)
@@ -408,13 +411,15 @@ func (v *server) pipeline(w http.ResponseWriter, r *http.Request) {
 		by[j.Status] = append(by[j.Status], j)
 	}
 	var cols []column
+	var hidden []string // empty final stages get no column but stay reachable as drop targets
 	for _, st := range store.Statuses {
 		if len(by[st]) == 0 && store.FinalStatuses[st] {
+			hidden = append(hidden, st)
 			continue
 		}
 		cols = append(cols, column{st, by[st]})
 	}
-	v.render(w, r, "pipeline.html", "pipeline", map[string]any{"Columns": cols, "Query": q, "Due": due, "Count": len(jobs)})
+	v.render(w, r, "pipeline.html", "pipeline", map[string]any{"Columns": cols, "Hidden": hidden, "Query": q, "Due": due, "Count": len(jobs)})
 }
 
 // dueJobs keeps what needs a hand this week: a deadline within 7 days (or passed) on an open job, or a follow-up due.
@@ -452,6 +457,8 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 	events, _ := v.s.Events(id, 100)
 	ivs, _ := v.s.Interviews(id, false)
 	kit, dir, entries := apply.Status(v.s, j, events)
+	gates := apply.Check(v.s, j, events, apply.CheckOptions{})
+	review, reviewErr := apply.LoadReview(dir)
 	files := make([]string, 0, len(entries))
 	hasMD := false
 	for _, f := range entries {
@@ -459,7 +466,8 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		hasMD = hasMD || f.Name == "resume.md"
 	}
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
-		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done})
+		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
+		"Gates": gates, "Review": review, "HasReview": reviewErr == nil})
 }
 
 func (v *server) jobFile(w http.ResponseWriter, r *http.Request) {
@@ -814,6 +822,23 @@ func (v *server) apiAddJob(w http.ResponseWriter, r *http.Request) {
 		code = 201
 	}
 	writeJSON(w, code, map[string]any{"job": job, "created": created})
+}
+
+// apiCheck runs the quality gates; 200 with ok=false when something still blocks the send.
+func (v *server) apiCheck(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		apiErr(w, 400, err)
+		return
+	}
+	j, err := v.s.JobByID(id)
+	if err != nil {
+		apiErr(w, 404, fmt.Errorf("job %d not found", id))
+		return
+	}
+	events, _ := v.s.Events(id, 200)
+	rep := apply.Check(v.s, j, events, apply.CheckOptions{})
+	writeJSON(w, 200, map[string]any{"job": j.ID, "ok": rep.OK(), "report": rep})
 }
 
 func (v *server) apiJob(w http.ResponseWriter, r *http.Request) {

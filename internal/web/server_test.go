@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -241,6 +242,9 @@ func TestAPI(t *testing.T) {
 	if rec := do("POST", "/api/jobs/1/email/draft", `{"to":"jobs@acme.test"}`); rec.Code != 201 || !strings.Contains(rec.Body.String(), `"subject":"Application: Go Engineer at Acme"`) {
 		t.Errorf("email draft: %d %s", rec.Code, rec.Body.String())
 	}
+	if rec := do("GET", "/api/jobs/1/check", ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ok":false`) || !strings.Contains(rec.Body.String(), `"name":"grounding"`) {
+		t.Errorf("check: %d %s", rec.Code, rec.Body.String())
+	}
 	if rec := do("GET", "/api/jobs/1", ""); !strings.Contains(rec.Body.String(), `"contact":"jobs@acme.test"`) {
 		t.Errorf("contact from draft: %s", rec.Body.String())
 	}
@@ -427,5 +431,116 @@ func TestSearchForm(t *testing.T) {
 	}
 	if jobs, _ := s.ListJobs(store.JobFilter{Query: "senior"}); len(jobs) != 1 || jobs[0].Source != "greenhouse" {
 		t.Errorf("added jobs: %+v", jobs)
+	}
+	// a careers URL works as a board, and a tracked posting shows its stage instead of an Add button
+	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://boards.greenhouse.io/acme/"}})
+	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "tracked · new") || strings.Contains(b, `name="company" value="acme"`) {
+		t.Errorf("tracked mark: %d %s", rec.Code, b)
+	}
+	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://www.linkedin.com/jobs/"}})
+	if !strings.Contains(rec.Body.String(), "LinkedIn has no public job API") {
+		t.Error("closed board should explain itself")
+	}
+}
+
+func TestNewJobFromURL(t *testing.T) {
+	s := testStore(t)
+	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/acme/jobs/123" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write([]byte(`{"title":"Staff Go Engineer","absolute_url":"https://boards.greenhouse.io/acme/jobs/123","content":"&lt;p&gt;Go and Postgres&lt;/p&gt;","location":{"name":"Remote - Europe"}}`))
+	}))
+	defer gh.Close()
+	h, _ := Handler(s, Config{Currency: "EUR", SearchBaseURL: map[string]string{"greenhouse": gh.URL}})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/new?from=https://boards.greenhouse.io/acme/jobs/123", nil))
+	body := rec.Body.String()
+	for _, want := range []string{`name="company" required maxlength="200" value="acme"`, `value="Staff Go Engineer"`, `value="remote" selected`, `value="Remote - Europe"`, `value="greenhouse"`, `>Go and Postgres</textarea>`, `value="EUR"`, "filled from greenhouse"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("prefill lacks %q", want)
+		}
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/new?from=https://www.linkedin.com/jobs/view/1", nil))
+	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "LinkedIn has no public job API") || !strings.Contains(b, `value="https://www.linkedin.com/jobs/view/1"`) {
+		t.Errorf("closed board: %d", rec.Code)
+	}
+	// already tracked by URL: go to the job instead of adding a twin
+	s.UpsertJob(store.Job{Company: "Globex", Title: "SRE", URL: "https://globex.test/jobs/9?utm_source=x"})
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/new?from=https://www.globex.test/jobs/9/", nil))
+	if rec.Code != 303 || rec.Header().Get("Location") != "/jobs/2" {
+		t.Errorf("tracked url: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+}
+
+func TestPipelineBoardDragAndDrop(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{WeeklyApplyTarget: 5, Version: "1.2.3"})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/pipeline", nil))
+	body := rec.Body.String()
+	for _, want := range []string{`data-drop="new"`, `data-id="1"`, `data-status="`, `class="dropbar"`, `data-drop="rejected"`, `<script src="/board.js" defer>`, `id="board-live"`, `>v1.2.3</a>`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("pipeline lacks %q", want)
+		}
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/board.js", nil))
+	if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/javascript") || !strings.Contains(rec.Body.String(), "data-drop") {
+		t.Errorf("board.js: %d %s", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	// the drop posts the status form with back=/pipeline; the redirect target carries the fresh board
+	form := url.Values{"status": {"rejected"}, "back": {"/pipeline?q=acme"}}
+	req := httptest.NewRequest("POST", "/jobs/1/status", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 303 || rec.Header().Get("Location") != "/pipeline?q=acme" {
+		t.Fatalf("drop: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	j, _ := s.JobByID(1)
+	if j.Status != "rejected" {
+		t.Errorf("status after drop: %s", j.Status)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/pipeline", nil))
+	if b := rec.Body.String(); !strings.Contains(b, `<section class="col s-rejected" data-drop="rejected">`) || strings.Contains(b, `class="drop s-rejected"`) {
+		t.Error("rejected should now be a column, not a drop chip")
+	}
+}
+
+func TestJobPageGatesAndReview(t *testing.T) {
+	s := testStore(t)
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	review := apply.FitReview{Score: 61, Requirements: []apply.Requirement{{Requirement: "5+ years Go", Kind: "must", Evidence: "profile.md: Go since 2018", Strength: "direct", Wording: "six years of Go"}},
+		Vetoes: []apply.Veto{{Rule: "work permit", Reason: "no sponsorship"}}}
+	if _, err := apply.SaveReview(dir, review); err != nil {
+		t.Fatal(err)
+	}
+	veto := review.VetoText()
+	if err := s.UpdateJob(j.ID, store.JobPatch{Veto: &veto}); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := Handler(s, Config{})
+	get := func(p string) string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", p, nil))
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d", p, rec.Code)
+		}
+		return rec.Body.String()
+	}
+	page := get("/jobs/1")
+	for _, want := range []string{"Ready to send?", "hard veto on the job: work permit: no sponsorship", "six years of Go", `class="badge direct"`, "Veto:", "blocking"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("job page lacks %q", want)
+		}
+	}
+	if board := get("/pipeline"); !strings.Contains(board, `title="work permit: no sponsorship">veto<`) {
+		t.Error("pipeline card lacks the veto badge")
 	}
 }

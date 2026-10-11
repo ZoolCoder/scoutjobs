@@ -283,4 +283,4 @@ Before delivering any cover letter:
 
 ## ScoutJobs integration
 
-Save the letter as `cover-letter.md` in the application folder (`scoutjobs job show <id> --json`, field `dir`). Use `profile.md` for facts and the stories in `$(scoutjobs path)/stories/` for examples. Then `scoutjobs job set <id> --note "cover letter drafted"`.
+Save the letter as `cover-letter.md` in the application folder (`scoutjobs job show <id> --json`, field `dir`). Use `profile.md` for facts, the `wording` rows of `fit-review.json` for the must-haves, and the stories in `$(scoutjobs path)/stories/` for examples. Write every letter from scratch for its posting: the duplicate gate refuses a letter that matches another application's. Then `scoutjobs job set <id> --note "cover letter drafted"` and have the `draft-reviewer` log its verdict with `scoutjobs job review <id> --verdict send|fix`.

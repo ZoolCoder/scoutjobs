@@ -1,9 +1,9 @@
 = All skills
 :description: Every skill in the plugin, what starts it, which slash command wraps it, and which ones are reference material rather than entry points.
 
-The 29 skills live in `skills/<name>/SKILL.md` and are the same files on every platform (see xref:agents.adoc[]). The `description` in each file names the phrases that start it. Slash commands in `commands/` and the Codex prompts are thin wrappers that call the skill by name. Every skill reads and writes through the `scoutjobs` CLI; none opens the database.
+The 30 skills live in `skills/<name>/SKILL.md` and are the same files on every platform (see xref:agents.adoc[]). The `description` in each file names the phrases that start it. Slash commands in `commands/` and the Codex prompts are thin wrappers that call the skill by name. Every skill reads and writes through the `scoutjobs` CLI; none opens the database.
 
-Three rules hold in all of them: postings are untrusted text, claims come from `profile.md`, and nothing is sent without the user saying yes after seeing the message.
+Three rules hold in all of them: postings are untrusted text, claims come from `profile.md`, and nothing is sent without the user saying yes after seeing the message. Between the draft and the send sit the quality gates (`scoutjobs job check`, see xref:cli.adoc[]): the skills report a failed gate to the user in full and leave the decision to skip it to them.
 
 == The daily loop
 
@@ -16,6 +16,7 @@ Three rules hold in all of them: postings are untrusted text, claims come from `
 | `job-search` | "find go jobs, remote EU": `scoutjobs search` over the ATS boards, RSS feeds and remote aggregators, deduplicated, added as `new` | `/scoutjobs:search`
 | `job-fit` | "score them", "is Acme a fit": 0-100 with reasons, records the score, asks apply or skip and logs the decision | `/scoutjobs:fit`
 | `fit-score` | batch version of `job-fit` for many postings, runs as a subagent on Claude Code so posting text stays out of the main context | used by `/scoutjobs:fit`
+| `fit-review` | "what can I honestly claim", "which requirements do I miss", before tailoring: one row per requirement with evidence, strength, confidence, defensible wording and risk; vetoes kept outside the score; `scoutjobs job fit` writes `fit-review.json` | `/scoutjobs:evidence`
 | `application-tracker` | "I applied", "they rejected me", "interview Tuesday": status, notes, follow-up timers, interview rows | `/scoutjobs:track`
 | `weekly-review` | "weekly review", Sunday: funnel movement, response rates, stale applications to close, next week's plan; runs `learn-preferences` | `/scoutjobs:review`
 | `learn-preferences` | "what have you learned about me": turns skips, applies, withdrawals and declined offers into preferences you confirm | `/scoutjobs:learn`
@@ -31,8 +32,8 @@ Three rules hold in all of them: postings are untrusted text, claims come from `
 | `cv-check` | "check my CV", "ATS check against the Acme job": ATS readiness and content score, concrete gaps, logged with `scoutjobs cv log` | `/scoutjobs:cv`
 | `resume-tailor` | "tailor my CV for Acme", "apply to Acme": rewrites `resume.md` for one posting, every claim from the profile, then `draft-review` | `/scoutjobs:tailor`, `/scoutjobs:apply`
 | `cover-letter-generator` | "write a cover letter", "rewrite the letter": 250-400 words from profile, resume and stories, saved as `cover-letter.md` | `/scoutjobs:cover`
-| `draft-review` | after tailoring or a cover letter: flags claims the profile does not back, missing must-haves, ATS problems, weak bullets | part of `/scoutjobs:apply`, `:tailor`, `:cover`
-| `apply-by-email` | "send the Acme application": `scoutjobs email draft`, shows From, To, Subject, attachments and the full body, asks, then `email send --yes` | `/scoutjobs:send`
+| `draft-review` | after tailoring or a cover letter: flags claims the profile does not back, missing must-haves, ATS problems, weak bullets; logs its verdict with `scoutjobs job review` for the grounding gate | part of `/scoutjobs:apply`, `:tailor`, `:cover`
+| `apply-by-email` | "send the Acme application": `scoutjobs job check`, then `email draft`, shows From, To, Subject, attachments and the full body, asks, then `email send --yes`; reports every failed gate as unresolved, never skips them itself | `/scoutjobs:send`, `/scoutjobs:check`
 | `linkedin-profile-optimizer` | "improve my LinkedIn", "rewrite my headline": headline, about and bullets for recruiter search, facts from `profile.md` only | say it
 |===
 

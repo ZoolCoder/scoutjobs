@@ -30,7 +30,7 @@ Skipped, rejected, no response, withdrawn and declined are *leaving* statuses: t
 
 == Moving a job
 
-* *Dashboard*: a button per next stage on the pipeline card and on the job page; *more* for any other status with a reason.
+* *Dashboard*: drag a card onto another column, or onto the closing stages that appear below the board while you drag (rejected, no response, withdrawn, and so on); the move posts the same request as the buttons and the board redraws with the new counts. The buttons stay: a button per next stage on the pipeline card and on the job page, *more* for any other status with a reason, and everything works without JavaScript.
 * *CLI*: `scoutjobs job set 3 --status applied --note "via Greenhouse"`; `scoutjobs job skip 4 --reason "onsite only" --signals '{"remote":"onsite"}'`.
 * *API*: `POST /api/jobs/3/status` with `{"status":"applied","reason":"..."}`.
 * *Agent*: the `application-tracker` skill, which also schedules interviews and follow-ups.

@@ -22,18 +22,19 @@ scoutjobs search                                   # queries and boards from con
 scoutjobs search --query "senior go engineer" --query "backend engineer" --remote --limit 40
 scoutjobs search --board greenhouse:stripe --board lever:netlify --board ashby:linear --query go
 scoutjobs search --board workable:acme --board smartrecruiters:Acme --board personio:acme --rss https://example.com/jobs.rss --query go
+scoutjobs search --board https://acme.recruitee.com --board https://acme.bamboohr.com/careers --query go   # careers URLs work as boards
 scoutjobs search --remote --query "platform engineer" --add --json --compact   # add as `new`, print one JSON line per posting
 ```
 
 Rules the search applies: every word of a query must appear as a whole word (so `go` does not match `good`); any one query may match; results are deduplicated by company plus title; `--add` upserts, so re-running is safe (`=` after the id means already tracked). Warnings about an unreachable board go to stderr; keep going.
 
-Company boards need the ATS slug: the part of the careers URL after `boards.greenhouse.io/`, `jobs.lever.co/`, `jobs.ashbyhq.com/`, `apply.workable.com/`, `jobs.smartrecruiters.com/`, or the subdomain of `<slug>.jobs.personio.de`. Any RSS or Atom job feed works with `--rss <url>`. Ask the user for target companies once and store them in config: `search_boards: greenhouse:stripe, lever:netlify` in `$(scoutjobs path)/config.yaml`, next to `search_queries`.
+Company boards take `source:slug` or the careers URL as the user pasted it: `boards.greenhouse.io/<slug>`, `jobs.lever.co/<slug>`, `jobs.ashbyhq.com/<slug>`, `apply.workable.com/<slug>`, `jobs.smartrecruiters.com/<company>`, `<slug>.jobs.personio.de`, `<slug>.recruitee.com`, `<slug>.bamboohr.com`. Any RSS or Atom job feed works with `--rss <url>`. `--remote` also covers the Hacker News "Who is hiring" thread (source `hn`, loosely parsed: trust the description over the fields). LinkedIn, Indeed, Glassdoor, XING and StepStone have no public API: the command says so; ask the user to paste the posting text. Ask the user for target companies once and store them in config: `search_boards: greenhouse:stripe, lever:netlify` in `$(scoutjobs path)/config.yaml`, next to `search_queries`.
 
 Token budget: use `--compact` and `--limit`; only read a description when `job-fit` needs it (it is in `scoutjobs job show <id> --json` as `notes` when saved below).
 
 ### Single URL or pasted text
 
-Fetch the URL, extract company, title, location, remote, salary, posting date, tags. If the page needs JavaScript or login, ask for a paste. Add with `scoutjobs job add`, or pipe JSON lines into `scoutjobs job import`.
+For a posting on Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee or BambooHR run `scoutjobs job add --from <url>`: it fills company, title, location, remote, source, date, tags and puts the description into `notes`. Flags you pass alongside win. For any other site fetch the URL yourself, extract company, title, location, remote, salary, posting date, tags; if the page needs JavaScript or login, ask for a paste. Add with `scoutjobs job add`, or pipe JSON lines into `scoutjobs job import`.
 
 ## Filter before adding
 

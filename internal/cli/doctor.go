@@ -246,7 +246,7 @@ func updateCheck() check {
 	if latest == strings.TrimPrefix(Version, "v") {
 		return check{"ok", "update", "latest is " + rel.Tag, ""}
 	}
-	return check{"warn", "update", "running " + Version + ", latest is " + rel.Tag, "brew upgrade --cask scoutjobs, ./install.sh, or " + rel.URL}
+	return check{"warn", "update", "running " + Version + ", latest is " + rel.Tag, "scoutjobs update (brew upgrade --cask scoutjobs for Homebrew), or " + rel.URL}
 }
 
 func finishDoctor(out io.Writer, asJSON bool, cs []check) error {

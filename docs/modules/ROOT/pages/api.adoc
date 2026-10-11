@@ -16,6 +16,7 @@ The server started by `scoutjobs serve` answers `/api/*` with JSON. With `api_to
 | GET | `/api/jobs/\{id}` | | job, events, interviews
 | POST | `/api/jobs/\{id}/status` | `{"status":"applied","reason":"..."}` | updated job; skip, withdraw and decline also log a decision
 | POST | `/api/jobs/\{id}/note` | `{"note":"..."}` | 201
+| GET | `/api/jobs/\{id}/check` | | the quality gates: `ok` and `report.gates` with `name`, `state` (`pass`, `warn`, `fail`, `skip`), `detail`, `items`; same as `scoutjobs job check --json`
 | GET | `/api/jobs/\{id}/files` | | the application folder: `files` with name, size, modified; `kit` with resume, cover, ATS check, draft, sent, done of 4
 | GET | `/api/jobs/\{id}/files/\{name}` | | `{"name","size","body"}` for `.md`, `.txt`, `.json`, `.eml`; 404 otherwise
 | PUT | `/api/jobs/\{id}/files/\{name}` | raw text, or `{"body":"..."}` | 201 new, 200 replaced; `.md`, `.txt`, `.json` only, 1 MB max, name is reduced to its base name

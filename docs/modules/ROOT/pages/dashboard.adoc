@@ -7,7 +7,57 @@ $ scoutjobs serve                     # http://127.0.0.1:7070
 $ scoutjobs serve --addr 127.0.0.1:8080
 ----
 
-One Go binary, SQLite, HTML templates, no JavaScript, no external assets, strict Content-Security-Policy. Light theme by default, `theme: dark` or `theme: auto` in `config.yaml`, and a switch in the sidebar that overrides per browser. The pages have no login, so keep it on localhost (see xref:security.adoc[]).
+One Go binary, SQLite, HTML templates, one small script for the drag and drop, no external assets, strict Content-Security-Policy. Light theme by default, `theme: dark` or `theme: auto` in `config.yaml`, and a switch in the sidebar that overrides per browser. The pages have no login, so keep it on localhost (see xref:security.adoc[]).
+
+image::overview.png[The overview: next best move, the four numbers, pipeline health, interviews and drafts,1200]
+
+== How it works
+
+The dashboard is a second window onto the same `~/.scoutjobs` the CLI and the agents use. It reads the SQLite database and the application folders on every request and renders plain HTML, so what you see is always the current state: no cache, no sync, no account. Every button on a page posts the same form a CLI command would run, and every change lands in the `events` table, which is what the *Activity* page and the agents' `scoutjobs job show` read back. Nothing is stored in the browser except the theme cookie.
+
+The agents never open the dashboard. They write through the CLI (or the JSON API from a cloud runner), and you watch the result here: a new card after `job add`, a score gauge after the `job-fit` skill runs, the tailored resume in the drafts viewer after `resume-tailor`, the gates turning green after `draft-review` logs its verdict. The one place the loop closes the other way is the drafts viewer: an edit you save there is the text the agent reads on its next turn.
+
+Because every page is a plain `GET` and every action a `POST` with a redirect, the whole thing works with the keyboard, in a reader mode, and with JavaScript off. The board script only adds drag and drop on top of the stage buttons; it never talks to anything but the same `/jobs/\{id}/status` form.
+
+== Overview
+
+The page opens with *Next best move*: one card the server picks from the state of the pipeline, in this order: the strongest draft waiting to be sent, a follow-up past its date, an interview to prepare, a CV that has never been checked, otherwise new jobs to find and score. The four numbers below are open jobs, applications this week against `weekly_apply_target`, upcoming interviews and the response rate over everything applied. *Pipeline health* is the funnel with the last eight weeks of applications as bars; *Coming up* lists interviews and the drafts waiting with their fit gauge.
+
+== Pipeline
+
+image::pipeline.png[The pipeline board: one column per open stage, a gauge per card, a veto badge, stage buttons,1200]
+
+One column per stage, left to right in the order a job moves. Each card carries the fit gauge (green from 75, amber from 50, red below), where and how remote the job is, the deadline or last update, the source board, and the buttons for the stages that usually come next. A job with a veto shows the `veto` badge instead of a gauge, so a hard failure never hides behind a good number.
+
+Drag a card onto another column to move it; the closing stages that have no column yet (hired, rejected, no response, withdrawn, offer declined, skipped) appear as drop targets under the board while you drag, so they do not take space the rest of the time. The *Due this week* toggle keeps only jobs with a deadline inside seven days or a follow-up due, and the search box filters on company, title and tags as you type. *Add job* opens the same form as `scoutjobs job add`, with *Fill from a posting URL* for the boards the search knows. The dark theme uses the same layout with its own contrast-checked tokens:
+
+image::pipeline-dark.png[The same board in the dark theme,1200]
+
+== Job
+
+image::job.png[One job: the Get selected kit, the application facts, the files in its folder,1200]
+
+The job page is where an application gets made. *Get selected* is the kit, four steps with the slash command that runs each: tailor the CV, write the cover letter, run the ATS check against this posting, and send. A step shows *Done* when its file exists, and the ATS step shows the score and the gaps it found. The right column holds the facts the agents also read (status, posting URL, contact, salary, deadline, tags) and the *Files* panel with everything in the application folder; each text file opens in the drafts viewer, and *Export resume.md as PDF* renders the PDF the ATS gate inspects.
+
+image::job-gates.png[Ready to send: seven gates all passing, and the evidence table from fit-review.json,1200]
+
+*Ready to send?* runs the same seven quality gates as `scoutjobs job check` on every page load: the documents exist and are not stubs, the fit review has no veto, every must-have is covered and its agreed wording is in the drafts, the draft-reviewer logged a `send` verdict after the last edit, nothing is duplicated, `resume.pdf` has a text layer, and the filenames look professional. A warning never blocks; a failure does, and the panel says what to do about each one:
+
+image::job-blocked.png[Three failing gates: a missing cover letter, a must-have without evidence, no reviewer verdict,1200]
+
+*Why this job fits* is `fit-review.json` as a table: the posting's wording for each requirement, whether it is a must or a nice-to-have, where in your profile the evidence is, how strong the match is (direct, adjacent, partial, gap), the wording the CV may use, and the risk a reviewer could raise. Below it the free-text notes, then interviews and the full history of the job.
+
+== Drafts viewer
+
+image::drafts.png[The drafts viewer: cover-letter.md in a textarea with save and discard,1200]
+
+`/jobs/\{id}/files/\{name}` renders a text file from the job's application folder: the posting, the tailored resume, the cover letter, the e-mail draft, research, the prep sheet. Drafts (`.md`, `.txt`, `.json`) open in a textarea: edit, save, and the agent sees the new text on its next read; the save logs `draft:edited` and the grounding gate asks for a fresh review. `.eml` files are read-only. Binary files (PDF, DOCX) are listed but not rendered.
+
+== Search
+
+image::search.png[Search: queries, boards and the remote aggregators, prefilled from config,1200]
+
+The same sources as `scoutjobs search`, prefilled from `search_queries`, `search_boards` and `search_remote` in `config.yaml`. Paste a careers page URL or a `source:slug` into *Boards*; results list company, title, place, source and date with an *Add* button each, or *Search and add all* tracks every hit as `new`. A posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
 
 == Pages
 
@@ -19,13 +69,13 @@ One Go binary, SQLite, HTML templates, no JavaScript, no external assets, strict
 | Your next best move, the funnel, applied this week against `weekly_apply_target`, follow-ups due, stale jobs, upcoming interviews, activity streak.
 
 | Pipeline
-| One column per open status. *Due this week* keeps only open jobs with a deadline within 7 days or a follow-up due; the search box filters company, title and tags. Every card opens the job. *Add job* opens a form with the same fields as `scoutjobs job add`; an existing company and title is updated, not duplicated. Each card has one-click buttons for the stages that follow (`new` offers ranked, drafted, skipped; `applied` offers interview, rejected, no response, withdrawn) and a *more* disclosure for any other status with a reason. See xref:pipeline.adoc[].
+| One column per open status. *Due this week* keeps only open jobs with a deadline within 7 days or a follow-up due; the search box filters company, title and tags. Every card opens the job and can be dragged onto another column, or onto the closing stages shown below the board while dragging. *Add job* opens a form with the same fields as `scoutjobs job add`; paste a posting URL from Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee or BambooHR into *Fill from a posting URL* and the form is filled, description included, for you to check. An existing company and title is updated, not duplicated. Each card has one-click buttons for the stages that follow (`new` offers ranked, drafted, skipped; `applied` offers interview, rejected, no response, withdrawn) and a *more* disclosure for any other status with a reason. See xref:pipeline.adoc[].
 
 | Job
-| Everything about one posting: score and fit notes, contact, tags, notes, events, interviews, and the *Get selected* kit: tailored resume, cover letter, ATS check at 70 or more, e-mail draft. Each file in the application folder opens in the drafts viewer (`.md`, `.txt`, `.json`, `.eml`). A `mailto:` link opens your own mail app with the subject and body prefilled.
+| Everything about one posting: score and fit notes, contact, tags, notes, events, interviews, the *Get selected* kit (tailored resume, cover letter, ATS check at 70 or more, e-mail draft), the *Ready to send?* panel with the seven quality gates and what blocks, and the evidence table from `fit-review.json` with a veto callout when one is set. A vetoed job shows a `veto` badge instead of its gauge on the pipeline board. Each file in the application folder opens in the drafts viewer (`.md`, `.txt`, `.json`, `.eml`). A `mailto:` link opens your own mail app with the subject and body prefilled.
 
 | Search
-| The same sources as `scoutjobs search`: queries, boards (`greenhouse:stripe`, `rss:https://...`) and the remote aggregators, prefilled from `search_queries`, `search_boards` and `search_remote`. Results list company, title, place, source and date with an *Add* button each, or *Search and add all* tracks every hit as `new`. Postings are stored as text and never followed.
+| The same sources as `scoutjobs search`: queries, boards (`greenhouse:stripe`, a careers URL such as `https://jobs.lever.co/netlify`, `rss:https://...`) and the remote aggregators including the Hacker News "Who is hiring" thread, prefilled from `search_queries`, `search_boards` and `search_remote`. Results list company, title, place, source and date with an *Add* button each, or *Search and add all* tracks every hit as `new`; a posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
 
 | Interviews
 | Scheduled and past interviews with prep status, plus the mock sessions and their scores.
@@ -45,10 +95,6 @@ One Go binary, SQLite, HTML templates, no JavaScript, no external assets, strict
 | Activity
 | Every event: job added, status change, note, decision, CV check, e-mail draft or sent, file written through the API.
 |===
-
-== Drafts viewer
-
-`/jobs/\{id}/files/\{name}` renders a text file from the job's application folder: the posting, the tailored resume, the cover letter, the e-mail draft, research, the prep sheet. Drafts (`.md`, `.txt`, `.json`) open in a textarea: edit, save, and the agent sees the new text on its next read; the save logs `draft:edited`. `.eml` files are read-only. Binary files (PDF, DOCX) are listed but not rendered. When `resume.md` exists, the Files panel offers "Export resume.md as PDF", which writes `resume.pdf` next to it and logs `cv:export`.
 
 == JSON API
 

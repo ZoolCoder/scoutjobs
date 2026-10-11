@@ -10,7 +10,7 @@
 | Tool | CLI command
 
 | `brief`, `stats`, `doctor` | `scoutjobs brief --compact`, `scoutjobs stats --json`, `scoutjobs doctor --json`
-| `job_list`, `job_show`, `job_add`, `job_set`, `job_skip` | `scoutjobs job ...`
+| `job_list`, `job_show`, `job_add`, `job_set`, `job_fit`, `job_check`, `job_review`, `job_skip` | `scoutjobs job ...`
 | `search` | `scoutjobs search --json --compact`, `add: true` tracks the matches
 | `cv_files`, `cv_log`, `cv_list`, `cv_export` | `scoutjobs cv ...`
 | `email_draft`, `email_show`, `email_sync` | `scoutjobs email ...`; `email_send` and `email_test` are not exposed
