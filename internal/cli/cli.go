@@ -361,14 +361,18 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		if *asJSON && *compact {
 			rows := make([]map[string]any, 0, len(jobs))
 			for _, j := range jobs {
-				rows = append(rows, map[string]any{"id": j.ID, "company": j.Company, "title": j.Title, "status": j.Status, "fit": j.FitScore, "remote": j.Remote, "updated": j.UpdatedAt[:10]})
+				rows = append(rows, map[string]any{"id": j.ID, "company": j.Company, "title": j.Title, "status": j.Status, "fit": j.FitScore, "veto": j.Veto, "remote": j.Remote, "updated": j.UpdatedAt[:10]})
 			}
 			return emit(out, true, rows, nil)
 		}
 		return emit(out, *asJSON, jobs, func() {
 			var rows [][]string
 			for _, j := range jobs {
-				rows = append(rows, []string{fmt.Sprint(j.ID), j.Status, fit(j.FitScore), j.Company, trunc(j.Title, 40), j.Remote, j.UpdatedAt[:10]})
+				score := fit(j.FitScore)
+				if j.Veto != "" {
+					score = "veto"
+				}
+				rows = append(rows, []string{fmt.Sprint(j.ID), j.Status, score, j.Company, trunc(j.Title, 40), j.Remote, j.UpdatedAt[:10]})
 			}
 			table(out, "ID\tSTATUS\tFIT\tCOMPANY\tTITLE\tREMOTE\tUPDATED", rows)
 		})
@@ -391,6 +395,9 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		return emit(out, *asJSON, map[string]any{"job": j, "events": events, "interviews": ivs, "dir": appDir(s, j)}, func() {
 			fmt.Fprintf(out, "#%d %s / %s\nstatus: %s  fit: %s  remote: %s  source: %s\nurl: %s\nlocation: %s  deadline: %s\ntags: %s\nnotes: %s\nfit notes: %s\ndir: %s\n",
 				j.ID, j.Company, j.Title, j.Status, fit(j.FitScore), j.Remote, j.Source, j.URL, j.Location, j.Deadline, j.Tags, j.Notes, j.FitNotes, appDir(s, j))
+			if j.Veto != "" {
+				fmt.Fprintf(out, "VETO: %s\n", j.Veto)
+			}
 			if len(ivs) > 0 {
 				fmt.Fprintln(out, "\ninterviews:")
 				for _, i := range ivs {
@@ -418,6 +425,7 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		tags := strFlag("tags", "")
 		notes := strFlag("notes", "")
 		contact := strFlag("contact", "application e-mail address")
+		veto := strFlag("veto", "hard eligibility failure, blocks sending; --veto '' clears it")
 		score := fs.Int64("score", -2, "fit score 0-100")
 		smin := fs.Int64("salary-min", -1, "")
 		smax := fs.Int64("salary-max", -1, "")
@@ -439,8 +447,8 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 			}
 			return v
 		}
-		p.Status, p.URL, p.Location, p.Remote, p.Currency, p.Source, p.PostedAt, p.Deadline, p.FitNotes, p.Tags, p.Notes, p.Contact =
-			pick(status), pick(url), pick(location), pick(remote), pick(currency), pick(source), pick(posted), pick(deadline), pick(fitNotes), pick(tags), pick(notes), pick(contact)
+		p.Status, p.URL, p.Location, p.Remote, p.Currency, p.Source, p.PostedAt, p.Deadline, p.FitNotes, p.Tags, p.Notes, p.Contact, p.Veto =
+			pick(status), pick(url), pick(location), pick(remote), pick(currency), pick(source), pick(posted), pick(deadline), pick(fitNotes), pick(tags), pick(notes), pick(contact), pick(veto)
 		if *score >= -1 {
 			p.FitScore = score
 		}
@@ -482,6 +490,12 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		}
 		fmt.Fprintf(out, "skipped #%d %s / %s\n", j.ID, j.Company, j.Title)
 		return nil
+	case "fit":
+		return runJobFit(s, rest, out)
+	case "review":
+		return runJobReview(s, rest, out)
+	case "check":
+		return runJobCheck(s, rest, out)
 	case "rm":
 		if len(rest) == 0 {
 			return errors.New("usage: job rm <id>")
@@ -496,7 +510,7 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, "removed #%d\n", j.ID)
 		return nil
 	}
-	return errors.New("usage: job add|list|show|set|skip|rm")
+	return errors.New("usage: job add|list|show|set|fit|check|review|skip|rm")
 }
 
 func appDir(s *store.Store, j store.Job) string { return apply.Dir(s, j) }

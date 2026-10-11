@@ -64,6 +64,7 @@ func runEmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	case "send":
 		fs := flag.NewFlagSet("email send", flag.ContinueOnError)
 		yes := fs.Bool("yes", false, "actually send; without it the draft is shown and nothing leaves the machine")
+		skip := fs.Bool("skip-checks", false, "send although a quality gate failed; the skip is logged on the job")
 		asJSON := fs.Bool("json", false, "")
 		pos, err := parse(fs, rest)
 		if err != nil {
@@ -92,6 +93,14 @@ func runEmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		if !*yes {
 			preview(out, m, dir)
 			return errors.New("not sent: review the draft above, then run again with --yes")
+		}
+		events, _ := s.Events(j.ID, 200)
+		if rep := apply.Check(s, j, events, apply.CheckOptions{}); !rep.OK() {
+			if !*skip {
+				printReport(out, j, rep)
+				return fmt.Errorf("not sent: %w\nfix them, or `--skip-checks` to send anyway", unresolved(rep))
+			}
+			_ = s.AddEvent(j.ID, "check:skipped", strings.Join(rep.Unresolved(), "; "))
 		}
 		if err := smtpAccount(cfg).Send(m, raw); err != nil {
 			return err

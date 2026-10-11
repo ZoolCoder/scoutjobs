@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -240,6 +241,9 @@ func TestAPI(t *testing.T) {
 	}
 	if rec := do("POST", "/api/jobs/1/email/draft", `{"to":"jobs@acme.test"}`); rec.Code != 201 || !strings.Contains(rec.Body.String(), `"subject":"Application: Go Engineer at Acme"`) {
 		t.Errorf("email draft: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := do("GET", "/api/jobs/1/check", ""); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"ok":false`) || !strings.Contains(rec.Body.String(), `"name":"grounding"`) {
+		t.Errorf("check: %d %s", rec.Code, rec.Body.String())
 	}
 	if rec := do("GET", "/api/jobs/1", ""); !strings.Contains(rec.Body.String(), `"contact":"jobs@acme.test"`) {
 		t.Errorf("contact from draft: %s", rec.Body.String())
@@ -505,5 +509,38 @@ func TestPipelineBoardDragAndDrop(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/pipeline", nil))
 	if b := rec.Body.String(); !strings.Contains(b, `<section class="col s-rejected" data-drop="rejected">`) || strings.Contains(b, `class="drop s-rejected"`) {
 		t.Error("rejected should now be a column, not a drop chip")
+	}
+}
+
+func TestJobPageGatesAndReview(t *testing.T) {
+	s := testStore(t)
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	review := apply.FitReview{Score: 61, Requirements: []apply.Requirement{{Requirement: "5+ years Go", Kind: "must", Evidence: "profile.md: Go since 2018", Strength: "direct", Wording: "six years of Go"}},
+		Vetoes: []apply.Veto{{Rule: "work permit", Reason: "no sponsorship"}}}
+	if _, err := apply.SaveReview(dir, review); err != nil {
+		t.Fatal(err)
+	}
+	veto := review.VetoText()
+	if err := s.UpdateJob(j.ID, store.JobPatch{Veto: &veto}); err != nil {
+		t.Fatal(err)
+	}
+	h, _ := Handler(s, Config{})
+	get := func(p string) string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", p, nil))
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d", p, rec.Code)
+		}
+		return rec.Body.String()
+	}
+	page := get("/jobs/1")
+	for _, want := range []string{"Ready to send?", "hard veto on the job: work permit: no sponsorship", "six years of Go", `class="badge direct"`, "Veto:", "blocking"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("job page lacks %q", want)
+		}
+	}
+	if board := get("/pipeline"); !strings.Contains(board, `title="work permit: no sponsorship">veto<`) {
+		t.Error("pipeline card lacks the veto badge")
 	}
 }

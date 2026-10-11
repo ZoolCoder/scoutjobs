@@ -180,6 +180,7 @@ func runCV(s *store.Store, rest []string, out io.Writer) error {
 	case "export":
 		fs := flag.NewFlagSet("cv export", flag.ContinueOnError)
 		name := fs.String("file", "resume.md", "markdown file to render; the PDF lands next to it")
+		skip := fs.Bool("skip-checks", false, "export although a quality gate failed")
 		asJSON := fs.Bool("json", false, "")
 		pos, err := parse(fs, rest)
 		if err != nil {
@@ -193,6 +194,11 @@ func runCV(s *store.Store, rest []string, out io.Writer) error {
 				return err
 			}
 			dir, jobID = apply.Dir(s, j), j.ID
+			events, _ := s.Events(j.ID, 200)
+			if rep := apply.Check(s, j, events, apply.CheckOptions{Export: true}); !rep.OK() && !*skip {
+				printReport(out, j, rep)
+				return fmt.Errorf("not exported: %w\nfix them, or `--skip-checks` to export anyway", unresolved(rep))
+			}
 		}
 		dst, size, err := apply.ExportPDF(dir, *name, "")
 		if err != nil {

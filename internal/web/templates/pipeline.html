@@ -11,7 +11,7 @@
   {{range .Jobs}}
   <article class="jobcard" data-id="{{.ID}}" data-status="{{.Status}}" data-company="{{.Company}}">
     <a class="cover" href="/jobs/{{.ID}}" aria-label="Open {{.Company}} · {{.Title}}"></a>
-    <div class="row"><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a>{{if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
+    <div class="row"><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
     <div class="ttl">{{.Title}}</div>
     <div class="meta">{{if or .Remote .Location}}<span class="chip">{{template "ico-pin"}}{{.Remote}}{{if and .Remote .Location}} · {{end}}{{.Location}}</span>{{end}}<span class="chip">{{template "ico-clock"}}{{if .Deadline}}due {{.Deadline}}{{else}}updated {{day .UpdatedAt}}{{end}}</span>{{if .Source}}<span class="chip acc">{{.Source}}</span>{{end}}</div>
     {{template "move" (dict_status .ID .Status "/pipeline")}}

@@ -175,13 +175,20 @@ func TestEmailDraftAndSend(t *testing.T) {
 	if err := Run([]string{"email", "send", "1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "--yes") {
 		t.Errorf("send without --yes must not send: %v", err)
 	}
-	if err := Run([]string{"email", "send", "1", "--yes"}, io.Discard); err == nil || !strings.Contains(err.Error(), "SCOUTJOBS_SMTP_PASSWORD") {
+	if err := Run([]string{"email", "send", "1", "--yes"}, io.Discard); err == nil || !strings.Contains(err.Error(), "unresolved failure") || !strings.Contains(err.Error(), "grounding") {
+		t.Errorf("send must stop on failed gates: %v", err)
+	}
+	if err := Run([]string{"email", "send", "1", "--yes", "--skip-checks"}, io.Discard); err == nil || !strings.Contains(err.Error(), "SCOUTJOBS_SMTP_PASSWORD") {
 		t.Errorf("send without password: %v", err)
 	}
 	out = run(t, "job", "show", "1", "--json")
-	if !strings.Contains(out, `"status": "new"`) || !strings.Contains(out, "email:draft") || strings.Contains(out, "email:sent") {
+	if !strings.Contains(out, `"status": "new"`) || !strings.Contains(out, "email:draft") || strings.Contains(out, "email:sent") || !strings.Contains(out, "check:skipped") {
 		t.Errorf("job after failed send: %s", out)
 	}
+	if err := Run([]string{"cv", "export", "1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "not exported") {
+		t.Errorf("export must stop before a reviewer verdict: %v", err)
+	}
+	run(t, "job", "review", "1", "--verdict", "send", "--notes", "all claims in profile")
 	out = run(t, "cv", "export", "1", "--json")
 	if !strings.Contains(out, `resume.pdf`) {
 		t.Errorf("cv export: %s", out)
@@ -318,5 +325,59 @@ func TestEmailTestUnreachableSMTP(t *testing.T) {
 	err := Run([]string{"email", "test"}, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "smtp 127.0.0.1:1") || !strings.Contains(err.Error(), "password: ") {
 		t.Errorf("unreachable smtp: %v", err)
+	}
+}
+
+func TestJobFitReviewAndCheck(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SCOUTJOBS_HOME", home)
+	run(t, "init")
+	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev", "--contact", "jobs@acme.test")
+	review := `{"requirements":[{"requirement":"5+ years Go","kind":"must","evidence":"profile.md: Go since 2018","strength":"direct","confidence":"high","wording":"six years of Go"},{"requirement":"Rust","kind":"nice","strength":"gap"}],"vetoes":[{"rule":"work permit","reason":"EU passport required"}],"score":70}`
+	if err := Run([]string{"job", "fit", "1", "--review", `{"requirements":[{"requirement":"x","kind":"must","strength":"maybe"}],"score":1}`}, io.Discard); err == nil || !strings.Contains(err.Error(), "strength") {
+		t.Errorf("bad review must fail: %v", err)
+	}
+	out := run(t, "job", "fit", "1", "--review", review)
+	if !strings.Contains(out, "VETO: work permit: EU passport required") || !strings.Contains(out, "fit 70") {
+		t.Errorf("fit: %s", out)
+	}
+	if _, err := os.Stat(filepath.Join(home, "applications", "acme_go-dev", "fit-review.json")); err != nil {
+		t.Error("fit-review.json not written")
+	}
+	out = run(t, "job", "show", "1", "--json")
+	if !strings.Contains(out, `"fit_score": 70`) || !strings.Contains(out, `"veto": "work permit: EU passport required"`) || !strings.Contains(out, "fit:review") || !strings.Contains(out, "1 direct, 1 gap") {
+		t.Errorf("job after fit: %s", out)
+	}
+	if out = run(t, "job", "list"); !strings.Contains(out, "veto") {
+		t.Errorf("list hides the veto: %s", out)
+	}
+	if err := Run([]string{"job", "check", "1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "fit_review: hard veto") {
+		t.Errorf("check with veto: %v", err)
+	}
+	run(t, "job", "set", "1", "--veto", "")
+	out = run(t, "job", "show", "1", "--json")
+	if !strings.Contains(out, `"veto": ""`) || !strings.Contains(out, "veto:cleared") {
+		t.Errorf("clear veto: %s", out)
+	}
+	dir := filepath.Join(home, "applications", "acme_go-dev")
+	body := strings.Repeat("Built Go services with Postgres and shipped them weekly. ", 5)
+	os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Me\n\nSix years of Go.\n\n"+body), 0o600)
+	os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team,\n\n"+body), 0o600)
+	os.WriteFile(filepath.Join(dir, "review.json"), []byte(strings.Replace(review, `"vetoes":[{"rule":"work permit","reason":"EU passport required"}],`, "", 1)), 0o600)
+	if err := Run([]string{"job", "fit", "1", "--file", filepath.Join(dir, "review.json")}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(filepath.Join(dir, "review.json"))
+	if err := Run([]string{"job", "review", "1", "--verdict", "maybe"}, io.Discard); err == nil {
+		t.Error("verdict must be send or fix")
+	}
+	run(t, "job", "review", "1", "--verdict", "send", "--notes", "all claims in profile")
+	out = run(t, "job", "check", "1", "--json")
+	if !strings.Contains(out, `"ok": true`) {
+		t.Errorf("check: %s", out)
+	}
+	out = run(t, "job", "check", "1")
+	if !strings.Contains(out, "PASS  grounding") || !strings.Contains(out, "WARN  ats_text") {
+		t.Errorf("check text: %s", out)
 	}
 }

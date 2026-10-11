@@ -23,14 +23,16 @@ func TestMCP(t *testing.T) {
 		`{"jsonrpc":"2.0","id":10,"method":"ping"}`,
 		`not json`,
 		`{"jsonrpc":"2.0","id":11,"method":"resources/list"}`,
+		`{"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"job_fit","arguments":{"job":"1","review":"{\"requirements\":[{\"requirement\":\"Go\",\"kind\":\"must\",\"strength\":\"direct\"}],\"vetoes\":[{\"rule\":\"visa\",\"reason\":\"no sponsorship\"}],\"score\":65}"}}}`,
+		`{"jsonrpc":"2.0","id":13,"method":"tools/call","params":{"name":"job_check","arguments":{"job":"1"}}}`,
 	}, "\n") + "\n"
 	var out strings.Builder
 	if err := runMCP(strings.NewReader(in), &out); err != nil {
 		t.Fatal(err)
 	}
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 12 {
-		t.Fatalf("want 12 replies (no reply to the notification), got %d:\n%s", len(lines), out.String())
+	if len(lines) != 14 {
+		t.Fatalf("want 14 replies (no reply to the notification), got %d:\n%s", len(lines), out.String())
 	}
 	type resp struct {
 		ID     json.RawMessage `json:"id"`
@@ -55,6 +57,12 @@ func TestMCP(t *testing.T) {
 	}
 	if n := len(byID["2"].Result["tools"].([]any)); n != len(mcpTools) {
 		t.Errorf("tools/list: %d", n)
+	}
+	if !strings.Contains(text("12"), `"veto": "visa: no sponsorship"`) || isErr("12") {
+		t.Errorf("job_fit: %s", text("12"))
+	}
+	if !strings.Contains(text("13"), `"ok": false`) || !isErr("13") {
+		t.Errorf("job_check must report the veto as an error: %s", text("13"))
 	}
 	if !strings.Contains(text("3"), `"created": true`) || isErr("3") {
 		t.Errorf("job_add: %s", text("3"))

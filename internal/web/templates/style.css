@@ -260,6 +260,14 @@ ul.reasons{list-style:none;padding:0;margin:0}ul.reasons li{display:flex;align-i
 ul.reasons .cnt{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:var(--bad-sub);color:var(--bad);font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
 ul.reasons .cnt.dim{background:var(--subtle);color:var(--muted)}ul.reasons small{margin-left:auto;font-size:11px}
 .callout.info{background:var(--info-sub);color:var(--fg);border-left-color:var(--info)}
+.callout.bad{background:var(--bad-sub);color:var(--fg);border-left-color:var(--bad)}
+ul.gates{list-style:none;margin:0;padding:0}ul.gates>li{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:8px 0;border-top:1px solid var(--line)}
+ul.gates>li:first-child{border-top:0;padding-top:0}ul.gates>li>.badge{min-width:44px;text-align:center;margin-top:2px}
+ul.gates b{display:block;font-weight:600;font-size:13px}ul.gates small{display:block;color:var(--muted);font-size:12.5px;line-height:1.45}
+ul.gates ul{margin:4px 0 0;padding-left:18px;font-size:12.5px;color:var(--fg)}ul.gates ul li{padding:1px 0}
+.badge.pass,.badge.direct{background:var(--ok-sub);color:var(--ok);border-color:transparent}.badge.fail,.badge.gap{background:var(--bad-sub);color:var(--bad);border-color:transparent}
+.badge.adjacent{background:var(--acc-sub);color:var(--acc);border-color:transparent}.badge.partial{background:var(--warn-sub);color:var(--warn);border-color:transparent}.badge.skip{background:var(--subtle);color:var(--muted)}
+table.review{width:100%;font-size:12.5px;margin-bottom:12px}table.review th{text-align:left;font-weight:600;color:var(--muted);font-size:11.5px;padding:4px 6px}table.review td{padding:5px 6px;vertical-align:top;border-top:1px solid var(--line)}
 code.path{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--subtle);border:1px solid var(--line);color:var(--muted);font-weight:400}
 .panel-h .act code.path{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle}
 td .file{display:inline-flex;align-items:center;gap:8px}td .file svg{width:16px;height:16px;fill:none;stroke:var(--acc);stroke-width:1.8}td .file a{font-weight:500}
