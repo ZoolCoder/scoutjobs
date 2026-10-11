@@ -206,6 +206,15 @@ CREATE TABLE IF NOT EXISTS contacts (
   connected_on TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS contacts_company ON contacts(company_key);
+CREATE TABLE IF NOT EXISTS saved_searches (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  queries TEXT NOT NULL DEFAULT '',
+  boards TEXT NOT NULL DEFAULT '',
+  remote INTEGER NOT NULL DEFAULT 0,
+  filters TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
 `
 
 func (s *Store) migrate() error {
@@ -214,7 +223,12 @@ func (s *Store) migrate() error {
 	}
 	// columns added after 0.1; sqlite has no ADD COLUMN IF NOT EXISTS
 	for _, stmt := range []string{`ALTER TABLE jobs ADD COLUMN contact TEXT NOT NULL DEFAULT ''`, `ALTER TABLE jobs ADD COLUMN veto TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE interviews ADD COLUMN duration INTEGER NOT NULL DEFAULT 60`, `ALTER TABLE interviews ADD COLUMN location TEXT NOT NULL DEFAULT ''`} {
+		`ALTER TABLE interviews ADD COLUMN duration INTEGER NOT NULL DEFAULT 60`, `ALTER TABLE interviews ADD COLUMN location TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE interviews ADD COLUMN prep TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mail ADD COLUMN from_addr TEXT NOT NULL DEFAULT ''`, `ALTER TABLE mail ADD COLUMN subject TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mail ADD COLUMN snippet TEXT NOT NULL DEFAULT ''`, `ALTER TABLE mail ADD COLUMN date TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mail ADD COLUMN thread TEXT NOT NULL DEFAULT ''`, `ALTER TABLE mail ADD COLUMN source TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE mail ADD COLUMN kind TEXT NOT NULL DEFAULT ''`} {
 		if _, err := s.DB.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}
@@ -622,6 +636,7 @@ type Interview struct {
 	Feedback    string `json:"feedback"`
 	Duration    int64  `json:"duration"` // minutes
 	Location    string `json:"location"` // meeting link or address
+	Prep        string `json:"prep"`     // done checklist items, comma separated (see PrepItems)
 	CreatedAt   string `json:"created_at"`
 	Company     string `json:"company"`
 	Title       string `json:"title"`
@@ -645,14 +660,22 @@ func (s *Store) AddInterview(i Interview) (int64, error) {
 }
 
 type InterviewPatch struct {
-	At, Format, Interviewer, PrepStatus, Outcome, Feedback, Stage, Location *string
-	Duration                                                                *int64
+	At, Format, Interviewer, PrepStatus, Outcome, Feedback, Stage, Location, Prep *string
+	Duration                                                                      *int64
 }
 
 func (s *Store) UpdateInterview(id int64, p InterviewPatch) error {
 	var sets []string
 	var args []any
-	for col, v := range map[string]*string{"at": p.At, "format": p.Format, "interviewer": p.Interviewer, "prep_status": p.PrepStatus, "outcome": p.Outcome, "feedback": p.Feedback, "stage": p.Stage, "location": p.Location} {
+	if p.Prep != nil {
+		done := checkedPrep(*p.Prep)
+		p.Prep = &done
+		if p.PrepStatus == nil {
+			st := PrepStatusOf(done)
+			p.PrepStatus = &st
+		}
+	}
+	for col, v := range map[string]*string{"at": p.At, "format": p.Format, "interviewer": p.Interviewer, "prep_status": p.PrepStatus, "outcome": p.Outcome, "feedback": p.Feedback, "stage": p.Stage, "location": p.Location, "prep": p.Prep} {
 		if v != nil {
 			sets = append(sets, col+"=?")
 			args = append(args, *v)
@@ -676,7 +699,7 @@ func (s *Store) UpdateInterview(id int64, p InterviewPatch) error {
 }
 
 func (s *Store) Interviews(jobID int64, upcomingOnly bool) ([]Interview, error) {
-	q := `SELECT i.id,i.job_id,i.stage,i.at,i.format,i.interviewer,i.prep_status,i.outcome,i.feedback,i.duration,i.location,i.created_at,j.company,j.title FROM interviews i JOIN jobs j ON j.id=i.job_id WHERE 1=1`
+	q := `SELECT i.id,i.job_id,i.stage,i.at,i.format,i.interviewer,i.prep_status,i.outcome,i.feedback,i.duration,i.location,i.prep,i.created_at,j.company,j.title FROM interviews i JOIN jobs j ON j.id=i.job_id WHERE 1=1`
 	var args []any
 	if jobID > 0 {
 		q += ` AND i.job_id=?`
@@ -695,7 +718,7 @@ func (s *Store) Interviews(jobID int64, upcomingOnly bool) ([]Interview, error) 
 	var out []Interview
 	for rows.Next() {
 		var i Interview
-		if err := rows.Scan(&i.ID, &i.JobID, &i.Stage, &i.At, &i.Format, &i.Interviewer, &i.PrepStatus, &i.Outcome, &i.Feedback, &i.Duration, &i.Location, &i.CreatedAt, &i.Company, &i.Title); err != nil {
+		if err := rows.Scan(&i.ID, &i.JobID, &i.Stage, &i.At, &i.Format, &i.Interviewer, &i.PrepStatus, &i.Outcome, &i.Feedback, &i.Duration, &i.Location, &i.Prep, &i.CreatedAt, &i.Company, &i.Title); err != nil {
 			return nil, err
 		}
 		out = append(out, i)
