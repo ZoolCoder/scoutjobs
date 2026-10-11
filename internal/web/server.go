@@ -90,6 +90,7 @@ var funcs = template.FuncMap{
 		return p
 	},
 	"kindcls": func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
+	"evrow":   activityRowOf,
 	"mailto": func(m any) string {
 		switch m := m.(type) {
 		case *mail.Message:
@@ -1028,23 +1029,51 @@ func (v *server) profile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (v *server) activity(w http.ResponseWriter, r *http.Request) {
-	all, _ := v.s.Events(0, 200)
-	kind := r.URL.Query().Get("kind")
-	kinds := map[string]bool{}
+	q := r.URL.Query()
+	group := q.Get("kind")
+	limit := 60
+	if n, err := strconv.Atoi(q.Get("n")); err == nil && n > 0 {
+		limit = min(n, 500)
+	}
+	all, _ := v.s.Events(0, 500)
+	weekAgo := time.Now().UTC().AddDate(0, 0, -7).Format("2006-01-02")
+	present, week := map[string]bool{}, map[string]int{}
 	var events []store.Event
 	for _, e := range all {
-		k, _, _ := strings.Cut(e.Kind, ":")
-		kinds[k] = true
-		if kind == "" || k == kind {
+		g := eventGroup(e.Kind)
+		present[g] = true
+		if day(e.At) >= weekAgo {
+			week[g]++
+		}
+		if group == "" || g == group {
 			events = append(events, e)
 		}
 	}
-	var names []string
-	for k := range kinds {
-		names = append(names, k)
+	total := len(events)
+	if len(events) > limit {
+		events = events[:limit]
 	}
-	sort.Strings(names)
-	v.render(w, r, "activity.html", "activity", map[string]any{"Days": groupByDay(events, time.Now()), "Kinds": names, "Kind": kind, "Count": len(events)})
+	type tally struct {
+		Group      string
+		Count, Max int
+	}
+	var groups []string
+	var tallies []tally
+	most := 0
+	for _, g := range activityGroups {
+		if present[g] {
+			groups = append(groups, g)
+		}
+		if week[g] > 0 {
+			tallies = append(tallies, tally{Group: g, Count: week[g]})
+			most = max(most, week[g])
+		}
+	}
+	for i := range tallies {
+		tallies[i].Max = most
+	}
+	v.render(w, r, "activity.html", "activity", map[string]any{"Days": groupByDay(events, time.Now()), "Groups": groups, "Kind": group,
+		"Older": total - len(events), "More": limit + 60, "Week": tallies})
 }
 
 // ---- json api (n8n, Make, scripts) ----

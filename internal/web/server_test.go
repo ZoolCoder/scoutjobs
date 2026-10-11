@@ -603,3 +603,23 @@ func TestJobPageGatesAndReview(t *testing.T) {
 		t.Error("pipeline card lacks the veto badge")
 	}
 }
+
+func TestActivityPlainWords(t *testing.T) {
+	s := testStore(t)
+	s.AddEvent(1, "run:tailor", strings.Repeat("long agent output ", 20))
+	s.AddEvent(1, "status", "drafted -> applied")
+	h, _ := Handler(s, Config{})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/activity", nil))
+	body := rec.Body.String()
+	for _, want := range []string{"Assistant tailored your CV", "drafted → applied", `class="evnote"`, `href="/activity?kind=assistant"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("activity page lacks %q", want)
+		}
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/activity?kind=status", nil))
+	if strings.Contains(rec.Body.String(), "Assistant tailored your CV") {
+		t.Errorf("status filter shows assistant events")
+	}
+}
