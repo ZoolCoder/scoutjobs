@@ -7,6 +7,15 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Gmail sync no longer fails with Google's raw 403 quota error (#27). Rate
+  limits and transient errors are retried with backoff, message reads are
+  paced under the per-user quota, and each message is read once: its metadata
+  is cached in `gmail-cache.json` (0600, deleted by `gmail disconnect`), so a
+  sync stopped by the quota resumes where it stopped. Replies found before the
+  stop are still logged, and the Inbox shows a short "wait a minute" message.
+- `doctor` no longer calls `agent` and `agent_command` unknown config keys.
+
 ## [0.4.0] - 2026-10-11
 
 ### Added

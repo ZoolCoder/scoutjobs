@@ -93,7 +93,7 @@ type Reply struct {
 
 // runEmailSync reads the inbox and logs replies to applications: reply:received on the job,
 // status interview or rejected when the wording is clear. Never deletes or flags anything.
-func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) error {
+func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) (err error) {
 	fs := flag.NewFlagSet("email sync", flag.ContinueOnError)
 	since := fs.String("since", "14d", "how far back to look: 14d, 3w, 2026-09-01; never before your first tracked job")
 	limit := fs.Int("limit", 500, "newest messages to inspect at most")
@@ -111,15 +111,21 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	mails, err := fetchMail(s, cfg, source, from, *limit)
-	if err != nil {
-		return err
+	// a sync stopped by Gmail's rate limit still logs the replies among the messages it read
+	mails, fetchErr := fetchMail(s, cfg, source, from, *limit)
+	if fetchErr != nil && len(mails) == 0 {
+		return fetchErr
 	}
 	replies, err := syncReplies(s, mails, source, *dry)
 	if err != nil {
 		return err
 	}
 	review := reviewCandidates(s, mails)
+	defer func() {
+		if fetchErr != nil {
+			err = fetchErr
+		}
+	}()
 	return emit(out, *asJSON, map[string]any{"source": source, "inspected": len(mails), "replies": replies, "review": review, "dry_run": *dry}, func() {
 		if len(review) > 0 {
 			defer fmt.Fprintf(out, "%d other messages may concern your search; --json lists them for inbox-triage\n", len(review))
@@ -145,11 +151,11 @@ func SyncMail(s *store.Store, cfg Config) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	mails, err := fetchMail(s, cfg, source, time.Now().AddDate(0, 0, -14), 500)
-	if err != nil {
-		return 0, err
-	}
+	mails, fetchErr := fetchMail(s, cfg, source, time.Now().AddDate(0, 0, -14), 500)
 	replies, err := syncReplies(s, mails, source, false)
+	if fetchErr != nil {
+		return len(replies), fetchErr
+	}
 	return len(replies), err
 }
 

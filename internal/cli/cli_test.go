@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -395,5 +396,15 @@ func TestPrefReviewCommands(t *testing.T) {
 	var b bytes.Buffer
 	if err := Run([]string{"pref", "reject", "stack_avoid"}, &b); err == nil {
 		t.Error("rejected a proposal that is no longer pending")
+	}
+}
+
+// Every key the config template offers, set or commented out, must be one doctor knows (#27).
+func TestDoctorKnowsEveryTemplateKey(t *testing.T) {
+	key := regexp.MustCompile(`^#? ?([a-z_]+):`)
+	for _, line := range strings.Split(configTemplate, "\n") {
+		if m := key.FindStringSubmatch(line); m != nil && !configKeys[m[1]] {
+			t.Errorf("doctor would call %q unknown", m[1])
+		}
 	}
 }
