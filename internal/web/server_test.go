@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -507,8 +508,63 @@ func TestPipelineBoardDragAndDrop(t *testing.T) {
 	}
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/pipeline", nil))
-	if b := rec.Body.String(); !strings.Contains(b, `<section class="col s-rejected" data-drop="rejected">`) || strings.Contains(b, `class="drop s-rejected"`) {
-		t.Error("rejected should now be a column, not a drop chip")
+	if b := rec.Body.String(); !strings.Contains(b, `<a class="col strip s-rejected" data-drop="rejected"`) || strings.Contains(b, `class="drop s-rejected"`) {
+		t.Error("rejected should now be a folded column, not a drop chip")
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/pipeline?closed=1", nil))
+	if !strings.Contains(rec.Body.String(), `<section class="col s-rejected" data-drop="rejected">`) {
+		t.Error("closed=1 should draw rejected as a full column")
+	}
+}
+
+func TestPipelineAtScale(t *testing.T) {
+	s := testStore(t)
+	for i := range 70 {
+		s.UpsertJob(store.Job{Company: fmt.Sprintf("Bulk %d", i), Title: "Engineer", URL: fmt.Sprintf("https://bulk.test/%d", i)})
+	}
+	h, _ := Handler(s, Config{})
+	get := func(path string) string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d", path, rec.Code)
+		}
+		return rec.Body.String()
+	}
+	newCol := func(b string) string {
+		i := strings.Index(b, `data-drop="new"`)
+		return b[i : i+strings.Index(b[i:], "</section>")]
+	}
+	b := get("/pipeline")
+	if n := strings.Count(newCol(b), `class="jobcard`); n != colCap {
+		t.Errorf("new column draws %d cards, want %d", n, colCap)
+	}
+	if !strings.Contains(b, `href="/pipeline?more=new">Show all 71</a>`) {
+		t.Error("capped column lacks Show all")
+	}
+	if n := strings.Count(newCol(get("/pipeline?more=new")), `class="jobcard`); n != 71 {
+		t.Errorf("expanded column draws %d cards, want 71", n)
+	}
+	full := get("/pipeline?full=1&dense=1")
+	for _, want := range []string{`class="pipe full dense"`, `href="/pipeline?dense=1&amp;full=1&amp;job=`, `href="/pipeline?dense=1" data-full`} {
+		if !strings.Contains(full, want) {
+			t.Errorf("full screen lacks %q", want)
+		}
+	}
+	list := get("/pipeline?view=list&page=2")
+	if strings.Contains(list, `class="pager"`) {
+		t.Error("71 jobs fit on one list page")
+	}
+	for i := range 40 {
+		s.UpsertJob(store.Job{Company: fmt.Sprintf("More %d", i), Title: "Engineer", URL: fmt.Sprintf("https://more.test/%d", i)})
+	}
+	list = get("/pipeline?view=list&page=2")
+	if !strings.Contains(list, "Page 2 of 2") || strings.Count(list, `class="row-job"`) != 11 || !strings.Contains(list, `href="/pipeline?view=list">← Prev</a>`) {
+		t.Error("list page 2 should hold the last 11 jobs and a Prev link")
+	}
+	if !strings.Contains(get("/pipeline?view=list&page=2&src=manual"), `href="/pipeline?due=1&amp;src=manual&amp;view=list">Due this week</a>`) {
+		t.Error("filter links should drop the page")
 	}
 }
 

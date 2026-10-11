@@ -81,8 +81,16 @@ var mcpTools = []mcpTool{
 		p("to", "string", "recipient; default the job's contact", "to"), p("subject", "string", "", "subject"),
 		p("body", "string", "file in the application folder used as body", "body"), p("attach", "array", "extra files to attach", "attach")}, true},
 	{"email_show", "Show the e-mail draft of a job.", []string{"email", "show"}, []mcpProp{jobRef}, true},
-	{"email_sync", "Read inbox replies (IMAP) and log them against applications; rejections and interview invitations move the status.", []string{"email", "sync"}, []mcpProp{
-		p("since", "string", "14d, 3w, or YYYY-MM-DD", "since"), p("limit", "integer", "", "limit"), p("dry_run", "boolean", "show matches, change nothing", "dry-run")}, true},
+	{"email_sync", "Read inbox replies (Gmail API after gmail connect, or IMAP) and log them against applications; rejections and interview invitations move the status.", []string{"email", "sync"}, []mcpProp{
+		p("since", "string", "14d, 3w, or YYYY-MM-DD", "since"), p("limit", "integer", "", "limit"), p("dry_run", "boolean", "show matches, change nothing", "dry-run"),
+		p("via", "string", "gmail | imap | auto", "via")}, true},
+	{"email_log", "Record a message matched to a job through a Gmail connector, so the dashboard shows it on the job and in the inbox. Repeat runs with the same message_id are ignored.", []string{"email", "log"}, []mcpProp{jobRef,
+		req("subject", "string", "", "subject"), p("from", "string", "sender address", "from"), p("snippet", "string", "one or two lines, no more", "snippet"),
+		p("date", "string", "RFC3339 or YYYY-MM-DD", "date"), p("thread", "string", "Gmail thread id", "thread"), p("message_id", "string", "Message-ID or connector message id", "message-id"),
+		p("kind", "string", "rejected|interview|offer|request|ack", "kind"), p("dir", "string", "in (received, default) or out (sent)", "dir"),
+		p("status", "string", "move the job too, only after the user confirmed", "status")}, true},
+	{"gmail_status", "Whether the Gmail API is connected and as which account.", []string{"gmail", "status"}, nil, true},
+	{"gmail_draft", "Upload the job's application e-mail (from email_draft) to the user's Gmail as a draft with attachments. Nothing is sent; the user sends from Gmail.", []string{"gmail", "draft"}, []mcpProp{jobRef}, true},
 	{"decision_log", "Record a decision the user made (skip, apply, withdraw, override_score, ...).", []string{"decision", "log"}, []mcpProp{
 		req("kind", "string", "skip|apply|withdraw|accept_offer|decline_offer|override_score|other", "kind"), req("reason", "string", "", "reason"),
 		p("signals", "string", "json object", "signals"), p("job", "string", "job id or company/title", "job")}, false},
@@ -94,10 +102,16 @@ var mcpTools = []mcpTool{
 	{"interview_list", "Interviews, upcoming unless all=true.", []string{"interview", "list"}, []mcpProp{p("all", "boolean", "include past", "all")}, true},
 	{"interview_add", "Schedule an interview; an earlier-stage job moves to interview.", []string{"interview", "add"}, []mcpProp{jobRef,
 		req("stage", "string", "screen|technical|system_design|behavioral|case|onsite|final|other", "stage"), p("at", "string", "YYYY-MM-DD or YYYY-MM-DDTHH:MM", "at"),
-		p("format", "string", "phone|video|onsite", "format"), p("interviewer", "string", "", "interviewer")}, false},
+		p("format", "string", "phone|video|onsite", "format"), p("interviewer", "string", "", "interviewer"),
+		p("duration", "integer", "minutes, default 60", "duration"), p("location", "string", "meeting link or address", "location")}, false},
 	{"interview_set", "Update an interview: outcome, feedback, prep status, time.", []string{"interview", "set"}, []mcpProp{req("id", "integer", "interview id", ""),
 		p("at", "string", "", "at"), p("format", "string", "", "format"), p("interviewer", "string", "", "interviewer"), p("prep_status", "string", "todo|in_progress|ready", "prep-status"),
-		p("outcome", "string", "passed|failed|pending|cancelled", "outcome"), p("feedback", "string", "", "feedback"), p("stage", "string", "", "stage")}, false},
+		p("outcome", "string", "passed|failed|pending|cancelled", "outcome"), p("feedback", "string", "", "feedback"), p("stage", "string", "", "stage"),
+		p("duration", "integer", "minutes", "duration"), p("location", "string", "meeting link or address", "location")}, false},
+	{"contacts", "Referral finder: people in the user's imported LinkedIn network who work at the job's company (or at company).", []string{"contacts"}, []mcpProp{
+		p("job", "string", "job id, or company/title", ""), p("company", "string", "company name instead of a job", "company")}, true},
+	{"linkedin_import", "Import a LinkedIn data export (zip or unpacked folder on this machine): profile to linkedin/profile.md, connections for the referral finder.", []string{"linkedin", "import"}, []mcpProp{
+		req("path", "string", "path to the export zip or folder", "")}, true},
 	{"session_log", "Log a practice session.", []string{"session", "log"}, []mcpProp{req("kind", "string", "mock_behavioral|mock_sysdesign|mock_coding|drill|study|review", "kind"),
 		p("topic", "string", "", "topic"), p("score", "integer", "0-100 if graded", "score"), p("notes", "string", "", "notes")}, false},
 	{"session_list", "Practice sessions, newest first.", []string{"session", "list"}, []mcpProp{p("limit", "integer", "", "limit")}, true},
@@ -107,7 +121,7 @@ var mcpTools = []mcpTool{
 	{"learn_set", "Update a learning item; hours are added.", []string{"learn", "set"}, []mcpProp{req("id", "integer", "learning item id", ""),
 		p("status", "string", "planned|in_progress|done", "status"), p("hours", "number", "hours to add", "hours"), p("resource", "string", "", "resource"),
 		p("notes", "string", "", "notes"), p("priority", "integer", "", "priority"), p("demand", "integer", "", "demand")}, false},
-	{"run", "Run any scoutjobs CLI command by its arguments, e.g. [\"job\",\"list\",\"--json\"]. Refused: email send, email test, serve, mcp.", []string{}, []mcpProp{
+	{"run", "Run any scoutjobs CLI command by its arguments, e.g. [\"job\",\"list\",\"--json\"]. Refused: email send, email test, serve, mcp, update.", []string{}, []mcpProp{
 		req("args", "array", "command line arguments without the program name", "")}, false},
 }
 
@@ -117,8 +131,10 @@ func mcpDenied(args []string) bool {
 		return false
 	}
 	switch args[0] {
-	case "serve", "mcp":
+	case "serve", "mcp", "update":
 		return true
+	case "gmail":
+		return len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
 	case "email":
 		return len(args) > 1 && (args[1] == "send" || args[1] == "test")
 	}

@@ -1,5 +1,5 @@
 = MCP server
-:description: scoutjobs mcp exposes every CLI command as an MCP tool over stdio, for Claude Desktop, Codex, Cursor and any other MCP client.
+:description: scoutjobs mcp exposes every CLI command as an MCP tool over stdio, and scoutjobs serve over HTTP on /mcp, for Claude Desktop, Codex, Cursor, n8n and any other MCP client.
 
 `scoutjobs mcp` is a Model Context Protocol server on stdin and stdout: newline-delimited JSON-RPC 2.0, no network port, no token. Every tool is a `scoutjobs` command run in-process with `--json`, so an MCP client gets the same rows the skills get. The server starts in a few milliseconds and keeps no state of its own; the data stays in `~/.scoutjobs`.
 
@@ -57,6 +57,23 @@ Cursor, `.cursor/mcp.json` in the project or `~/.cursor/mcp.json`:
 ----
 
 `scoutjobs` must be on the PATH the client starts with. GUI apps on macOS do not read your shell profile, so give the full path (`/opt/homebrew/bin/scoutjobs` or `$HOME/go/bin/scoutjobs`) when the client reports "command not found".
+
+== Over HTTP
+
+`scoutjobs serve` also answers MCP on `POST /mcp`, the Streamable HTTP transport, for clients that cannot start a local process: n8n's MCP Client Tool node, cloud agents, a claude.ai custom connector behind a tunnel. The tools are the same as on stdio.
+
+* `api_token` in `config.yaml` is required; without it `/mcp` answers 403. Send it as `Authorization: Bearer <api_token>`, or as `?token=<api_token>` for a client that cannot set headers (the token then shows up in logs).
+* A request with an `Origin` header other than the server's own address is refused, so a web page in your browser cannot call the tools.
+* Every request gets one JSON response; there is no event stream, so `GET /mcp` answers 405. Notifications get 202.
+* Tool calls run one at a time, in the order they arrive.
+
+[source,console]
+----
+$ curl -s -X POST http://127.0.0.1:7070/mcp -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"brief","arguments":{}}}'
+----
+
+The dashboard binds to `127.0.0.1` by default. Expose `/mcp` beyond the machine only through a tunnel or reverse proxy with TLS, and treat `api_token` as a password: anyone holding it can change your pipeline.
 
 == Protocol
 

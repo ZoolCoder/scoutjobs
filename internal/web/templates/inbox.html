@@ -1,0 +1,29 @@
+{{template "head" .}}
+{{with .Data}}{{$kind := .Kind}}
+<div class="inbox-top">
+  <div class="src">{{if eq .Source "gmail"}}<span class="badge done">Gmail API</span> {{.Account}}{{else if eq .Source "imap"}}<span class="badge done">IMAP</span> {{.Account}}{{else}}<span class="badge todo">no inbox connected</span>{{end}}</div>
+  <span class="chips"><a {{if not $kind}}class="on" {{end}}href="/inbox">All</a>{{range .Kinds}}<a {{if eq . $kind}}class="on" {{end}}href="/inbox?kind={{.}}">{{.}}</a>{{end}}</span>
+  {{if .CanSync}}<form method="post" action="/inbox/sync"><input type="hidden" name="back" value="/inbox"><button class="primary">Sync now</button></form>{{end}}
+</div>
+{{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
+{{if .Days}}
+{{range .Days}}<section class="panel"><div class="panel-h"><h2>{{if .Day}}{{when .Day}}{{else}}Undated{{end}}</h2><span class="n">{{len .Rows}}</span></div>
+<ul class="mails wide">{{range .Rows}}<li class="{{.Dir}}">
+  <span class="mdir" title="{{if eq .Dir "in"}}received{{else}}sent{{end}}">{{if eq .Dir "in"}}←{{else}}→{{end}}</span>
+  <div><div class="mhead"><b>{{if eq .Dir "in"}}{{.From}}{{else}}You{{end}}</b>{{if .Kind}}<span class="badge k-{{.Kind}}">{{.Kind}}</span>{{end}}<a class="chip acc" href="/pipeline?job={{.JobID}}">{{.Company}} · {{.Title}}</a>{{if .Source}}<span class="chip dim">{{.Source}}</span>{{end}}</div>
+  <div class="msubj">{{.Subject}}</div>{{if .Snippet}}<div class="msnip muted">{{.Snippet}}</div>{{end}}
+  <div class="mact">{{if .Open}}<a href="{{.Open}}" rel="noopener noreferrer" target="_blank">Open in Gmail</a>{{end}}{{if .Reply}}<a href="{{.Reply}}" rel="noopener noreferrer" target="_blank">Reply in Gmail</a>{{end}}<a href="/jobs/{{.JobID}}?tab=mail">All mail for this job</a></div></div>
+</li>{{end}}</ul></section>{{end}}
+{{else if $kind}}
+<section class="panel"><p class="empty">No {{$kind}} messages. <a href="/inbox">Show all</a></p></section>
+{{else}}
+<section class="panel"><div class="panel-h"><h2>No replies logged yet</h2></div>
+<p>Pick one way to fill this page:</p>
+<ol class="setup">
+  <li><b>Gmail API</b> (recommended). Create a Desktop OAuth client in your own Google Cloud project. Put <code>gmail_client_id</code> and <code>gmail_client_secret</code> in <code>config.yaml</code>, then run <code>scoutjobs gmail connect</code>. ScoutJobs reads your inbox and creates drafts. It never sends.</li>
+  <li><b>IMAP</b>. Set <code>imap_host: imap.gmail.com:993</code> and <code>SCOUTJOBS_IMAP_PASSWORD</code> (a Google app password), then run <code>scoutjobs email sync</code>.</li>
+  <li><b>Agent connector</b>. In Claude with the Gmail connector, say “check my inbox”. The <code>inbox-triage</code> skill records matched threads with <code>scoutjobs email log</code>.</li>
+</ol></section>
+{{end}}
+{{end}}
+{{template "foot" .}}

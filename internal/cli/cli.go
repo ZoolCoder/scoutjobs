@@ -30,16 +30,20 @@ Usage: scoutjobs <command> [subcommand] [flags]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
   email draft|show|send   application e-mail from the cover letter; send needs --yes
-  email test|sync         probe the SMTP/IMAP account; log inbox replies to applications
+  email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
+  email log <job>         record a message an agent's Gmail connector matched to a job
+  gmail connect|status|disconnect|draft <job>   Gmail API with your own OAuth client: read replies, create drafts (never sends)
   decision log|summary
   pref set|list|rm|render
-  interview add|list|set
+  interview add|list|set     --duration 45 --location <meeting link or address>
+  linkedin import <zip|dir>  LinkedIn data export: profile for setup, connections for referrals
+  contacts <job>|--company x who you know at a company (from the LinkedIn import)
   session log|list
   learn add|list|set
   stats                      funnel, weekly numbers, follow-ups due
   brief [--compact]          everything the daily briefing needs (json)
   export                     full json dump
-  serve [--addr 127.0.0.1:7070]   dashboard
+  serve [--addr 127.0.0.1:7070]   dashboard, calendar feed, JSON API, MCP over HTTP on /mcp (needs api_token)
   mcp                        MCP server on stdio for Claude Desktop, Codex, Cursor (every tool is a CLI command)
   doctor [--online]          check PATH, data dir, config keys, mail secrets, linked skills, dashboard; --online compares with the latest release
 
@@ -98,6 +102,12 @@ func Run(args []string, out io.Writer) error {
 		return runSession(s, rest, out)
 	case "learn":
 		return runLearn(s, rest, out)
+	case "gmail":
+		return runGmail(s, cfg, rest, out)
+	case "linkedin":
+		return runLinkedIn(s, rest, out)
+	case "contacts":
+		return runContacts(s, rest, out)
 	case "stats":
 		return runStats(s, rest, out)
 	case "brief":
@@ -111,7 +121,7 @@ func Run(args []string, out io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(out, "ScoutJobs dashboard on http://%s  (data: %s)\n", *addr, s.Home)
-		return web.Serve(s, *addr, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version})
+		return web.Serve(s, *addr, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg)})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -238,6 +248,10 @@ smtp_host:              # smtp.gmail.com:587 (STARTTLS) or host:465 (TLS); passw
 smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
+
+# Gmail API instead of IMAP (scoutjobs gmail connect): a Desktop OAuth client from your own Google Cloud project
+gmail_client_id:        # xxxx.apps.googleusercontent.com
+gmail_client_secret:    # the Desktop client's secret; or set $SCOUTJOBS_GMAIL_CLIENT_SECRET
 
 # automation (n8n, Make, scripts). Leave empty to disable.
 api_token:              # when set, /api/* requires "Authorization: Bearer <token>"
@@ -698,6 +712,8 @@ func runInterview(s *store.Store, rest []string, out io.Writer) error {
 		fs.StringVar(&i.At, "at", "", "YYYY-MM-DD or YYYY-MM-DDTHH:MM")
 		fs.StringVar(&i.Format, "format", "", "phone|video|onsite")
 		fs.StringVar(&i.Interviewer, "interviewer", "", "names / titles")
+		fs.Int64Var(&i.Duration, "duration", 60, "minutes")
+		fs.StringVar(&i.Location, "location", "", "meeting link or address")
 		pos, err := parse(fs, rest)
 		if err != nil {
 			return err
@@ -734,14 +750,16 @@ func runInterview(s *store.Store, rest []string, out io.Writer) error {
 		return emit(out, *asJSON, ivs, func() {
 			var rows [][]string
 			for _, i := range ivs {
-				rows = append(rows, []string{fmt.Sprint(i.ID), i.At, i.Company, i.Stage, i.Format, i.PrepStatus, i.Outcome})
+				rows = append(rows, []string{fmt.Sprint(i.ID), i.At, fmt.Sprintf("%dm", i.Duration), i.Company, i.Stage, i.Format, i.PrepStatus, i.Outcome})
 			}
-			table(out, "ID\tWHEN\tCOMPANY\tSTAGE\tFORMAT\tPREP\tOUTCOME", rows)
+			table(out, "ID\tWHEN\tLENGTH\tCOMPANY\tSTAGE\tFORMAT\tPREP\tOUTCOME", rows)
 		})
 	case "set":
 		fs := flag.NewFlagSet("interview set", flag.ContinueOnError)
 		str := func(n, h string) *string { return fs.String(n, "\x00", h) }
 		at, format, who, prep, outcome, feedback, stage := str("at", ""), str("format", ""), str("interviewer", ""), str("prep-status", "todo|in_progress|ready"), str("outcome", "passed|failed|pending|cancelled"), str("feedback", "what they said / what you learned"), str("stage", "")
+		location := str("location", "meeting link or address")
+		duration := fs.Int64("duration", 0, "minutes")
 		pos, err := parse(fs, rest)
 		if err != nil {
 			return err
@@ -759,7 +777,7 @@ func runInterview(s *store.Store, rest []string, out io.Writer) error {
 			}
 			return v
 		}
-		p := store.InterviewPatch{At: pick(at), Format: pick(format), Interviewer: pick(who), PrepStatus: pick(prep), Outcome: pick(outcome), Feedback: pick(feedback), Stage: pick(stage)}
+		p := store.InterviewPatch{At: pick(at), Format: pick(format), Interviewer: pick(who), PrepStatus: pick(prep), Outcome: pick(outcome), Feedback: pick(feedback), Stage: pick(stage), Location: pick(location), Duration: duration}
 		if err := s.UpdateInterview(id, p); err != nil {
 			return err
 		}

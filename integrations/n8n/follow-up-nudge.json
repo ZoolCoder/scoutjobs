@@ -1,0 +1,17 @@
+{
+  "name": "ScoutJobs follow-up nudge",
+  "nodes": [
+    {"parameters": {"rule": {"interval": [{"field": "cronExpression", "expression": "0 9 * * 1-5"}]}}, "name": "Every weekday 09:00", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0]},
+    {"parameters": {"url": "http://127.0.0.1:7070/api/brief", "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth", "options": {}}, "name": "GET /api/brief", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [220, 0]},
+    {"parameters": {"conditions": {"options": {"caseSensitive": true, "typeValidation": "loose"}, "conditions": [{"leftValue": "={{ ($json.follow_ups_due || []).length + ($json.stale || []).length }}", "rightValue": 0, "operator": {"type": "number", "operation": "gt"}}], "combinator": "and"}, "options": {}}, "name": "Only when follow-ups are due", "type": "n8n-nodes-base.filter", "typeVersion": 2, "position": [440, 0]},
+    {"parameters": {"jsCode": "const b = $input.first().json;\nconst lines = ['ScoutJobs follow-ups'];\nfor (const j of b.follow_ups_due || []) lines.push(`Follow up: ${j.company} - ${j.title}${j.contact ? ' <' + j.contact + '>' : ''}`);\nfor (const j of b.stale || []) lines.push(`No answer for weeks, close it? ${j.company} - ${j.title}`);\nlines.push('Draft the nudge: /scoutjobs:track');\nreturn [{ json: { text: lines.join('\\n') } }];"}, "name": "Format", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [660, 0]},
+    {"parameters": {"chatId": "={{ $env.TELEGRAM_CHAT_ID }}", "text": "={{ $json.text }}", "additionalFields": {}}, "name": "Telegram (swap for Slack/email)", "type": "n8n-nodes-base.telegram", "typeVersion": 1.2, "position": [880, 0]}
+  ],
+  "connections": {
+    "Every weekday 09:00": {"main": [[{"node": "GET /api/brief", "type": "main", "index": 0}]]},
+    "GET /api/brief": {"main": [[{"node": "Only when follow-ups are due", "type": "main", "index": 0}]]},
+    "Only when follow-ups are due": {"main": [[{"node": "Format", "type": "main", "index": 0}]]},
+    "Format": {"main": [[{"node": "Telegram (swap for Slack/email)", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

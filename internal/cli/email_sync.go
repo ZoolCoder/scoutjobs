@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	netmail "net/mail"
 	"os"
 	"strconv"
 	"strings"
@@ -87,7 +88,7 @@ type Reply struct {
 	Company string `json:"company"`
 	Title   string `json:"title"`
 	Status  string `json:"status,omitempty"` // new status applied, "" when the text gave no hint
-	Via     string `json:"via"`              // "thread" (In-Reply-To matched our Message-ID) or "contact" (sender is the job's contact)
+	Via     string `json:"via"`              // "thread" (In-Reply-To matched our Message-ID), "contact" (sender is the job's contact) or "domain" (same company domain)
 }
 
 // runEmailSync reads the inbox and logs replies to applications: reply:received on the job,
@@ -97,6 +98,7 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) erro
 	since := fs.String("since", "14d", "how far back to look: 14d, 3w, 2026-09-01")
 	limit := fs.Int("limit", 500, "newest messages to inspect at most")
 	dry := fs.Bool("dry-run", false, "show matches, change nothing")
+	via := fs.String("via", "auto", "gmail (API, after gmail connect), imap (imap_host), or auto")
 	asJSON := fs.Bool("json", false, "")
 	if _, err := parse(fs, rest); err != nil {
 		return err
@@ -105,15 +107,19 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	mails, err := imapAccount(cfg).Fetch(from, *limit)
+	source, err := mailSource(s, cfg, *via)
 	if err != nil {
 		return err
 	}
-	replies, err := syncReplies(s, mails, *dry)
+	mails, err := fetchMail(s, cfg, source, from, *limit)
 	if err != nil {
 		return err
 	}
-	return emit(out, *asJSON, map[string]any{"inspected": len(mails), "replies": replies, "dry_run": *dry}, func() {
+	replies, err := syncReplies(s, mails, source, *dry)
+	if err != nil {
+		return err
+	}
+	return emit(out, *asJSON, map[string]any{"source": source, "inspected": len(mails), "replies": replies, "dry_run": *dry}, func() {
 		if len(replies) == 0 {
 			fmt.Fprintf(out, "%d messages inspected, no new replies to applications\n", len(mails))
 			return
@@ -129,8 +135,22 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) erro
 	})
 }
 
-// syncReplies matches inbox messages to jobs and records them. Split from the IMAP fetch so tests feed messages directly.
-func syncReplies(s *store.Store, mails []mail.Mail, dry bool) ([]Reply, error) {
+// SyncMail is `email sync` for the dashboard's Sync button: default window, auto source, no output.
+func SyncMail(s *store.Store, cfg Config) (int, error) {
+	source, err := mailSource(s, cfg, "auto")
+	if err != nil {
+		return 0, err
+	}
+	mails, err := fetchMail(s, cfg, source, time.Now().AddDate(0, 0, -14), 500)
+	if err != nil {
+		return 0, err
+	}
+	replies, err := syncReplies(s, mails, source, false)
+	return len(replies), err
+}
+
+// syncReplies matches inbox messages to jobs and records them. Split from the fetch so tests feed messages directly.
+func syncReplies(s *store.Store, mails []mail.Mail, source string, dry bool) ([]Reply, error) {
 	var replies []Reply
 	for _, m := range mails {
 		id := m.MessageID
@@ -161,11 +181,20 @@ func syncReplies(s *store.Store, mails []mail.Mail, dry bool) ([]Reply, error) {
 				return replies, err
 			}
 		}
-		if err := s.RecordMail(id, j.ID, "in", m.UID); err != nil {
+		if _, err := s.LogMail(store.Mail{MessageID: id, JobID: j.ID, Dir: "in", From: m.From, Subject: m.Subject, Snippet: m.Text,
+			Date: mailDate(m.Date), Thread: m.Thread, Source: source, Kind: mail.Classify(m.Subject, m.Text)}); err != nil {
 			return replies, err
 		}
 	}
 	return replies, nil
+}
+
+// mailDate turns an RFC 5322 Date header into RFC3339 so messages sort; unparseable dates stay as they are.
+func mailDate(v string) string {
+	if t, err := netmail.ParseDate(v); err == nil {
+		return t.UTC().Format(time.RFC3339)
+	}
+	return v
 }
 
 func matchReply(s *store.Store, m mail.Mail) (store.Job, string, bool) {
@@ -188,7 +217,31 @@ func matchReply(s *store.Store, m mail.Mail) (store.Job, string, bool) {
 			return j, "contact", true
 		}
 	}
+	// same company domain as the contact (hr@acme.com wrote, jobs@acme.com was the contact), only when one open job fits
+	domain := mailDomain(m.From)
+	if domain == "" || freeMail[domain] {
+		return store.Job{}, "", false
+	}
+	var hit []store.Job
+	for _, j := range jobs {
+		if mailDomain(j.Contact) == domain {
+			hit = append(hit, j)
+		}
+	}
+	if len(hit) == 1 {
+		return hit[0], "domain", true
+	}
 	return store.Job{}, "", false
+}
+
+var freeMail = map[string]bool{"gmail.com": true, "googlemail.com": true, "outlook.com": true, "hotmail.com": true, "yahoo.com": true, "icloud.com": true, "gmx.de": true, "web.de": true, "proton.me": true, "protonmail.com": true}
+
+func mailDomain(addr string) string {
+	_, d, ok := strings.Cut(strings.ToLower(strings.TrimSpace(addr)), "@")
+	if !ok {
+		return ""
+	}
+	return d
 }
 
 // parseSince accepts 14d, 3w, 2h-style windows or a YYYY-MM-DD day.

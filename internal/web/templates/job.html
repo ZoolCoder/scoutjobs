@@ -1,12 +1,29 @@
 {{template "head" .}}
-{{with .Data}}{{$j := .Job}}
+{{with .Data}}{{$j := .Job}}{{$p := .P}}{{$tab := .Tab}}
 <header class="top job">
-<div><a class="crumb" href="/pipeline">← Pipeline</a>
-<div class="jobhead">{{template "gauge-lg" $j.FitScore}}<h1>{{$j.Company}}<small>{{$j.Title}}</small></h1><span class="badge {{$j.Status}}">{{title $j.Status}}</span>{{if $j.Veto}}<span class="badge bad" title="{{$j.Veto}}">veto</span>{{end}}</div></div>
+<div class="jobtop"><a class="crumb" href="/pipeline">← Pipeline</a>
+<div class="jobhead">{{template "gauge-lg" $j.FitScore}}<h1>{{$j.Company}}<small>{{$j.Title}}</small></h1><span class="badge {{$j.Status}}">{{title $j.Status}}</span>{{if $j.Veto}}<span class="badge bad" title="{{$j.Veto}}">veto</span>{{end}}<span class="key mono">SJ-{{$j.ID}}</span></div>
+<div class="issue-acts">
+  {{if $j.URL}}<a class="btn mini" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}Posting</a>{{end}}
+  <a class="btn mini" href="{{$p.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
+  <a class="btn mini" href="/calendar?new={{today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a>
+  {{if $p.CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Self}}"><button class="mini go">Draft in Gmail</button></form>{{end}}
+  <a class="btn mini" href="/pipeline?job={{$j.ID}}">Show on board</a>
+</div>
+{{template "stepper" $p.Steps}}
+</div>
 <span class="now">{{$.Now}}</span>
 </header>
+<nav class="tabs" aria-label="job sections">
+  <a {{if eq $tab "overview"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}">Overview</a>
+  <a {{if eq $tab "mail"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=mail">Mail <span class="n">{{len .Mails}}</span></a>
+  <a {{if eq $tab "interviews"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=interviews">Interviews <span class="n">{{len .Interviews}}</span></a>
+  <a {{if eq $tab "files"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=files">Files <span class="n">{{len .Files}}</span></a>
+  <a {{if eq $tab "activity"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=activity">Activity <span class="n">{{len .Events}}</span></a>
+</nav>
 <div class="grid-3">
 <div class="stack span-2">
+{{if eq $tab "overview"}}
 <section class="panel">
   <div class="panel-h"><h2>Get selected</h2><span class="n">{{.KitDone}}/4</span><span class="act muted">run in your agent</span></div>
   <ol class="kit">
@@ -27,24 +44,42 @@
   {{if .HasReview}}<table class="review"><thead><tr><th>Requirement</th><th>Kind</th><th>Evidence</th><th>Strength</th><th>Wording</th><th>Risk</th></tr></thead><tbody>{{range .Review.Requirements}}<tr><td>{{.Requirement}}</td><td class="muted">{{.Kind}}</td><td class="muted">{{.Evidence}}</td><td><span class="badge {{.Strength}}">{{.Strength}}</span>{{if .Confidence}} <span class="muted">{{.Confidence}}</span>{{end}}</td><td>{{.Wording}}</td><td class="muted">{{.Risk}}</td></tr>{{end}}</tbody></table>{{end}}
   {{if $j.FitNotes}}<p class="pre">{{$j.FitNotes}}</p>{{else}}<p class="empty">Fit not scored yet. Run the <code>fit-review</code> skill or <code>/scoutjobs:fit {{$j.ID}}</code>.</p>{{end}}
   {{if $j.Notes}}<h3>Notes</h3><p class="pre">{{$j.Notes}}</p>{{end}}
-  <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input name="note" placeholder="Add a note"><button class="primary">Add</button></form>
-</section>
+  </section>
+{{else if eq $tab "mail"}}
 <section class="panel">
-  <div class="panel-h"><h2>Interviews</h2><span class="n">{{len .Interviews}}</span><a class="act" href="/interviews">All interviews</a></div>
-  {{if .Interviews}}<table><tbody>{{range .Interviews}}<tr><td class="mono">{{when .At}}</td><td>{{title .Stage}}</td><td class="muted">{{.Format}}</td><td><span class="badge {{.PrepStatus}}">{{title .PrepStatus}}</span></td><td>{{if .Outcome}}<span class="badge {{.Outcome}}">{{.Outcome}}</span>{{end}}</td></tr>{{if .Feedback}}<tr><td></td><td colspan="4" class="muted">{{.Feedback}}</td></tr>{{end}}{{end}}</tbody></table>
-  {{else}}<p class="empty">None yet. <code>scoutjobs interview add {{$j.ID}} --stage screen --at YYYY-MM-DD</code></p>{{end}}
+  <div class="panel-h"><h2>Mail</h2><span class="n">{{len .Mails}}</span><a class="act" href="{{$p.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail</a></div>
+  {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="empty">No messages logged for this job.<small>Replies land here after <code>scoutjobs email sync</code>, a Gmail sync on the <a href="/inbox">Inbox</a> page, or the inbox-triage skill.</small></p>{{end}}
 </section>
+{{else if eq $tab "interviews"}}
 <section class="panel">
-  <div class="panel-h"><h2>History</h2><span class="n">{{len .Events}}</span></div>
+  <div class="panel-h"><h2>Interviews</h2><span class="n">{{len .Interviews}}</span><a class="act" href="/calendar?new={{today}}&amp;job={{$j.ID}}">Schedule</a></div>
+  {{range .Interviews}}<article class="ivcard">
+    <div class="ivhead"><a class="mono" href="/calendar?view=week&amp;d={{day .At}}&amp;ev=i{{.ID}}">{{when .At}}</a><b>{{title .Stage}}</b>{{if .Format}}<span class="muted">{{.Format}}</span>{{end}}{{if .Interviewer}}<span class="muted">with {{.Interviewer}}</span>{{end}}<span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span>{{if .Outcome}}<span class="badge {{.Outcome}}">{{.Outcome}}</span>{{end}}</div>
+    {{template "prep-check" (prepArgs . $.Data.Self)}}
+    {{if .Feedback}}<p class="muted">{{.Feedback}}</p>{{end}}
+  </article>{{else}}<p class="empty">None yet. <a href="/calendar?new={{today}}&amp;job={{$j.ID}}">Schedule one</a> or run <code>scoutjobs interview add {{$j.ID}} --stage screen --at YYYY-MM-DD</code></p>{{end}}
+</section>
+{{else if eq $tab "files"}}
+<section class="panel">
+  <div class="panel-h"><h2>Files</h2><span class="n">{{len .Files}}</span></div>
+  {{if .Files}}{{$id := $j.ID}}{{range .Files}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}">{{template "ico-doc"}}{{.}}</a> {{end}}{{else}}<p class="muted">None yet. Drafts land here when you run <code>/scoutjobs:apply</code>.</p>{{end}}
+  <p class="mono small">{{tilde .Dir}}</p>
+  {{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export"><button class="mini" type="submit">Export resume.md as PDF</button></form>{{end}}
+</section>
+{{else}}
+<section class="panel">
+  <div class="panel-h"><h2>Activity</h2><span class="n">{{len .Events}}</span></div>
+  <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Self}}"><input name="note" placeholder="Add a note" aria-label="note"><button class="primary">Add</button></form>
   <ul class="timeline">{{range .Events}}<li><span class="mono">{{when .At}}</span><span><span class="tag">{{.Kind}}</span> {{.Note}}</span></li>{{end}}</ul>
 </section>
+{{end}}
 </div>
 <div class="stack">
 <section class="panel">
   <div class="panel-h"><h2>Application</h2></div>
   <dl class="facts">
     <dt>Status</dt><dd><span class="badge {{$j.Status}}">{{title $j.Status}}</span></dd>
-    <dt>Move to</dt><dd>{{template "move" (dict_status $j.ID $j.Status (printf "/jobs/%d" $j.ID))}}</dd>
+    <dt>Move to</dt><dd>{{template "move" (dict_status $j.ID $j.Status $.Data.Self)}}</dd>
     <dt>Where</dt><dd>{{$j.Location}} {{if $j.Remote}}<span class="chip">{{$j.Remote}}</span>{{end}}</dd>
     {{if $j.URL}}<dt>Posting</dt><dd><a href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{$j.URL}}</a></dd>{{end}}
     <dt>Source</dt><dd>{{$j.Source}}</dd>
@@ -56,10 +91,11 @@
   </dl>
 </section>
 <section class="panel">
-  <div class="panel-h"><h2>Files</h2><span class="n">{{len .Files}}</span></div>
-  {{if .Files}}{{$id := $j.ID}}{{range .Files}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}">{{template "ico-doc"}}{{.}}</a> {{end}}{{else}}<p class="muted">None yet. Drafts land here when you run <code>/scoutjobs:apply</code>.</p>{{end}}
-  <p class="mono small">{{tilde .Dir}}</p>
-  {{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export"><button class="mini" type="submit">Export resume.md as PDF</button></form>{{end}}
+  <div class="panel-h"><h2>People you know here</h2><span class="n">{{len .Contacts}}</span></div>
+  {{if .Contacts}}<ul class="plain">{{range .Contacts}}<li><div><b>{{if .URL}}<a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Name}}</a>{{else}}{{.Name}}{{end}}</b><br><small class="muted">{{.Position}}</small></div></li>{{end}}</ul>
+  <p class="small muted">Ask for a referral before you send. <code>scoutjobs contacts {{$j.ID}}</code></p>
+  {{else if .ContactCount}}<p class="muted small">Nobody in your {{.ContactCount}} imported connections works at {{$j.Company}}.</p>
+  {{else}}<p class="muted small">Import your LinkedIn data export to see who you know here: <code>scoutjobs linkedin import &lt;export.zip&gt;</code></p>{{end}}
 </section>
 </div>
 </div>

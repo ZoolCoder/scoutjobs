@@ -106,7 +106,7 @@ func runEmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 			return err
 		}
 		_ = os.WriteFile(filepath.Join(dir, "email-sent.eml"), raw, 0o600)
-		_ = s.RecordMail(m.MessageID, j.ID, "out", 0)
+		_, _ = s.LogMail(store.Mail{MessageID: m.MessageID, JobID: j.ID, Dir: "out", From: m.From, Subject: m.Subject, Snippet: m.Body, Source: "smtp"})
 		_ = s.AddEvent(j.ID, "email:sent", "to "+m.To+": "+m.Subject)
 		if j.Status == "new" || j.Status == "ranked" || j.Status == "drafted" {
 			st := "applied"
@@ -117,8 +117,71 @@ func runEmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		return runEmailTest(cfg, rest, out)
 	case "sync":
 		return runEmailSync(s, cfg, rest, out)
+	case "log":
+		return runEmailLog(s, rest, out)
 	}
-	return errors.New("usage: email draft|show|send <id> | email test | email sync")
+	return errors.New("usage: email draft|show|send <id> | email test | email sync | email log <id>")
+}
+
+// runEmailLog records one message an agent matched through its Gmail connector, so the dashboard
+// shows it on the job and in the inbox. --status moves the job, like a reply found by email sync.
+func runEmailLog(s *store.Store, rest []string, out io.Writer) error {
+	fs := flag.NewFlagSet("email log", flag.ContinueOnError)
+	from := fs.String("from", "", "sender address")
+	subject := fs.String("subject", "", "subject line")
+	snippet := fs.String("snippet", "", "one or two lines of the message, no more")
+	date := fs.String("date", "", "when it was sent: RFC3339 or YYYY-MM-DD; default now")
+	thread := fs.String("thread", "", "Gmail thread id, for the Open in Gmail link")
+	msgID := fs.String("message-id", "", "Message-ID header or the connector's message id; dedupes repeat runs")
+	kind := fs.String("kind", "", "rejected | interview | offer | request | ack")
+	dir := fs.String("dir", "in", "in (received) or out (you sent it)")
+	status := fs.String("status", "", "move the job too, e.g. rejected or interview")
+	asJSON := fs.Bool("json", false, "")
+	pos, err := parse(fs, rest)
+	if err != nil {
+		return err
+	}
+	if len(pos) == 0 || *subject == "" {
+		return errors.New("usage: email log <job> --from hr@acme.com --subject \"...\" [--thread id] [--snippet ...] [--status rejected]")
+	}
+	j, err := s.ResolveJob(pos[0])
+	if err != nil {
+		return err
+	}
+	if *dir != "in" && *dir != "out" {
+		return fmt.Errorf("--dir %q: use in or out", *dir)
+	}
+	id := *msgID
+	if id == "" {
+		id = "connector:" + *thread + ":" + store.Slug(*from+" "+*subject+" "+*date)
+	}
+	when := *date
+	if when != "" {
+		when = mailDate(when)
+		if t, err := time.Parse("2006-01-02", when); err == nil {
+			when = t.UTC().Format(time.RFC3339)
+		}
+	}
+	created, err := s.LogMail(store.Mail{MessageID: id, JobID: j.ID, Dir: *dir, From: mail.Address(*from), Subject: *subject, Snippet: *snippet,
+		Date: when, Thread: *thread, Source: "connector", Kind: *kind})
+	if err != nil {
+		return err
+	}
+	if created && *dir == "in" {
+		_ = s.AddEvent(j.ID, "reply:received", "from "+mail.Address(*from)+": "+*subject)
+	}
+	if *status != "" && *status != j.Status {
+		if err := s.UpdateJob(j.ID, store.JobPatch{Status: status}); err != nil {
+			return err
+		}
+	}
+	return emit(out, *asJSON, map[string]any{"job": j.ID, "logged": created, "message_id": id}, func() {
+		if created {
+			fmt.Fprintf(out, "logged on %d %s: %s\n", j.ID, j.Company, *subject)
+		} else {
+			fmt.Fprintln(out, "already logged")
+		}
+	})
 }
 
 func loadDraft(s *store.Store, j store.Job) (mail.Message, string, error) {

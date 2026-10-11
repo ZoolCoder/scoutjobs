@@ -1,0 +1,69 @@
+{{define "stepper"}}<ol class="stepper">{{range .}}<li class="{{.State}}"><span>{{title .Status}}</span></li>{{end}}</ol>{{end}}
+
+{{define "mail-list"}}{{if .}}<ul class="mails">{{range .}}<li class="{{.Dir}}">
+  <span class="mdir" title="{{if eq .Dir "in"}}received{{else}}sent{{end}}">{{if eq .Dir "in"}}←{{else}}→{{end}}</span>
+  <div><div class="mhead"><b>{{if eq .Dir "in"}}{{.From}}{{else}}You{{end}}</b>{{if .Kind}}<span class="badge k-{{.Kind}}">{{.Kind}}</span>{{end}}<span class="mono muted">{{day .Date}}</span></div>
+  <div class="msubj">{{.Subject}}</div>{{if .Snippet}}<div class="msnip muted">{{.Snippet}}</div>{{end}}
+  <div class="mact">{{if .Open}}<a href="{{.Open}}" rel="noopener noreferrer" target="_blank">Open in Gmail</a>{{end}}{{if .Reply}}<a href="{{.Reply}}" rel="noopener noreferrer" target="_blank">Reply</a>{{end}}</div></div>
+</li>{{end}}</ul>{{end}}{{end}}
+
+{{define "issue"}}{{$j := .Job}}
+<div class="modal-wrap">
+<a class="backdrop" href="{{.Close}}" data-close tabindex="-1" aria-hidden="true"></a>
+<section class="issue" role="dialog" aria-modal="true" aria-labelledby="issue-title" aria-label="{{$j.Company}} · {{$j.Title}}">
+  <header class="issue-h"><span class="av h{{hue $j.Company}}" aria-hidden="true">{{initial $j.Company}}</span><span class="key mono">SJ-{{$j.ID}}</span><span class="muted">{{$j.Company}}</span>
+    <a class="mini btn" href="/jobs/{{$j.ID}}">Open full page</a><a class="x" href="{{.Close}}" data-close aria-label="Close">×</a></header>
+  <div class="issue-grid">
+  <div class="issue-main">
+    <h2 id="issue-title">{{$j.Title}}</h2>
+    <div class="issue-acts">
+      {{if $j.URL}}<a class="btn mini" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}Posting</a>{{end}}
+      <a class="btn mini" href="{{.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
+      <a class="btn mini" href="/calendar?new={{today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a>
+      {{if .CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Back}}"><button class="mini go">Draft in Gmail</button></form>{{end}}
+    </div>
+    {{template "stepper" .Steps}}
+    {{if $j.FitNotes}}<section><h3>Why it fits</h3><p class="pre clamp">{{$j.FitNotes}}</p></section>{{end}}
+    {{if $j.Veto}}<p class="callout bad"><b>Veto:</b> {{$j.Veto}}</p>{{end}}
+    <section><h3>Mail <span class="n">{{len .Mails}}</span><a class="act" href="{{.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail</a></h3>
+    {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="muted small">No messages logged. Replies appear after <code>scoutjobs email sync</code> or the inbox-triage skill.</p>{{end}}</section>
+    <section><h3>Activity</h3>
+    <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Back}}"><input name="note" placeholder="Add a note" aria-label="note"><button class="mini primary">Add</button></form>
+    <ul class="timeline compact">{{range .Events}}<li><span class="mono">{{when .At}}</span><span><span class="tag">{{.Kind}}</span> {{.Note}}</span></li>{{end}}</ul></section>
+  </div>
+  <aside class="issue-side">
+    <div class="side-status"><span class="badge {{$j.Status}}">{{title $j.Status}}</span>{{if $j.Veto}}<span class="badge bad" title="{{$j.Veto}}">veto</span>{{else}}{{template "gauge-lg" $j.FitScore}}{{end}}</div>
+    <div class="issue-move"><small class="muted">Move to</small>{{template "move" (dict_status $j.ID $j.Status .Back)}}</div>
+    <section><h3>Details</h3>
+    <dl class="facts">
+      {{if $j.Location}}<dt>Location</dt><dd>{{$j.Location}}</dd>{{end}}
+      {{if $j.Remote}}<dt>Work</dt><dd>{{$j.Remote}}</dd>{{end}}
+      {{if $j.SalaryMax}}<dt>Salary</dt><dd>{{$j.SalaryMin}}–{{$j.SalaryMax}} {{$j.Currency}}</dd>{{end}}
+      {{if $j.Deadline}}<dt>Deadline</dt><dd>{{$j.Deadline}}</dd>{{end}}
+      {{if $j.Contact}}<dt>Contact</dt><dd>{{$j.Contact}}</dd>{{end}}
+      {{if $j.Source}}<dt>Source</dt><dd>{{$j.Source}}</dd>{{end}}
+      {{if .Contacts}}<dt>People</dt><dd><a href="/jobs/{{$j.ID}}">{{.Contacts}} you know here</a></dd>{{end}}
+      {{if $j.Tags}}<dt>Tags</dt><dd>{{range split $j.Tags}}<span class="chip">{{.}}</span> {{end}}</dd>{{end}}
+      <dt>Added</dt><dd>{{day $j.CreatedAt}}</dd>
+    </dl></section>
+    <section><h3>Application kit <span class="n">{{.KitDone}}/4</span></h3>
+    <ul class="kitmini">{{range .Kit}}<li class="{{if .Done}}done{{end}}">{{.Label}}</li>{{end}}</ul>
+    {{if .Files}}<p class="files">{{$id := $j.ID}}{{range .Files}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}">{{.}}</a> {{end}}</p>{{end}}</section>
+    <section><h3>Interviews <span class="n">{{len .Interviews}}</span></h3>
+    {{range .Interviews}}<p class="ivrow"><a href="/calendar?view=week&amp;d={{day .At}}&amp;ev=i{{.ID}}">{{when .At}}</a><span>{{title .Stage}} · <span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span>{{if .Outcome}} <span class="badge {{.Outcome}}">{{.Outcome}}</span>{{end}}</span></p>{{else}}<p class="muted small">None scheduled.</p>{{end}}</section>
+  </aside>
+  </div>
+</section>
+</div>
+{{end}}
+
+{{define "ico-mail"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>{{end}}
+{{define "ico-inbox"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h5l1 3h6l1-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/></svg>{{end}}
+
+{{define "ico-expand"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>{{end}}
+{{define "ico-shrink"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>{{end}}
+{{define "ico-rows"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>{{end}}
+
+{{define "prep-check"}}{{$i := .I}}<form class="prepcheck" method="post" action="/interviews/{{$i.ID}}"><input type="hidden" name="back" value="{{.Back}}"><input type="hidden" name="prep_form" value="1">
+  {{range prepItems}}<label class="check"><input type="checkbox" name="prep" value="{{.Key}}" {{if $i.PrepDone .Key}}checked{{end}}> {{.Label}}</label>{{end}}
+  <button class="mini primary">Save prep</button></form>{{end}}

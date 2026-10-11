@@ -46,9 +46,11 @@ Without `--yes` the CLI refuses, so a slip cannot send. With `--yes` the gates r
 
 If the user prefers their own mail app: `scoutjobs email show <id> --json` returns a `mailto:` link (attachments must be added by hand); the dashboard job page offers the same link.
 
-## 4. Replies
+If the user prefers Gmail and the agent has a Gmail connector (no SMTP setup needed): after step 1, run `scoutjobs email draft <id> --to ...` as usual, then `scoutjobs email show <id> --json` (`email` holds To, Subject and the body text, `dir` the folder), and create a Gmail draft with them through the connector's draft tool. Never use its send tool. Most connectors cannot attach files: tell the user to attach `resume.pdf` from `dir` before sending. Once the user says they sent it, record it with `scoutjobs job set <id> --status applied --note "sent from Gmail"`. The quality gates still apply: do not create the draft while `job check` has a `FAIL` the user has not decided to skip.
 
-When `imap_host` is set, `scoutjobs email sync --since 14d` reads the inbox (read-only) and logs replies on the matching jobs as `reply:received`; clear rejections or interview invitations move the status. Suggest it when the user asks "did anyone answer" and let `application-tracker` take it from there. `--dry-run` shows the matches without changing anything.
+## 5. Replies
+
+When `imap_host` is set, `scoutjobs email sync --since 14d` reads the inbox (read-only) and logs replies on the matching jobs as `reply:received`; clear rejections or interview invitations move the status. Suggest it when the user asks "did anyone answer" and let `application-tracker` take it from there. Without IMAP, the `inbox-triage` skill reads Gmail through the connector instead. `--dry-run` shows the matches without changing anything.
 
 ## Rules
 

@@ -29,7 +29,8 @@ type Mail struct {
 	Date      string `json:"date"`
 	MessageID string `json:"message_id"`
 	InReplyTo string `json:"in_reply_to"`
-	Text      string `json:"-"` // first bytes of the body, for keyword classification only
+	Thread    string `json:"thread,omitempty"` // Gmail thread id; IMAP leaves it empty
+	Text      string `json:"-"`                // first bytes of the body, for keyword classification only
 }
 
 const textPeek = 4000

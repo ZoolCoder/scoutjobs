@@ -25,6 +25,8 @@ type Config struct {
 	SMTPUser      string   `json:"-"`
 	IMAPHost      string   `json:"-"`
 	IMAPUser      string   `json:"-"`
+	GmailClientID string   `json:"-"`
+	GmailSecret   string   `json:"-"`
 	SearchQueries []string `json:"search_queries"`
 	SearchBoards  []string `json:"search_boards"`
 	SearchRemote  bool     `json:"search_remote"`
@@ -95,6 +97,10 @@ func LoadConfig(home string) Config {
 			c.IMAPHost = strings.Trim(v, `"'`)
 		case "imap_user":
 			c.IMAPUser = strings.Trim(v, `"'`)
+		case "gmail_client_id":
+			c.GmailClientID = strings.Trim(v, `"'`)
+		case "gmail_client_secret":
+			c.GmailSecret = strings.Trim(v, `"'`)
 		case "search_queries":
 			c.SearchQueries = splitList(v)
 		case "search_boards":

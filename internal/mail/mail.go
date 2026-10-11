@@ -12,8 +12,10 @@ import (
 	"mime"
 	"mime/multipart"
 	"net"
+	netmail "net/mail"
 	"net/smtp"
 	"net/textproto"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -202,4 +204,36 @@ func Mailto(m Message) string {
 		return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(s, "%", "%25"), "&", "%26"), "\n", "%0A")
 	}
 	return "mailto:" + m.To + "?subject=" + q(m.Subject) + "&body=" + q(m.Body)
+}
+
+// Address returns the bare address of a From header, or the header itself when it does not parse.
+func Address(from string) string {
+	dec := new(mime.WordDecoder)
+	if d, err := dec.DecodeHeader(from); err == nil {
+		from = d
+	}
+	if a, err := netmail.ParseAddress(from); err == nil {
+		return a.Address
+	}
+	return strings.TrimSpace(from)
+}
+
+// GmailCompose opens Gmail's compose window filled in; the user reviews and presses Send there.
+func GmailCompose(to, subject, body string) string {
+	q := url.Values{"view": {"cm"}, "fs": {"1"}}
+	if to != "" {
+		q.Set("to", to)
+	}
+	if subject != "" {
+		q.Set("su", subject)
+	}
+	if body != "" {
+		q.Set("body", body)
+	}
+	return "https://mail.google.com/mail/?" + q.Encode()
+}
+
+// GmailSearch opens Gmail on a search, e.g. every message from a company's domain.
+func GmailSearch(query string) string {
+	return "https://mail.google.com/mail/#search/" + url.PathEscape(query)
 }

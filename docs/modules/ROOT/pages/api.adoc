@@ -28,8 +28,9 @@ The server started by `scoutjobs serve` answers `/api/*` with JSON. With `api_to
 | GET | `/api/events` | `?limit=50` | recent activity
 | POST | `/api/jobs/\{id}/skip` | `{"reason":"...","signals":{...}}` | `job skip`: status skipped plus the decision the learner reads
 | POST | `/api/search` | `{"queries":["go"],"boards":["greenhouse:acme"],"remote":true,"limit":40,"add":true}` | `scoutjobs search`: `postings`, `added`, `errors`; omitted queries and boards fall back to `config.yaml`
-| GET, POST | `/api/interviews` | `?job=3&all=1`; POST `{"job_id","stage","at","format","interviewer"}` | interviews (upcoming unless `all`); POST 201 and the job moves to `interview` when earlier
-| PATCH | `/api/interviews/\{id}` | `{"at","format","interviewer","prep_status","outcome","feedback","stage"}`, any subset | updated interview
+| GET, POST | `/api/interviews` | `?job=3&all=1`; POST `{"job_id","stage","at","format","interviewer","duration","location"}` | interviews (upcoming unless `all`); POST 201 and the job moves to `interview` when earlier
+| PATCH | `/api/interviews/\{id}` | `{"at","format","interviewer","prep_status","outcome","feedback","stage","duration","location"}`, any subset | updated interview
+| GET | `/api/jobs/\{id}/contacts` | | `{"company","contacts"}`: people from the LinkedIn import who work there
 | GET, POST | `/api/sessions` | `?limit=30`; POST `{"kind","topic","score","notes"}` | practice sessions, newest first; POST 201
 | GET, POST | `/api/learning` | POST `{"skill","priority","resource","demand","notes"}` (upsert by skill) | learning items; POST 201
 | PATCH | `/api/learning/\{id}` | `{"status","resource","notes","hours","priority","demand"}`, `hours` is added | updated item
