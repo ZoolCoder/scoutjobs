@@ -30,7 +30,9 @@ Usage: scoutjobs <command> [subcommand] [flags]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
   email draft|show|send   application e-mail from the cover letter; send needs --yes
-  email test|sync         probe the SMTP/IMAP account; log inbox replies to applications
+  email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
+  email log <job>         record a message an agent's Gmail connector matched to a job
+  gmail connect|status|disconnect|draft <job>   Gmail API with your own OAuth client: read replies, create drafts (never sends)
   decision log|summary
   pref set|list|rm|render
   interview add|list|set     --duration 45 --location <meeting link or address>
@@ -100,6 +102,8 @@ func Run(args []string, out io.Writer) error {
 		return runSession(s, rest, out)
 	case "learn":
 		return runLearn(s, rest, out)
+	case "gmail":
+		return runGmail(s, cfg, rest, out)
 	case "linkedin":
 		return runLinkedIn(s, rest, out)
 	case "contacts":
@@ -117,7 +121,7 @@ func Run(args []string, out io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(out, "ScoutJobs dashboard on http://%s  (data: %s)\n", *addr, s.Home)
-		return web.Serve(s, *addr, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP()})
+		return web.Serve(s, *addr, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg)})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -244,6 +248,10 @@ smtp_host:              # smtp.gmail.com:587 (STARTTLS) or host:465 (TLS); passw
 smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
+
+# Gmail API instead of IMAP (scoutjobs gmail connect): a Desktop OAuth client from your own Google Cloud project
+gmail_client_id:        # xxxx.apps.googleusercontent.com
+gmail_client_secret:    # the Desktop client's secret; or set $SCOUTJOBS_GMAIL_CLIENT_SECRET
 
 # automation (n8n, Make, scripts). Leave empty to disable.
 api_token:              # when set, /api/* requires "Authorization: Bearer <token>"
