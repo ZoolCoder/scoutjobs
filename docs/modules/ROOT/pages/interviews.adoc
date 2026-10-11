@@ -11,6 +11,26 @@
 
 Stories live in `~/.scoutjobs/stories/`. `/scoutjobs:story` extracts one from a CV line or a two-minute conversation using the STAR frame, so the prep has material to map.
 
+== Calendar
+
+Every interview carries a time, a length (`--duration`, default 60 minutes) and a place (`--location`, a meeting link or an address). A date without a time is an all-day entry. The dashboard's *Calendar* page shows them with deadlines and follow-ups due, and gets them into Google Calendar three ways:
+
+[cols="1,3"]
+|===
+| Way | How
+
+| One event
+| *Add to Google Calendar* on the event opens Google's event form, filled in. Nothing is saved until you click Save there.
+
+| Import once
+| *Download .ics* in the side panel, then Google Calendar: Settings, Import & export, Import.
+
+| Stay in sync
+| Subscribe to the feed (`/calendar.ics`, keyed by `api_token` when one is set) with Settings, Add calendar, From URL. Google fetches it from its own servers, so the dashboard must be reachable from the internet, for example behind a tunnel. Apple Calendar and Outlook on the same machine subscribe to the local address directly.
+|===
+
+With the Google Calendar connector, the `calendar-sync` skill does it both ways without a public address: it creates and moves events for tracked interviews and imports interviews you booked in Google Calendar. Each event ScoutJobs writes carries `scoutjobs:interview:<id>` in its description, so it is found again and never duplicated.
+
 == Mock
 
 ----

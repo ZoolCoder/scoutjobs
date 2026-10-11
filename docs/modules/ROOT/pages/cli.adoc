@@ -81,8 +81,10 @@ $ scoutjobs decision log --job 4 --kind skip --reason "..." --signals '{...}'
 $ scoutjobs decision summary              # what learn-preferences reads
 $ scoutjobs pref set remote "remote or hybrid" --source stated [--confidence 1]
 $ scoutjobs pref list | rm <key> | render  # render rewrites preferences.md
-$ scoutjobs interview add 3 --stage technical --at 2026-10-20T14:00
-$ scoutjobs interview list | set <id> --outcome passed
+$ scoutjobs interview add 3 --stage technical --at 2026-10-20T14:00 --duration 45 --location https://meet.example/abc
+$ scoutjobs interview list | set <id> --outcome passed     # set also takes --at, --duration, --location
+$ scoutjobs linkedin import ~/Downloads/Basic_LinkedInDataExport.zip   # profile to linkedin/profile.md, connections for referrals
+$ scoutjobs contacts 3                    # who you know at the job's company; --company Acme, --json
 $ scoutjobs session log --kind mock_sysdesign --topic "rate limiter" --score 70
 $ scoutjobs session list
 $ scoutjobs learn add --skill Kubernetes --priority 1

@@ -45,7 +45,7 @@ image::job-gates.png[Ready to send: seven gates all passing, and the evidence ta
 
 image::job-blocked.png[Three failing gates: a missing cover letter, a must-have without evidence, no reviewer verdict,1200]
 
-*Why this job fits* is `fit-review.json` as a table: the posting's wording for each requirement, whether it is a must or a nice-to-have, where in your profile the evidence is, how strong the match is (direct, adjacent, partial, gap), the wording the CV may use, and the risk a reviewer could raise. Below it the free-text notes, then interviews and the full history of the job.
+*Why this job fits* is `fit-review.json` as a table: the posting's wording for each requirement, whether it is a must or a nice-to-have, where in your profile the evidence is, how strong the match is (direct, adjacent, partial, gap), the wording the CV may use, and the risk a reviewer could raise. Below it the free-text notes, then interviews and the full history of the job. *People you know here* lists your LinkedIn connections at the company after `scoutjobs linkedin import`, for asking a referral.
 
 == Drafts viewer
 
@@ -79,6 +79,9 @@ The same sources as `scoutjobs search`, prefilled from `search_queries`, `search
 
 | Interviews
 | Scheduled and past interviews with prep status, plus the mock sessions and their scores.
+
+| Calendar
+| Interviews, application deadlines and follow-ups due, laid out like Google Calendar: day, week, month and schedule views, colour by stage, an all-day row for deadlines and date-only interviews, and a red line at the current time. Click an empty slot or *Create* to schedule an interview for a tracked job; click an event to see it, move it, change its length or place, set prep status and outcome. Each event has *Add to Google Calendar* (Google's own event form, filled in) and *Download .ics*. The side panel shows the feed address for subscribing; see xref:interviews.adoc#_calendar[Calendar].
 
 | Learning
 | Skill gaps found by `upskill`, ranked, with hours tracked.

@@ -20,7 +20,9 @@ Your job search, on your machine. An open-source job-search operating system for
 - **A dashboard**: a single Go binary, SQLite, no Node, no JavaScript, no external assets, bound to localhost. Overview with your next best move, pipeline board where every card opens the job and moves to the next stage with one click or a drag, a per-job "get selected" checklist (tailored CV, cover letter, ATS check), drafts you can edit in place, a "due this week" filter, an add-job form and a board search page, weekly reviews next to the live funnel, interviews, learning progress, preferences it learned, profile and CV health, activity log. Light by default, dark and auto available.
 - **A built-in job search**: `scoutjobs search` queries public ATS boards (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR) by slug or careers URL, any RSS feed and remote aggregators (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas, HN Who is hiring) without an API key, imports a single posting by URL (`job add --from`), deduplicates by posting URL and normalised title, converts salaries to your currency, and adds results to the pipeline.
 - **Apply by e-mail**: `scoutjobs email draft|send` builds the application from your cover letter and tailored resume and sends it through your own SMTP account. The CLI refuses without `--yes`, and the skill asks you first. Every job page also offers a `mailto:` link for your own mail app.
-- **Automation hooks**: a JSON API on the dashboard and an outgoing webhook for n8n, Make, Zapier or cron. See `integrations/n8n/`.
+- **A calendar like Google's**: day, week, month and schedule views of interviews, deadlines and follow-ups, click a slot to schedule, click an event to move it. Every event has *Add to Google Calendar* and an `.ics` download, and the whole calendar is a subscribable feed.
+- **Connectors**: with the Gmail, Google Calendar and Google Drive connectors, `inbox-triage` matches recruiter replies to your jobs, `calendar-sync` keeps interviews in Google Calendar, `google-drive` pulls your CV in. `scoutjobs linkedin import` reads the LinkedIn data export into your profile and shows who you know at each company.
+- **Automation hooks**: a JSON API on the dashboard, MCP over HTTP on `/mcp`, and an outgoing webhook for n8n, Make, Zapier or cron, with six ready workflows (daily search, high-fit alert, follow-up nudge, Gmail replies to notes, daily brief, interviews to calendar). See `integrations/n8n/`.
 - **Every platform**: Claude Code (plugin with slash commands and subagents), Codex (skills plus generated `/scoutjobs-*` prompts), Cursor, Gemini CLI, GitHub Copilot, and anything else that reads `SKILL.md`. Agents without a shell on your machine (Claude Code web, Codex cloud, hosted n8n) use the same features through the JSON API.
 
 Your data never leaves `~/.scoutjobs`. There are no accounts, no keys, no telemetry.
@@ -88,8 +90,11 @@ Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds
 | "what should I do today" | `daily-briefing` | interviews, follow-ups due, drafts, new jobs, one learning task |
 | Friday | `weekly-review` | funnel, response rate, stale cleanup, runs `learn-preferences` |
 | "what should I learn" | `upskill` | gaps ranked by demand in your tracked jobs, plan, hours tracked |
+| "check my inbox" | `inbox-triage` | Gmail connector: replies matched to jobs, status changes proposed, reply drafts in Gmail |
+| "put my interviews in my calendar" | `calendar-sync` | Google Calendar connector: events created, moved and imported both ways |
+| "my CV is in Drive" | `google-drive` | Drive connector: CV into `cv/`, final documents copied back |
 
-The full list of the 30 skills, what triggers each and which ones are reference material is in the manual: [All skills](https://zoolcoder.github.io/scoutjobs/scoutjobs/skills.html).
+The full list of the 33 skills, what triggers each and which ones are reference material is in the manual: [All skills](https://zoolcoder.github.io/scoutjobs/scoutjobs/skills.html).
 
 ## Install per platform
 

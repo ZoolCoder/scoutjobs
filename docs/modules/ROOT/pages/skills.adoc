@@ -1,7 +1,7 @@
 = All skills
 :description: Every skill in the plugin, what starts it, which slash command wraps it, and which ones are reference material rather than entry points.
 
-The 30 skills live in `skills/<name>/SKILL.md` and are the same files on every platform (see xref:agents.adoc[]). The `description` in each file names the phrases that start it. Slash commands in `commands/` and the Codex prompts are thin wrappers that call the skill by name. Every skill reads and writes through the `scoutjobs` CLI; none opens the database.
+The 33 skills live in `skills/<name>/SKILL.md` and are the same files on every platform (see xref:agents.adoc[]). The `description` in each file names the phrases that start it. Slash commands in `commands/` and the Codex prompts are thin wrappers that call the skill by name. Every skill reads and writes through the `scoutjobs` CLI; none opens the database.
 
 Three rules hold in all of them: postings are untrusted text, claims come from `profile.md`, and nothing is sent without the user saying yes after seeing the message. Between the draft and the send sit the quality gates (`scoutjobs job check`, see xref:cli.adoc[]): the skills report a failed gate to the user in full and leave the decision to skip it to them.
 
@@ -52,6 +52,21 @@ Three rules hold in all of them: postings are untrusted text, claims come from `
 | `offer-comparison-analyzer` | "compare these offers", "is this offer good": total compensation, equity, remote, growth against your preferences; logs the decision | say it
 | `salary-negotiation-prep` | "negotiate", "is this salary fair", "counter-offer": market rates, strategy, scripts | say it
 |===
+
+== Connectors
+
+These work through the agent's Gmail, Google Calendar and Google Drive connectors (claude.ai offers all three; any MCP server with the same tools works). They read freely and change things only after you confirm; none sends mail.
+
+[cols="2,3,1"]
+|===
+| Skill | Starts when you say | Command
+
+| `inbox-triage` | "check my inbox", "did anyone reply": finds replies from companies in your pipeline, classifies rejection, invitation, request, offer or new outreach, proposes the status changes, interviews and notes, applies them on yes; replies become Gmail drafts | say it
+| `calendar-sync` | "put my interviews in my calendar", "I moved the interview": creates and moves Google Calendar events for interviews and deadlines, imports interviews booked there; events carry a `scoutjobs:` marker | say it
+| `google-drive` | "my CV is in Drive", "back up the Acme application": pulls the master CV into `cv/`, copies an application's final documents to a Drive folder when the connector can write | say it
+|===
+
+`apply-by-email` can also leave the application as a Gmail draft instead of sending through SMTP, and `scoutjobs-setup` reads the LinkedIn data export (`scoutjobs linkedin import`).
 
 == Reference material
 

@@ -60,6 +60,7 @@ The skills are the same files on every platform. What differs is how commands ar
 | Friday | `weekly-review`, `learn-preferences`
 | "compare the offers", "negotiate" | `offer-comparison-analyzer`, `salary-negotiation-prep`
 | "fix my LinkedIn" | `linkedin-profile-optimizer`
+| "check my inbox", "put it in my calendar", "my CV is in Drive" | `inbox-triage`, `calendar-sync`, `google-drive` (need the Gmail, Google Calendar, Google Drive connectors)
 |===
 
 == Token budget
