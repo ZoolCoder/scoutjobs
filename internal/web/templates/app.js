@@ -121,3 +121,39 @@
     });
   });
 })();
+
+// Search results: the tag bar narrows the rows to those carrying every chosen tag.
+(function () {
+  var bar = document.querySelector('[data-tagbar]');
+  if (!bar) return;
+  var rows = document.querySelectorAll('table.results tbody tr');
+  var clear = bar.querySelector('[data-tag-clear]');
+  var none = bar.querySelector('[data-tag-none]');
+  var count = bar.closest('section').querySelector('.panel-h .n');
+
+  function apply() {
+    var on = [];
+    bar.querySelectorAll('[data-tag][aria-pressed="true"]').forEach(function (b) { on.push('|' + b.dataset.tag + '|'); });
+    var shown = 0;
+    rows.forEach(function (tr) {
+      var tags = tr.dataset.tags || '';
+      var ok = on.every(function (t) { return tags.indexOf(t) >= 0; });
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    clear.hidden = on.length === 0;
+    none.hidden = shown > 0;
+    if (count) count.textContent = on.length ? shown + ' of ' + rows.length : rows.length;
+  }
+
+  bar.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    if (b === clear) {
+      bar.querySelectorAll('[data-tag]').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+    } else if (b.dataset.tag) {
+      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    }
+    apply();
+  });
+})();

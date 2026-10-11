@@ -4,6 +4,7 @@
 <form class="toolbar" method="get" action="/pipeline">
   <label class="tsearch">{{template "ico-search"}}<input name="q" value="{{$f.Q}}" placeholder="Search jobs  ( / )" aria-label="Search company, title, tags"></label>
   {{if $f.Due}}<input type="hidden" name="due" value="1">{{end}}{{if $f.Remote}}<input type="hidden" name="remote" value="1">{{end}}{{if $f.Fit}}<input type="hidden" name="fit" value="{{$f.Fit}}">{{end}}{{if eq $f.View "list"}}<input type="hidden" name="view" value="list">{{end}}{{if $f.Full}}<input type="hidden" name="full" value="1">{{end}}{{if $f.Dense}}<input type="hidden" name="dense" value="1">{{end}}{{if $f.Closed}}<input type="hidden" name="closed" value="1">{{end}}
+  <label class="tloc">{{template "ico-pin"}}<input name="loc" value="{{$f.Loc}}" placeholder="Location" aria-label="Location: city, country or region"></label>
   <span class="chips">
     {{if $f.Due}}<a class="on" href="{{$f.DueURL}}">Due this week ×</a>{{else}}<a href="{{$f.DueURL}}">Due this week</a>{{end}}
     <a {{if $f.Fit}}class="on" {{end}}href="{{$f.FitURL}}">Fit 70+{{if $f.Fit}} ×{{end}}</a>
@@ -11,6 +12,7 @@
     {{if ne $f.View "list"}}<a {{if $f.Closed}}class="on" {{end}}href="{{$f.ClosedURL}}">Closed stages{{if $f.Closed}} ×{{end}}</a>{{end}}
   </span>
   <select name="src" aria-label="source" class="auto"><option value="">All sources</option>{{range .Sources}}<option value="{{.}}" {{if eq . $f.Src}}selected{{end}}>{{.}}</option>{{end}}</select>
+  {{if or .Tags $f.Tag}}<select name="tag" aria-label="tag" class="auto"><option value="">All tags</option>{{if $f.Tag}}<option value="{{$f.Tag}}" selected>{{$f.Tag}}</option>{{end}}{{range .Tags}}{{if ne . $f.Tag}}<option value="{{.}}">{{.}}</option>{{end}}{{end}}</select>{{end}}
   <select name="sort" aria-label="sort" class="auto">{{range .Sorts}}<option value="{{.}}" {{if eq . $f.Sort}}selected{{end}}>Sort: {{.}}</option>{{end}}</select>
   <button class="mini apply">Apply</button>
   <span class="muted">{{.Count}} jobs{{if $f.Active}} · <a href="/pipeline">clear</a>{{end}}</span>
@@ -23,15 +25,16 @@
 <div class="pipe-main">
 {{if eq $f.View "list"}}
 <div class="panel tight listview"><table class="issues">
-  <thead><tr><th>Key</th><th>Job</th><th>Status</th><th>Fit</th><th>Due</th><th>Updated</th><th></th></tr></thead>
+  <thead><tr><th>Key</th><th>Job</th><th>Where</th><th>Status</th><th>Fit</th><th>Due</th><th>Updated</th><th></th></tr></thead>
   <tbody>{{range .Jobs}}<tr class="{{if eq .ID $sel}}sel{{end}}">
     <td class="mono key"><a href="{{$f.JobURL .ID}}" data-issue>SJ-{{.ID}}</a></td>
     <td><a class="row-job" href="{{$f.JobURL .ID}}" data-issue><span class="av h{{hue .Company}}">{{initial .Company}}</span><span><b>{{.Company}}</b><small>{{.Title}}</small></span></a></td>
+    <td class="where">{{if eq .Remote "remote"}}remote{{if .Location}} · {{end}}{{end}}{{.Location}}</td>
     <td><span class="badge {{.Status}}">{{title .Status}}</span></td>
     <td>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else}}{{template "gauge" .FitScore}}{{end}}</td>
     <td class="mono">{{.Deadline}}</td><td class="mono muted">{{day .UpdatedAt}}</td>
     <td>{{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}</td>
-  </tr>{{else}}<tr><td colspan="7" class="empty">No match here</td></tr>{{end}}</tbody>
+  </tr>{{else}}<tr><td colspan="8" class="empty">No match here</td></tr>{{end}}</tbody>
 </table>
 {{if gt .Pages 1}}<nav class="pager" aria-label="pages">{{if gt .Page 1}}<a class="btn mini" href="{{$f.PageURL (add .Page -1)}}">← Prev</a>{{end}}<span class="muted">Page {{.Page}} of {{.Pages}}</span>{{if lt .Page .Pages}}<a class="btn mini" href="{{$f.PageURL (add .Page 1)}}">Next →</a>{{end}}</nav>{{end}}
 </div>
@@ -49,7 +52,7 @@
     <div class="row"><span class="who"><span class="av h{{hue .Company}}" aria-hidden="true">{{initial .Company}}</span><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a></span>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
     <div class="cardfoot"><span class="key mono">SJ-{{.ID}}</span>
       {{if .Deadline}}<span class="chip warn" title="deadline">{{template "ico-clock"}}{{.Deadline}}</span>{{end}}
-      {{if eq .Remote "remote"}}<span class="chip" title="{{.Location}}">{{template "ico-pin"}}remote</span>{{end}}
+      {{if or .Location (eq .Remote "remote")}}<span class="chip loc" title="{{.Remote}}{{if .Location}} · {{.Location}}{{end}}">{{template "ico-pin"}}{{if eq .Remote "remote"}}remote{{if .Location}} · {{end}}{{end}}{{.Location}}</span>{{end}}
       {{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}
       <span class="age muted" title="updated {{day .UpdatedAt}}">{{day .UpdatedAt}}</span></div>
   </article>

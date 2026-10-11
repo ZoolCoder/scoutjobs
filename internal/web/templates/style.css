@@ -195,7 +195,7 @@ dl.facts{display:grid;grid-template-columns:96px 1fr;gap:10px 12px;margin:0;alig
 .chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:var(--subtle);border:1px solid var(--line);color:var(--fg);margin:1px 2px 1px 0}
 .chip svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;vertical-align:-2px;margin-right:4px;color:var(--muted)}
 .chip.acc{color:var(--acc);background:var(--acc-sub);border-color:transparent}
-.chip.dim{color:var(--muted)}.chip.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-sub)}
+.chip.dim{color:var(--muted)}.chip[hidden]{display:none}.chip.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-sub)}
 .fit{font-variant-numeric:tabular-nums;font-size:11.5px;font-weight:600;color:var(--acc);background:var(--acc-sub);padding:0 7px;border-radius:6px}
 
 /* forms */
@@ -461,11 +461,11 @@ label.feed input{font-family:var(--mono);font-size:11.5px;width:100%}
 /* ---- pipeline: toolbar, Jira-style cards, issue side panel ---- */
 .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
 .toolbar .seg{margin-left:0}
-.tsearch{display:flex;align-items:center;gap:6px;flex:1 1 180px;max-width:300px;height:36px;padding:0 10px;border:1px solid var(--line2);border-radius:10px;background:var(--field)}
-.tsearch:focus-within{box-shadow:var(--ring);border-color:var(--acc)}
-.tsearch svg{width:16px;height:16px;flex:none;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round}
-.tsearch input{border:0;background:transparent;box-shadow:none;height:34px;padding:0;flex:1;min-width:0}
-.tsearch input:focus{box-shadow:none;outline:0}
+.tsearch,.tloc{display:flex;align-items:center;gap:6px;flex:1 1 180px;max-width:300px;height:36px;padding:0 10px;border:1px solid var(--line2);border-radius:10px;background:var(--field)}
+.tsearch:focus-within,.tloc:focus-within{box-shadow:var(--ring);border-color:var(--acc)}
+.tsearch svg,.tloc svg{width:16px;height:16px;flex:none;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round}
+.tsearch input,.tloc input{border:0;background:transparent;box-shadow:none;height:34px;padding:0;flex:1;min-width:0}
+.tsearch input:focus,.tloc input:focus{box-shadow:none;outline:0}
 select.auto{width:auto}
 .pipe-body{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
 .pipe.loading{cursor:progress}.pipe.loading .pipe-body{opacity:.75;transition:opacity .15s .1s}
@@ -705,3 +705,16 @@ ol.checklist li.next .state{color:var(--acc)}ol.checklist li.warn .state{color:v
 .ackform label:not(.check){display:grid;gap:4px;font-size:13px}
 .ackform .runpick{display:grid;gap:6px}
 .gates-left{margin:0 0 8px 18px;font-size:13px}
+.fit.lo{background:var(--bad-sub);color:var(--bad)}
+.tagbar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 10px}
+.tagbar .chip{cursor:pointer;font:inherit;font-size:12px}
+.tagbar .chip em{font-style:normal;color:var(--muted);margin-left:2px}
+.tagbar .chip[aria-pressed="true"]{color:var(--acc);background:var(--acc-sub);border-color:transparent}
+table.results .tags{margin-top:3px}
+table.results .why{display:block;font-size:12px;margin-top:2px}
+table.results .why.bad{color:var(--bad)}
+.saved form.inline{display:inline}
+.saved .suggest{cursor:pointer;font:inherit;font-size:12.5px}
+.tloc{flex:0 1 150px}
+.jobcard .chip.loc{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.issues td.where{font-size:12.5px;color:var(--muted);max-width:180px}

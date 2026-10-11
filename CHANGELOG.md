@@ -7,6 +7,23 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Added
+- Search finds the jobs that fit: with a filled `profile.md`, results are
+  ranked by a match score with the reasons (target role, skills, level, work
+  mode, place, avoided stacks), and *Hide jobs that break a must* drops the
+  wrong place, a ruled-out engagement type or pay below the floor. The search
+  page suggests searches built from the profile; `scoutjobs search` gains
+  `--location`, `--hide-mismatches`, `--suggest` and `--rank`.
+- Location filter: search by city, country or region (`Berlin`, `Germany`,
+  `Europe`, `EMEA`); remote jobs match when open to it. The pipeline shows
+  where each job is and filters by location and tag.
+- More tags: every posting gets its skills, level, employment type, regions
+  and visa stance from the title, tags and description, stored with the job on
+  add. The search results have a tag bar to narrow the rows.
+
+### Changed
+- The boards of a search are queried in parallel.
+
 ### Fixed
 - Jobs added from a search keep the posting: its text is saved to
   `posting.md`, and Prepare application fetches a missing one from the job's

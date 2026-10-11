@@ -234,6 +234,7 @@ func FetchPosting(ctx context.Context, rawURL string, client *http.Client, base 
 	if p.URL == "" {
 		p.URL = rawURL
 	}
+	Enrich(&p)
 	return p, nil
 }
 
@@ -249,7 +250,11 @@ func (f fetcher) remotiveJob(ctx context.Context, u *url.URL, rawURL string) (Po
 	if err != nil {
 		return Posting{}, err
 	}
-	return pick(list, last[i:])
+	p, err := pick(list, last[i:])
+	if err == nil {
+		Enrich(&p)
+	}
+	return p, err
 }
 
 func pick(list []Posting, id string) (Posting, error) {

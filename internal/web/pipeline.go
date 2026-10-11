@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -28,6 +29,7 @@ type column struct {
 // pipeFilter is the board's toolbar. Every field round-trips through the query string so a view can be bookmarked.
 type pipeFilter struct {
 	Q, Src, Sort, View  string
+	Loc, Tag            string // a city, country or region; one tag
 	Due, Remote         bool
 	Fit                 int64
 	Full, Dense, Closed bool   // focus mode, compact cards, closed stages as full columns
@@ -44,6 +46,8 @@ func (f pipeFilter) values() url.Values {
 	}
 	set("q", f.Q)
 	set("src", f.Src)
+	set("loc", f.Loc)
+	set("tag", f.Tag)
 	if f.Sort != "updated" {
 		set("sort", f.Sort)
 	}
@@ -117,7 +121,15 @@ func (f pipeFilter) MoreURL(status string) string {
 	}
 	return f.url("more", status)
 }
-func (f pipeFilter) Active() bool { return f.Q != "" || f.Src != "" || f.Due || f.Remote || f.Fit > 0 }
+func (f pipeFilter) TagURL(tag string) string {
+	if strings.EqualFold(f.Tag, tag) {
+		return f.url("tag", "")
+	}
+	return f.url("tag", tag)
+}
+func (f pipeFilter) Active() bool {
+	return f.Q != "" || f.Src != "" || f.Loc != "" || f.Tag != "" || f.Due || f.Remote || f.Fit > 0
+}
 
 func flag(b bool) string {
 	if b {
@@ -133,6 +145,7 @@ type pipeData struct {
 	Count   int
 	F       pipeFilter
 	Sources []string
+	Tags    []string // the most used tags, for the tag picker
 	Sorts   []string
 	MailN   map[int64]int
 	Sel     *jobPanel
@@ -144,7 +157,7 @@ type pipeData struct {
 
 func (v *server) pipeline(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	f := pipeFilter{Q: strings.TrimSpace(q.Get("q")), Src: q.Get("src"), Sort: q.Get("sort"), View: q.Get("view"), Due: q.Get("due") != "", Remote: q.Get("remote") != "",
+	f := pipeFilter{Q: strings.TrimSpace(q.Get("q")), Src: q.Get("src"), Loc: strings.TrimSpace(q.Get("loc")), Tag: strings.TrimSpace(q.Get("tag")), Sort: q.Get("sort"), View: q.Get("view"), Due: q.Get("due") != "", Remote: q.Get("remote") != "",
 		Full: q.Get("full") != "", Dense: q.Get("dense") != "", Closed: q.Get("closed") != "", More: q.Get("more")}
 	f.Fit, _ = strconv.ParseInt(q.Get("fit"), 10, 64)
 	f.Page, _ = strconv.Atoi(q.Get("page"))
@@ -179,6 +192,7 @@ func (v *server) pipeline(w http.ResponseWriter, r *http.Request) {
 		d.Sources = append(d.Sources, s)
 	}
 	sort.Strings(d.Sources)
+	d.Tags = topTags(all, 40)
 	by := map[string][]store.Job{}
 	for _, j := range jobs {
 		by[j.Status] = append(by[j.Status], j)
@@ -228,9 +242,55 @@ func filterJobs(jobs []store.Job, f pipeFilter) []store.Job {
 		if f.Fit > 0 && j.FitScore < f.Fit {
 			continue
 		}
+		if f.Loc != "" && !jobIn(j, f.Loc) {
+			continue
+		}
+		if f.Tag != "" && !hasTag(j.Tags, f.Tag) {
+			continue
+		}
 		out = append(out, j)
 	}
 	return out
+}
+
+// jobIn is true when the job is in, or remote and open to, one of the comma separated places.
+// A job with no location stated is left out: the user asked for a place.
+func jobIn(j store.Job, places string) bool {
+	ok, note := search.LocationMatch(search.Posting{Location: j.Location, Remote: j.Remote}, splitList(places))
+	return ok && note == ""
+}
+
+func hasTag(tags, tag string) bool {
+	for _, t := range splitList(tags) {
+		if strings.EqualFold(t, tag) {
+			return true
+		}
+	}
+	return false
+}
+
+// topTags is the tags most jobs carry, most common first, at most n.
+func topTags(jobs []store.Job, n int) []string {
+	count := map[string]int{}
+	for _, j := range jobs {
+		for _, t := range splitList(j.Tags) {
+			count[strings.ToLower(t)]++
+		}
+	}
+	tags := make([]string, 0, len(count))
+	for t := range count {
+		tags = append(tags, t)
+	}
+	sort.Slice(tags, func(a, b int) bool {
+		if count[tags[a]] != count[tags[b]] {
+			return count[tags[a]] > count[tags[b]]
+		}
+		return tags[a] < tags[b]
+	})
+	if len(tags) > n {
+		tags = tags[:n]
+	}
+	return tags
 }
 
 func sortJobs(jobs []store.Job, by string) {

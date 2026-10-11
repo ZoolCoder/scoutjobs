@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -33,12 +35,18 @@ type Posting struct {
 	SalaryMax   int64  `json:"salary_max,omitempty"`
 	Currency    string `json:"currency,omitempty"`
 	Description string `json:"description,omitempty"`
+	// derived by Enrich from the title, tags and description
+	Skills     []string `json:"skills,omitempty"`
+	Level      string   `json:"level,omitempty"`      // intern, junior, mid, senior, lead, staff, principal, manager
+	Employment string   `json:"employment,omitempty"` // full-time, part-time, contract, freelance, internship
+	Regions    []string `json:"regions,omitempty"`    // countries and regions it is in or open to; worldwide
+	Visa       string   `json:"visa,omitempty"`       // yes, no, or empty when not mentioned
 }
 
 // Job converts a posting into a tracker row.
 func (p Posting) Job() store.Job {
 	return store.Job{Company: p.Company, Title: p.Title, URL: p.URL, Location: p.Location, Remote: p.Remote,
-		Source: p.Source, PostedAt: p.PostedAt, Tags: p.Tags, SalaryMin: p.SalaryMin, SalaryMax: p.SalaryMax, Currency: p.Currency}
+		Source: p.Source, PostedAt: p.PostedAt, Tags: p.AllTags(), SalaryMin: p.SalaryMin, SalaryMax: p.SalaryMax, Currency: p.Currency}
 }
 
 // Options drive one search run.
@@ -49,6 +57,11 @@ type Options struct {
 	Limit   int
 	Client  *http.Client
 	BaseURL map[string]string // test override per source
+	// Keep, when set, drops matches before Rank and Limit see them (a place or a must the user set);
+	// it is called from one goroutine
+	Keep func(Posting) bool
+	// Rank orders the matches, best first, before Limit cuts them; nil keeps the feed order
+	Rank func(Posting) int
 }
 
 // Result is what a run returns besides the postings.
@@ -166,25 +179,58 @@ func Run(ctx context.Context, o Options) Result {
 		feeds = append(feeds, feed{"remoteok", func(ctx context.Context) ([]Posting, error) { return f.remoteok(ctx) }})
 	}
 
+	// every feed at once; results are merged in feed order, so a run is repeatable
+	type answer struct {
+		rows []Posting
+		err  error
+	}
+	answers := make([]answer, len(feeds))
+	var wg sync.WaitGroup
+	for i, fd := range feeds {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rows, err := fd.fn(ctx)
+			answers[i] = answer{rows, err}
+		}()
+	}
+	wg.Wait()
+
 	r := Result{Errors: errs}
 	seen := map[string]bool{}
-	for _, fd := range feeds {
-		rows, err := fd.fn(ctx)
-		if err != nil {
-			r.Errors = append(r.Errors, fd.name+": "+err.Error())
+	for i, a := range answers {
+		if a.err != nil {
+			r.Errors = append(r.Errors, feeds[i].name+": "+a.err.Error())
 			continue
 		}
-		for _, p := range rows {
+		for _, p := range a.rows {
 			key := store.JobKey(p.Company, p.Title)
 			if seen[key] || !Matches(p, o.Queries) {
 				continue
 			}
 			seen[key] = true
-			r.Postings = append(r.Postings, p)
-			if len(r.Postings) >= o.Limit {
-				return r
+			Enrich(&p)
+			if o.Keep != nil && !o.Keep(p) {
+				continue
 			}
+			r.Postings = append(r.Postings, p)
 		}
+	}
+	if o.Rank != nil {
+		score := make(map[int]int, len(r.Postings))
+		idx := make([]int, len(r.Postings))
+		for i, p := range r.Postings {
+			idx[i], score[i] = i, o.Rank(p)
+		}
+		sort.SliceStable(idx, func(a, b int) bool { return score[idx[a]] > score[idx[b]] })
+		ranked := make([]Posting, len(idx))
+		for i, k := range idx {
+			ranked[i] = r.Postings[k]
+		}
+		r.Postings = ranked
+	}
+	if len(r.Postings) > o.Limit {
+		r.Postings = r.Postings[:o.Limit]
 	}
 	return r
 }
@@ -383,6 +429,7 @@ func (f fetcher) remotive(ctx context.Context, q string) ([]Posting, error) {
 			Published   string   `json:"publication_date"`
 			Tags        []string `json:"tags"`
 			Salary      string   `json:"salary"`
+			JobType     string   `json:"job_type"`
 			Description string   `json:"description"`
 		} `json:"jobs"`
 	}
@@ -393,7 +440,7 @@ func (f fetcher) remotive(ctx context.Context, q string) ([]Posting, error) {
 	for _, j := range list.Jobs {
 		smin, smax, cur := store.ParseSalary(j.Salary)
 		out = append(out, Posting{Company: j.CompanyName, Title: j.Title, URL: j.URL, Location: j.Location, Remote: "remote", Source: "remotive",
-			PostedAt: day(j.Published), Tags: strings.Join(j.Tags, ","), SalaryMin: smin, SalaryMax: smax, Currency: cur, Description: stripHTML(j.Description)})
+			PostedAt: day(j.Published), Tags: strings.Join(j.Tags, ","), SalaryMin: smin, SalaryMax: smax, Currency: cur, Description: stripHTML(j.Description), Employment: j.JobType})
 	}
 	return out, nil
 }

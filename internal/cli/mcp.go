@@ -68,9 +68,11 @@ var mcpTools = []mcpTool{
 		req("verdict", "string", "send | fix", "verdict"), p("notes", "string", "what was checked, or what must change", "notes")}, false},
 	{"job_skip", "Skip a job with the reason the preference learner reads.", []string{"job", "skip"}, []mcpProp{jobRef,
 		req("reason", "string", "why, in the user's words", "reason"), p("signals", "string", `json object, e.g. {"remote":"onsite","stack":["java"]}`, "signals")}, false},
-	{"search", "Search company boards (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr, rss) and remote boards. add=true tracks the matches as status new.", []string{"search", "--compact"}, []mcpProp{
+	{"search", "Search company boards (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr, rss) and remote boards. Each posting carries derived skills, level, employment type, regions and visa, and a match score against the profile (best first). add=true tracks the matches as status new.", []string{"search", "--compact"}, []mcpProp{
 		p("query", "array", "keyword queries; every word of a query must appear", "query"), p("board", "array", "source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, or the careers page URL", "board"),
-		p("remote", "boolean", "also query the remote boards", "remote"), p("limit", "integer", "max postings", "limit"), p("add", "boolean", "add matches to the tracker", "add")}, true},
+		p("remote", "boolean", "also query the remote boards", "remote"), p("limit", "integer", "max postings", "limit"), p("add", "boolean", "add matches to the tracker", "add"),
+		p("location", "string", "comma separated cities, countries or regions; remote jobs match when open to them", "location"),
+		p("hide_mismatches", "boolean", "drop postings that break a must in the profile (place, engagement, salary floor)", "hide-mismatches")}, true},
 	{"cv_files", "Resume files in the cv folder.", []string{"cv", "files"}, nil, true},
 	{"cv_log", "Log a CV check result.", []string{"cv", "log"}, []mcpProp{req("file", "string", "file name inside cv/", "file"),
 		p("score", "integer", "overall 0-100", "score"), p("ats", "integer", "ATS score 0-100", "ats"), p("summary", "string", "one line verdict", "summary"),
