@@ -223,3 +223,13 @@ document.querySelectorAll('[data-open]').forEach(function (a) {
     d.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 });
+
+// Job page: a link to a folded section opens it.
+(function () {
+  var open = function () {
+    var d = location.hash && document.getElementById(location.hash.slice(1));
+    if (d && d.tagName === 'DETAILS') d.open = true;
+  };
+  open();
+  window.addEventListener('hashchange', open);
+})();

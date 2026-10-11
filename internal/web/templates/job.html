@@ -22,7 +22,7 @@
   <a {{if eq $tab "activity"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=activity">Activity <span class="n">{{len .Events}}</span></a>
 </nav>
 <div class="grid-3">
-<div class="stack span-2">
+<div class="stack span-2 jobmain">
 {{with .Err}}<p class="callout bad">{{.}}</p>{{end}}{{with .Msg}}<p class="callout">{{.}}</p>{{end}}
 {{with .Drafted}}<p class="callout">Draft saved in Gmail. <a href="{{.}}" rel="noopener noreferrer" target="_blank">Open it</a>, review, and send it from there.</p>{{end}}
 {{if eq $tab "overview"}}
@@ -30,6 +30,7 @@
   <div class="panel-h"><h2>Checklist</h2><span class="n">{{.Done}}/{{len .Items}}</span><span class="act muted">nothing is sent without you</span></div>
   <ol class="checklist">{{range .Items}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Label}}</b>{{if .Detail}}<small title="{{.Detail}}">{{.Detail}}</small>{{end}}{{with .Files}}<small class="prov" title="SHA-256 of the files this result covered">{{.}}</small>{{end}}</div><span class="state">{{if eq .State "next"}}next{{else if eq .State "blocked"}}blocked{{else if eq .State "warn"}}check{{else if eq .State "done"}}done{{end}}</span>{{if .Href}}<a class="btn mini" href="{{.Href}}">{{.Act}}</a>{{end}}</li>{{end}}</ol>
 </section>{{end}}
+<div class="pair">
 {{with .RunP}}<section class="panel" id="run"{{if .Active}} data-run="/jobs/{{$j.ID}}/run"{{else if .Queued}} data-run="/jobs/{{$j.ID}}/run" data-queued="1"{{end}}>
   <div class="panel-h"><h2>Prepare application</h2>{{with .Run}}<span class="badge {{.State}}">{{.State}}</span>{{if .Agent}}<span class="n">{{.Agent}}</span>{{end}}{{end}}<span class="act muted">nothing is sent</span></div>
   {{with $.Data.RunErr}}<p class="callout bad">{{.}}</p>{{end}}
@@ -62,8 +63,10 @@
   {{if .Problems}}<ul class="gates-left">{{range .Problems}}<li>{{.}}</li>{{end}}</ul>{{end}}{{end}}{{end}}
   {{if .Draft}}<p class="small">Application e-mail ready for {{.Draft.To}}: <b>{{.Draft.Subject}}</b>. <a href="{{mailto .Draft}}">Open in your mail app</a>{{if .CanGmail}} or{{end}}</p>{{if .CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="/jobs/{{$j.ID}}"><button class="mini go">{{$.Data.DraftLabel}}</button></form>{{end}}{{end}}
 </section>
-{{if .Emails}}<section class="panel" id="emails">
-  <div class="panel-h"><h2>Proposed e-mails</h2><span class="n">{{len .Emails}}</span><span class="act muted">edit, save, draft; you send</span></div>
+</div>
+<div class="folds">
+{{if .Emails}}<details class="panel fold" id="emails">
+  <summary class="panel-h"><h2>Proposed e-mails</h2><span class="n">{{len .Emails}}</span><span class="act muted">edit, save, draft; you send</span></summary>
   {{range .Emails}}<details class="proposal"{{if eq (len $.Data.Emails) 1}} open{{end}}><summary><b>{{.Label}}</b> <span class="muted small">{{.Why}}</span>{{if .Saved}} <span class="badge drafted">edited</span>{{end}}</summary>
   <form class="mailform" method="post" data-busy="Saving…" action="/jobs/{{$j.ID}}/emails/{{.Kind}}">
     <label>To <input name="to" value="{{.Msg.To}}" autocomplete="off"></label>
@@ -71,14 +74,14 @@
     <label>Message <textarea name="body" rows="10">{{.Msg.Body}}</textarea></label>
     <div class="runbar"><button class="mini" name="action" value="save">Save</button>{{if $.Data.CanGmail}}<button class="mini go" name="action" value="gmail">Save &amp; {{lower $.Data.DraftLabel}}</button>{{end}}<a class="btn mini" href="{{mailto .Msg}}">Open in mail app</a></div>
   </form></details>{{end}}
-</section>{{end}}
-<section class="panel" id="gates">
-  <div class="panel-h"><h2>Ready to send?</h2><span class="n">{{if .Gates.OK}}clear{{else}}{{.Gates.Failed}} blocking{{end}}</span><span class="act muted">scoutjobs job check {{$j.ID}}</span></div>
+</details>{{end}}
+<details class="panel fold" id="gates">
+  <summary class="panel-h"><h2>Ready to send?</h2><span class="n">{{if .Gates.OK}}clear{{else}}{{.Gates.Failed}} blocking{{end}}</span><span class="act muted">scoutjobs job check {{$j.ID}}</span></summary>
   <ul class="gates">{{range .Gates.Gates}}<li><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Name}}</b><small>{{.Detail}}</small>{{if .Items}}<ul>{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{end}}</div></li>{{end}}</ul>
   {{if not .Gates.OK}}<p class="callout">Sending is blocked until every failed gate passes. <code>scoutjobs email send {{$j.ID}} --yes --skip-checks</code> overrides it and logs the skip on the job.</p>{{end}}
-</section>
-{{with .Portal}}<section class="panel" id="portal">
-  <div class="panel-h"><h2>Apply with gaps</h2>{{if .Acked}}<span class="badge ack">acknowledged {{day .Acked}}</span>{{end}}<span class="act muted">for an employer portal</span></div>
+</details>
+{{with .Portal}}<details class="panel fold" id="portal">
+  <summary class="panel-h"><h2>Apply with gaps</h2>{{if .Acked}}<span class="badge ack">acknowledged {{day .Acked}}</span>{{end}}<span class="act muted">for an employer portal</span></summary>
   {{if .Gaps}}<p class="callout warn">{{len .Gaps}} must-have {{if gt (len .Gaps) 1}}gaps remain{{else}}gap remains{{end}}. Your documents do not claim this experience.</p>
   <form method="post" action="/jobs/{{$j.ID}}/acknowledge" class="ackform">
     <div class="runpick">{{range .Gaps}}<label class="check"><input type="checkbox" name="gap" value="{{.}}" required> I apply without evidence for: {{.}}</label>{{end}}</div>
@@ -95,14 +98,15 @@
     <label>Note <input type="text" name="note" maxlength="300" placeholder="optional, e.g. reference number"></label>
     <div class="runbar"><button class="go" type="submit">Yes, mark applied</button><span class="muted small">No? Nothing to do; the job stays drafted. Nothing is submitted for you.</span></div>
   </form>{{end}}{{end}}
-</section>{{end}}
-<section class="panel">
-  <div class="panel-h"><h2>Why this job fits</h2><span class="n">fit {{fit $j.FitScore}}</span></div>
+</details>{{end}}
+<details class="panel fold" id="fit">
+  <summary class="panel-h"><h2>Why this job fits</h2><span class="n">fit {{fit $j.FitScore}}</span>{{if .HasReview}}<span class="act muted">{{len .Review.Requirements}} requirements</span>{{end}}</summary>
   {{if $j.Veto}}<p class="callout bad"><b>Veto:</b> {{$j.Veto}}. Hard failures stay outside the score; this job is not sendable until the veto is cleared with <code>scoutjobs job set {{$j.ID}} --veto ''</code>.</p>{{end}}
   {{if .HasReview}}<table class="review"><thead><tr><th>Requirement</th><th>Kind</th><th>Evidence</th><th>Strength</th><th>Wording</th><th>Risk</th></tr></thead><tbody>{{range .Review.Requirements}}<tr><td>{{.Requirement}}</td><td class="muted">{{.Kind}}</td><td class="muted">{{.Evidence}}</td><td><span class="badge {{.Strength}}">{{.Strength}}</span>{{if .Confidence}} <span class="muted">{{.Confidence}}</span>{{end}}</td><td>{{.Wording}}</td><td class="muted">{{.Risk}}</td></tr>{{end}}</tbody></table>{{end}}
   {{if $j.FitNotes}}<p class="pre">{{$j.FitNotes}}</p>{{else}}<p class="empty">Fit not scored yet. Run the <code>fit-review</code> skill or <code>/scoutjobs:fit {{$j.ID}}</code>.</p>{{end}}
   {{if $j.Notes}}<h3>Notes</h3><p class="pre">{{$j.Notes}}</p>{{end}}
-  </section>
+  </details>
+</div>
 {{else if eq $tab "mail"}}
 <section class="panel">
   <div class="panel-h"><h2>Mail</h2><span class="n">{{len .Mails}}</span><a class="act" href="{{$p.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail</a></div>

@@ -822,3 +822,39 @@ ul.feed small{display:block;font-size:11.5px;color:var(--muted)}
 .board .col.empty .empty{padding:16px 6px;font-size:12px}
 .col .jobcard{padding:10px}
 .jobcard .gauge{width:36px;height:36px}.jobcard .gauge b{width:28px;height:28px;font-size:10.5px}
+
+/* job page: one-line checklist, documents beside prepare, long sections fold */
+.jobmain{gap:16px}
+.jobmain .panel{padding:16px 18px;border-radius:12px}
+.jobmain ol.checklist>li{padding:6px 4px;gap:10px}
+.jobmain ol.checklist>li>div{display:flex;align-items:baseline;gap:10px;min-width:0}
+.jobmain ol.checklist b{flex:none}
+.jobmain ol.checklist small{display:block;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jobmain ol.checklist .prov{flex:0 1 auto;max-width:30%}
+.jobmain .pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.jobmain .pair #docs{order:-1}
+.jobmain #docs thead{display:none}
+.jobmain #docs td{padding:6px 4px;vertical-align:middle}
+.jobmain #docs td.mono{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.jobmain #docs code.small{display:none}
+.jobmain .folds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.jobmain .fold{padding:0}
+.jobmain .fold[open]{grid-column:1/-1;padding:0 18px 16px}
+.jobmain .fold>summary{list-style:none;cursor:pointer;margin:0;padding:12px 16px;gap:10px}
+.jobmain .fold[open]>summary{padding:14px 0;margin-bottom:4px}
+.jobmain .fold>summary::-webkit-details-marker{display:none}
+.jobmain .fold>summary h2{font-size:14px}
+.jobmain .fold>summary::after{content:"";width:7px;height:7px;border:solid var(--muted);border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);margin-left:8px;flex:none}
+.jobmain .fold[open]>summary::after{transform:rotate(45deg)}
+.jobmain .fold>summary:hover h2{color:var(--acc)}
+.jobmain .fold>summary .act{margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+@media (max-width:1100px){.jobmain .pair,.jobmain .folds{grid-template-columns:1fr}}
+.jobmain #docs tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n a" "d a";align-items:center;border-top:1px solid var(--line);padding:6px 0}
+.jobmain #docs tbody tr:first-child{border-top:0}
+.jobmain #docs td{border:0;padding:0 4px}
+.jobmain #docs td:first-child{grid-area:n;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jobmain #docs td:nth-child(2){grid-area:d;font-size:11.5px;color:var(--muted)}
+.jobmain #docs td.acts{grid-area:a;white-space:nowrap}
+.jobmain .fold>summary h2,.jobmain .fold>summary .n{white-space:nowrap}
+.jobmain #docs td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.jobmain .pair .panel-h .act{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
