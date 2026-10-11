@@ -342,7 +342,7 @@ Something broken, a skill that invented a fact or acted without asking, a board 
 | File | What it covers |
 |---|---|
 | [SUPPORT.md](SUPPORT.md) | where to ask what, what to include, response time |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | development setup, the rules every change keeps, pull request checklist |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | development setup, the rules every change keeps, git flow and pull request checklist |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | expected behaviour and how conduct reports are handled |
 | [GOVERNANCE.md](GOVERNANCE.md) | roles, how decisions are made, release policy |
 | [SECURITY.md](SECURITY.md) | what counts as a vulnerability, private reporting, response times |

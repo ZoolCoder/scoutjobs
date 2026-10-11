@@ -20,6 +20,7 @@ Code, docs and skills are welcome. The rules every change keeps, the pull reques
 The short version:
 
 * Open an issue before anything bigger than a bug fix.
-* One topic per pull request, Conventional Commits, target `develop`, rebase on `develop`. `main` only receives release merges.
+* Git flow, always: branch from `develop` (`feat/`, `fix/`, `docs/`), one topic per pull request, Conventional Commits, rebase on `develop`, pull request against `develop`. `main` only receives release and hotfix merges; nothing is pushed to it directly. The branch table and the step-by-step are in `CONTRIBUTING.md`.
+* Pull requests into `develop` run a short CI job; the full matrix runs for releases. Run `make test` and `make lint` locally first.
 * `make test`, `make lint` and `claude plugin validate .` pass. New CLI commands and API endpoints come with a test and a row in xref:cli.adoc[] or xref:api.adoc[].
 * A new skill follows xref:skills.adoc#_writing_a_new_skill[Writing a new skill] and gets an eval case when it makes claims, sends something or reads a posting.

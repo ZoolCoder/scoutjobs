@@ -68,8 +68,42 @@ way unless an issue agrees otherwise.
   API changes.
 - A new or changed skill comes with an eval case under `evals/` when it
   makes a claim, sends something, or reads a posting.
-- Git flow: branch from `develop`, open the pull request against `develop`,
-  rebase on `develop` before merge. `main` only receives release merges.
+- Every change follows the git flow below. Nothing is pushed to `main`
+  directly, not even a typo fix.
+
+## Git flow
+
+Everything flows through `develop`. `main` is the released state and only
+ever receives a release or hotfix merge.
+
+| Branch | From | Into | Purpose |
+|---|---|---|---|
+| `main` | | | What users install. Every commit is a tagged release or a hotfix. |
+| `develop` | `main` | `main` | Integration branch. Every feature, fix and dependency bump lands here first. |
+| `feat/<topic>`, `fix/<topic>`, `docs/<topic>` | `develop` | `develop` | One topic each. Deleted after merge. |
+| `release/vX.Y.Z` | `develop` | `main` and `develop` | Version bump, changelog, last fixes. |
+| `hotfix/<topic>` | `main` | `main` and `develop` | Urgent fix for a released version. |
+
+How a change moves:
+
+1. Branch from `develop`: `git switch -c feat/<topic> develop`.
+2. Commit with Conventional Commits, rebase on `develop` as it moves:
+   `git fetch && git rebase origin/develop`.
+3. Open the pull request against `develop`. CI runs vet and the short tests
+   only, to keep the Actions quota for releases. Run `make test` and
+   `make lint` locally before pushing.
+4. Maintainers rebase-merge into `develop` and delete the branch. A push to
+   `develop` runs no CI; trigger `ci` by hand from the Actions tab when you
+   want the full matrix.
+5. A release is `develop` merged into `main` with `git merge --no-ff` and a
+   tag; see Releases. The full matrix runs on that pull request and on
+   `main`.
+6. A hotfix branches from `main`, merges into `main` with a tag, then into
+   `develop`, so `develop` never falls behind `main`.
+
+Dependabot opens its pull requests against `develop`. If the same bump
+already landed there by hand, close the Dependabot one as superseded rather
+than merging it.
 
 ## Skills
 
@@ -82,8 +116,8 @@ over the skill; change the skill, not the wrapper.
 
 ## Releases
 
-Maintainers merge `develop` into `main` (`git merge --no-ff develop`) and tag
-`vX.Y.Z` there; GoReleaser builds the binaries, publishes the GitHub release
+Maintainers open a pull request from `develop` into `main`, merge it with
+`git merge --no-ff develop` and tag `vX.Y.Z` on `main`; GoReleaser builds the binaries, publishes the GitHub release
 and updates `Casks/scoutjobs.rb`. The manual is published from `main`. The plugin version in
 `.claude-plugin/plugin.json` and `marketplace.json` is bumped in the same
 commit as the tag.
