@@ -7,6 +7,19 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-11
+
+### Added
+- The dashboard shows the running version in the sidebar and serves it on
+  `GET /version`. An open tab offers a reload when the server is newer.
+
+### Changed
+- `scoutjobs serve` restarts itself on the new binary after an upgrade (brew,
+  `scoutjobs update`, `make install`), on the same address. `--no-restart`
+  opts out; on Windows, restart the dashboard by hand.
+- `make build` stamps the git version with a `-dev` suffix, so local builds
+  report what they are and `scoutjobs update` still leaves them alone.
+
 ## [0.3.0] - 2026-10-11
 
 ### Added
@@ -96,7 +109,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.0
 [0.2.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.2.0
 [0.1.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.1.0
