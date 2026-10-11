@@ -351,9 +351,14 @@ func TestGmailConnectFromInbox(t *testing.T) {
 	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, "Connect Google") || !strings.Contains(b, `action="/gmail/client"`) || !strings.Contains(b, "Watching Downloads") {
 		t.Fatal("inbox lacks the Google setup wizard")
 	}
-	if b := get(h, "/gmail/detect").Body.String(); !strings.Contains(b, `"file":""`) {
+	if b := get(h, "/gmail/detect").Body.String(); !strings.Contains(b, `"file":""`) || !strings.Contains(b, `"blind":false`) {
 		t.Errorf("detect before download: %s", b)
 	}
+	downloadsDir = func() string { return filepath.Join(downloads, "missing") }
+	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, "cannot look in your Downloads") || strings.Contains(b, "Watching Downloads") || !strings.Contains(b, `class="manual" open`) {
+		t.Error("unreadable Downloads still shows the watcher")
+	}
+	downloadsDir = func() string { return downloads }
 	if err := os.WriteFile(filepath.Join(downloads, "client_secret_9.json"), []byte(`{"installed":{"client_id":"9-z.apps.googleusercontent.com","client_secret":"s9"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}

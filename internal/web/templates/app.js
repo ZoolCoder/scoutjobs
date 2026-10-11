@@ -163,9 +163,16 @@
   var box = document.querySelector('[data-gmail-detect]');
   if (!box || box.querySelector('form')) return;
   var tries = 0;
+  var giveUp = function (text) {
+    clearInterval(timer);
+    box.querySelector('p').textContent = text;
+    var manual = document.querySelector('.gmail-setup details.manual');
+    if (manual) manual.open = true;
+  };
   var timer = setInterval(function () {
-    if (++tries > 200) return clearInterval(timer); // ten minutes
+    if (++tries > 200) return giveUp('No client file arrived in Downloads. Add it below.'); // ten minutes
     fetch('/gmail/detect', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.blind) return giveUp('ScoutJobs cannot look in Downloads (macOS privacy). Add the file below.');
       if (d.file || d.client) { clearInterval(timer); location.reload(); }
     }).catch(function () {});
   }, 3000);

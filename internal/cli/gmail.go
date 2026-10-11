@@ -63,6 +63,9 @@ func setupGmail(s *store.Store, cfg Config, file string, wait time.Duration, out
 	if file == "" {
 		fmt.Fprint(out, gmailSteps)
 		dir := downloadsDir()
+		if _, err := os.ReadDir(dir); err != nil {
+			return fmt.Errorf("cannot read %s (on macOS, the terminal needs access to Downloads); rerun with --file <path to the downloaded JSON>", dir)
+		}
 		if file = gmail.FindDownload(dir, time.Time{}); file == "" {
 			fmt.Fprintf(out, "\nWaiting for client_secret_….json in %s (%s; or rerun with --file <path>)...\n", dir, wait)
 			deadline := time.Now().Add(wait)

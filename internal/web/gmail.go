@@ -74,6 +74,7 @@ type googleView struct {
 	Offered bool // the dashboard can connect Google at all
 	gmail.State
 	Download string // a client_secret_….json waiting in Downloads, by name
+	Blind    bool   // Downloads cannot be read (macOS privacy), so the file must be added by hand
 	Home     string
 }
 
@@ -84,9 +85,11 @@ func (v *server) googleView() googleView {
 	}
 	g := googleView{Offered: true, State: c.Status(), Home: v.s.Home}
 	if !g.Client {
-		g.Download = filepath.Base(gmail.FindDownload(downloadsDir(), time.Time{}))
-		if g.Download == "." {
-			g.Download = ""
+		dir := downloadsDir()
+		if _, err := os.ReadDir(dir); err != nil {
+			g.Blind = true
+		} else if f := gmail.FindDownload(dir, time.Time{}); f != "" {
+			g.Download = filepath.Base(f)
 		}
 	}
 	return g
@@ -114,7 +117,7 @@ func (g googleView) Missing() []string {
 func (v *server) gmailDetect(w http.ResponseWriter, r *http.Request) {
 	g := v.googleView()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"file": g.Download, "client": g.Client})
+	_ = json.NewEncoder(w).Encode(map[string]any{"file": g.Download, "client": g.Client, "blind": g.Blind})
 }
 
 // gmailSetClient imports the OAuth client JSON pasted or uploaded on the Inbox page, or the one

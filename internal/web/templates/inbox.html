@@ -21,10 +21,11 @@
   <li><a href="https://console.cloud.google.com/auth/audience" rel="noopener noreferrer" target="_blank">Publish the app</a> (Audience &rsaquo; Publish app). <b>Do not skip it</b>: while it is in Testing, Google disconnects you every 7 days.</li>
   <li><a href="https://console.cloud.google.com/auth/clients/create" rel="noopener noreferrer" target="_blank">Create an OAuth client</a> of type <b>Desktop app</b>, then press <b>Download JSON</b>.</li>
 </ol>
-<div class="detect" data-gmail-detect>{{if .Download}}<form method="post" action="/gmail/client"><input type="hidden" name="detected" value="1">
+{{if .Blind}}<p class="callout">ScoutJobs cannot look in your Downloads folder: macOS keeps it private from the terminal that started the dashboard. Add the downloaded file below.</p>
+{{else}}<div class="detect" data-gmail-detect>{{if .Download}}<form method="post" action="/gmail/client"><input type="hidden" name="detected" value="1">
   <p>Found <code>{{.Download}}</code> in Downloads.</p><button class="primary">Import it</button></form>
-{{else}}<p class="muted"><span class="spin" aria-hidden="true"></span>Watching Downloads for the client JSON Google gives you; this page offers to import it when it lands.</p>{{end}}</div>
-<details class="manual"><summary>Downloaded somewhere else? Add the file by hand</summary>
+{{else}}<p class="muted"><span class="spin" aria-hidden="true"></span>Watching Downloads for the client JSON Google gives you; this page offers to import it when it lands.</p>{{end}}</div>{{end}}
+<details class="manual"{{if .Blind}} open{{end}}><summary>Downloaded somewhere else? Add the file by hand</summary>
 <form class="gmail-client" method="post" action="/gmail/client" enctype="multipart/form-data">
   <label>Client file <input type="file" name="file" accept=".json,application/json"></label>
   <label>or paste it <textarea name="client" rows="3" placeholder='{"installed":{"client_id":"….apps.googleusercontent.com", …}}'></textarea></label>
