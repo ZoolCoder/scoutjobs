@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"net"
@@ -241,6 +242,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /learning", srv.learning)
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
+	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
 	mux.HandleFunc("GET /profile", srv.profile)
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
@@ -291,6 +293,9 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("GET /api/preferences", srv.apiPreferences)
 	api.HandleFunc("PUT /api/preferences/{key}", srv.apiSetPreference)
 	api.HandleFunc("DELETE /api/preferences/{key}", srv.apiDeletePreference)
+	api.HandleFunc("GET /api/preferences/proposals", srv.apiProposals)
+	api.HandleFunc("PUT /api/preferences/proposals/{key}", srv.apiPropose)
+	api.HandleFunc("POST /api/preferences/proposals/{key}", srv.apiReviewProposal)
 	api.HandleFunc("GET /api/decisions", srv.apiDecisions)
 	api.HandleFunc("POST /api/decisions", srv.apiAddDecision)
 	api.HandleFunc("POST /api/search", srv.apiSearch)
@@ -805,7 +810,34 @@ func (v *server) setLearning(w http.ResponseWriter, r *http.Request) {
 func (v *server) preferences(w http.ResponseWriter, r *http.Request) {
 	prefs, _ := v.s.Preferences()
 	ds, _ := v.s.DecisionSummary(200)
-	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds})
+	all, _ := v.s.Proposals(true)
+	var pending, rejected []store.Proposal
+	for _, p := range all {
+		if p.Status == "pending" {
+			pending = append(pending, p)
+		} else {
+			rejected = append(rejected, p)
+		}
+	}
+	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds, "Pending": pending, "Rejected": rejected})
+}
+
+// reviewForm confirms, edits (confirm with the user's wording) or rejects one proposal.
+func (v *server) reviewForm(w http.ResponseWriter, r *http.Request) {
+	action := r.FormValue("action")
+	value := ""
+	if action == "edit" {
+		action, value = "confirm", r.FormValue("value")
+		if strings.TrimSpace(value) == "" {
+			fail(w, errors.New("write the value in your own words, or confirm the proposal as it is"))
+			return
+		}
+	}
+	if _, err := v.reviewProposal(r.FormValue("key"), action, value, r.FormValue("reason")); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
 }
 
 // profile shows profile.md, the cv/ folder and the CV check history. Files are read, never written, from here.

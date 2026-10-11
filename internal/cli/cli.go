@@ -34,7 +34,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   email log <job>         record a message an agent's Gmail connector matched to a job
   gmail connect|status|disconnect|draft <job>   Gmail API with your own OAuth client: read replies, create drafts (never sends)
   decision log|summary
-  pref set|list|rm|render
+  pref set|list|rm|render|propose|review|confirm|reject
   interview add|list|set     --duration 45 --location <meeting link or address>
   linkedin import <zip|dir>  LinkedIn data export: profile for setup, connections for referrals
   contacts <job>|--company x who you know at a company (from the LinkedIn import)
@@ -629,6 +629,74 @@ func runPref(s *store.Store, rest []string, out io.Writer) error {
 		}
 		fmt.Fprintf(out, "set %s = %s (%.2f, %s)\n", p.Key, p.Value, p.Confidence, p.Source)
 		return renderPrefs(s)
+	case "propose":
+		fs := flag.NewFlagSet("pref propose", flag.ContinueOnError)
+		conf := fs.Float64("confidence", 0.5, "0-0.95")
+		evidence := fs.String("evidence", "", "counts and the strongest quotes")
+		support := fs.Int("support", 0, "decisions that support it")
+		against := fs.Int("against", 0, "decisions that contradict it")
+		pos, err := parse(fs, rest)
+		if err != nil {
+			return err
+		}
+		if len(pos) < 2 {
+			return errors.New("usage: pref propose <key> <value> --support 5 [--against 1 --confidence 0.7 --evidence '...']")
+		}
+		p := store.Proposal{Key: pos[0], Value: strings.Join(pos[1:], " "), Confidence: *conf, Evidence: *evidence, Support: *support, Against: *against}
+		if err := s.ProposePreference(p); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "proposed %s = %s; awaiting review (scoutjobs pref review, or the dashboard's Preferences page)\n", p.Key, p.Value)
+		return nil
+	case "review":
+		fs := flag.NewFlagSet("pref review", flag.ContinueOnError)
+		asJSON := fs.Bool("json", false, "")
+		all := fs.Bool("all", false, "include rejected proposals")
+		if err := fs.Parse(rest); err != nil {
+			return err
+		}
+		ps, err := s.Proposals(*all)
+		if err != nil {
+			return err
+		}
+		return emit(out, *asJSON, ps, func() {
+			var rows [][]string
+			for _, p := range ps {
+				rows = append(rows, []string{p.Key, trunc(p.Value, 30), trunc(p.Current, 20), fmt.Sprintf("%.2f", p.Confidence), fmt.Sprintf("%d/%d", p.Support, p.Against), p.Status, trunc(p.Evidence, 40)})
+			}
+			table(out, "KEY\tPROPOSED\tCURRENT\tCONF\tFOR/AGAINST\tSTATUS\tEVIDENCE", rows)
+		})
+	case "confirm":
+		fs := flag.NewFlagSet("pref confirm", flag.ContinueOnError)
+		value := fs.String("value", "", "your own wording; stores it as stated")
+		pos, err := parse(fs, rest)
+		if err != nil {
+			return err
+		}
+		if len(pos) != 1 {
+			return errors.New("usage: pref confirm <key> [--value '...']")
+		}
+		p, err := s.ConfirmProposal(pos[0], *value)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "set %s = %s (%.2f, %s)\n", p.Key, p.Value, p.Confidence, p.Source)
+		return nil
+	case "reject":
+		fs := flag.NewFlagSet("pref reject", flag.ContinueOnError)
+		reason := fs.String("reason", "", "why, in your words")
+		pos, err := parse(fs, rest)
+		if err != nil {
+			return err
+		}
+		if len(pos) != 1 {
+			return errors.New("usage: pref reject <key> [--reason '...']")
+		}
+		if err := s.RejectProposal(pos[0], *reason); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "rejected %s; it is not proposed again without new evidence\n", pos[0])
+		return nil
 	case "rm":
 		if len(rest) == 0 {
 			return errors.New("usage: pref rm <key>")
@@ -665,44 +733,7 @@ func runPref(s *store.Store, rest []string, out io.Writer) error {
 }
 
 // renderPrefs writes preferences.md, the file skills load before scoring or tailoring.
-func renderPrefs(s *store.Store) error {
-	prefs, err := s.Preferences()
-	if err != nil {
-		return err
-	}
-	var b strings.Builder
-	b.WriteString("# Preferences\n\nRendered by `scoutjobs pref render`. Edit with `scoutjobs pref set <key> <value>`.\n")
-	b.WriteString("Stated = the user said so. Learned = inferred from decisions; confidence shows how sure.\n\n")
-	section := func(title, source string) {
-		var any bool
-		for _, p := range prefs {
-			if p.Source != source {
-				continue
-			}
-			if !any {
-				b.WriteString("## " + title + "\n\n")
-				any = true
-			}
-			fmt.Fprintf(&b, "- **%s**: %s", p.Key, p.Value)
-			if source == "learned" {
-				fmt.Fprintf(&b, " _(confidence %.0f%%)_", p.Confidence*100)
-			}
-			if p.Evidence != "" {
-				fmt.Fprintf(&b, " — %s", p.Evidence)
-			}
-			b.WriteString("\n")
-		}
-		if any {
-			b.WriteString("\n")
-		}
-	}
-	section("Stated", "stated")
-	section("Learned", "learned")
-	if len(prefs) == 0 {
-		b.WriteString("Nothing learned yet. Decisions you make (skip, apply, decline) teach this file.\n")
-	}
-	return os.WriteFile(filepath.Join(s.Home, "preferences.md"), []byte(b.String()), 0o600)
-}
+func renderPrefs(s *store.Store) error { return s.RenderPreferences() }
 
 // ---- interview ----
 

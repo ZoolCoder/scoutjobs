@@ -235,6 +235,18 @@ CREATE TABLE IF NOT EXISTS preferences (
   source TEXT NOT NULL DEFAULT 'learned',
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pref_proposals (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  confidence REAL NOT NULL DEFAULT 0.5,
+  evidence TEXT NOT NULL DEFAULT '',
+  support INTEGER NOT NULL DEFAULT 0,
+  against INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  note TEXT NOT NULL DEFAULT '',
+  proposed_at TEXT NOT NULL,
+  decided_at TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS interviews (
   id INTEGER PRIMARY KEY,
   job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -673,9 +685,15 @@ type Preference struct {
 	UpdatedAt  string  `json:"updated_at"`
 }
 
+// ErrStated refuses to let an inferred value replace one the user stated.
+var ErrStated = errors.New("stated by the user; learned values never overwrite it (set it with --source stated, or pref rm it first)")
+
 func (s *Store) SetPreference(p Preference) error {
 	if p.Source == "" {
 		p.Source = "learned"
+	}
+	if p.Source != "stated" && s.statedPreference(p.Key) {
+		return fmt.Errorf("%s: %w", p.Key, ErrStated)
 	}
 	if p.Confidence <= 0 {
 		p.Confidence = 0.5
