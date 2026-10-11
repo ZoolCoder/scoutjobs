@@ -29,7 +29,7 @@ cv_source:                  # the CV tailored resumes start from, e.g. "cv/Jane 
 cover_template:             # the cover letter whose format every letter keeps; default cv/cover-letter.md
 ----
 
-`cv_source` and `cover_template` are relative to the data directory. When `cv_source` is a PDF or Word file, `resume.md` is only the reviewed text: the run never renders `resume.pdf` from it, and the export step asks you to save the final `resume.pdf`, made from your source, in the application folder.
+`cv_source` and `cover_template` are relative to the data directory. A Word `cover_template` (`.docx`) is the design of every letter: mark the parts each letter changes with placeholders such as `{{employer_name}}`, `{{recipient_name_or_team}}`, `{{employer_address}}`, `{{location_and_date}}`, `{{subject}}`, `{{salutation}}`, `{{body_paragraph_1}}` to `{{body_paragraph_4}}`, `{{signoff}}` and `{{candidate_name}}`, in the body, a header or a footer. The agent then writes only the words of each slot and `scoutjobs cv cover <id>` fills a copy of the template (see xref:cli.adoc[CLI]). When `cv_source` is a PDF or Word file, `resume.md` is only the reviewed text: the run never renders `resume.pdf` from it, and the export step asks you to save the final `resume.pdf`, made from your source, in the application folder.
 
 The SMTP password is never a config key. It comes from `SCOUTJOBS_SMTP_PASSWORD` in the environment.
 

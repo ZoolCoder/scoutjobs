@@ -17,6 +17,15 @@ All notable changes to ScoutJobs. The format follows
 - `cv_source` and `cover_template` in config.yaml: the CV and cover letter
   every tailored document starts from. A PDF or Word source is never replaced
   by a PDF rendered from Markdown.
+- Cover letters from a Word template (#36): with a `.docx` `cover_template`
+  holding `{{slot}}` placeholders, the agent writes only the slot values and
+  `scoutjobs cv cover <id>` fills a copy of the template, keeping its styles,
+  page setup, headers and run formatting, and writes cover-letter.docx, the
+  same words as cover-letter.md, and with LibreOffice cover-letter.pdf. It
+  checks required slots and lengths, the employer, unstated recipients or
+  addresses, leftover placeholders, design drift, the page count against the
+  template and the PDF text layer. The dashboard shows the template check, and
+  a `cover_template` gate blocks sending while it fails or is out of date.
 
 ### Fixed
 - The job page records the agent results a stopped run left behind, so the

@@ -30,7 +30,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   job add [--from url]|list [--compact]|show|set|skip|rm|import
   job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--keep-going] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
-  cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
+  cv files|log|list|export|cover   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF, cover letter from a Word template
   email draft|show|send   application e-mail from the cover letter; send needs --yes
   email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
   email log <job>         record a message an agent's Gmail connector matched to a job

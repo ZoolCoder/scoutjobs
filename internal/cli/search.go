@@ -208,6 +208,52 @@ func runCV(s *store.Store, rest []string, out io.Writer) error {
 			_ = s.AddEvent(jobID, "cv:export", filepath.Base(dst))
 		}
 		return emit(out, *asJSON, map[string]any{"job": jobID, "file": dst, "bytes": size}, func() { fmt.Fprintf(out, "wrote %s (%d bytes)\n", dst, size) })
+	case "cover":
+		fs := flag.NewFlagSet("cv cover", flag.ContinueOnError)
+		tmpl := fs.String("template", "", "Word template with {{slot}} placeholders (default: cover_template in config.yaml)")
+		asJSON := fs.Bool("json", false, "")
+		pos, err := parse(fs, rest)
+		if err != nil {
+			return err
+		}
+		if len(pos) == 0 {
+			return errors.New("usage: scoutjobs cv cover <job> [--template file.docx]")
+		}
+		j, err := s.ResolveJob(pos[0])
+		if err != nil {
+			return err
+		}
+		path := *tmpl
+		if path == "" {
+			path = LoadConfig(s.Home).CoverTemplate
+		}
+		if !apply.IsWordTemplate(path) {
+			return apply.ErrNoWordTemplate
+		}
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(s.Home, path)
+		}
+		rec, err := apply.BuildCover(context.Background(), s, j, path)
+		if err != nil {
+			return err
+		}
+		err = emit(out, *asJSON, rec, func() {
+			fmt.Fprintf(out, "%s: cover-letter.docx, cover-letter.md", rec.State)
+			if rec.Rendered {
+				fmt.Fprintf(out, ", cover-letter.pdf (%d of %d pages)", rec.Pages, rec.TemplatePages)
+			}
+			fmt.Fprintln(out)
+			for _, p := range rec.Problems {
+				fmt.Fprintln(out, "  - "+p)
+			}
+			if !rec.Rendered {
+				fmt.Fprintln(out, "  not rendered: install LibreOffice (or set SCOUTJOBS_SOFFICE) to make cover-letter.pdf and check the page count")
+			}
+		})
+		if err == nil && rec.State == apply.CoverFail {
+			return fmt.Errorf("the cover letter does not fit its template: fix %s and run again", apply.SlotsName)
+		}
+		return err
 	case "files":
 		fs := flag.NewFlagSet("cv files", flag.ContinueOnError)
 		asJSON := fs.Bool("json", false, "")

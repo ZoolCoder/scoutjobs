@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -24,6 +25,9 @@ func (rn *Runner) done(j store.Job, name string) (bool, string) {
 	case "tailor":
 		return exists(dir, "resume.md"), "resume.md"
 	case "cover":
+		if rn.wordTemplate() {
+			return rn.coverBuilt(dir)
+		}
 		return exists(dir, "cover-letter.md"), "cover-letter.md"
 	case "review":
 		e, ok := rn.lastEvent(j, "review:")
@@ -82,6 +86,49 @@ func (rn *Runner) exported(dir string) (bool, string) {
 	return rn.formattedSource() || err != nil || !md.ModTime().After(st.ModTime()), "resume.pdf"
 }
 
+// wordTemplate is true when config.yaml names a Word cover letter template: every letter is that
+// file with its slots filled, never a Markdown letter of its own.
+func (rn *Runner) wordTemplate() bool { return apply.IsWordTemplate(rn.CoverTemplate) }
+
+func (rn *Runner) templatePath() string {
+	if filepath.IsAbs(rn.CoverTemplate) {
+		return rn.CoverTemplate
+	}
+	return filepath.Join(rn.Store.Home, rn.CoverTemplate)
+}
+
+// coverBuilt reports whether the cover letter was built from the template, is unchanged since, and
+// kept the template. A letter not rendered for want of LibreOffice counts; the checklist warns.
+func (rn *Runner) coverBuilt(dir string) (bool, string) {
+	rec := apply.LoadProvenance(dir).Cover
+	switch {
+	case rec == nil:
+		return false, "cover-letter.docx built from " + filepath.Base(rn.CoverTemplate)
+	case len(apply.CoverChanges(dir)) > 0:
+		return false, "a cover letter rebuilt after changes to " + strings.Join(apply.CoverChanges(dir), ", ")
+	case rec.State == apply.CoverFail:
+		return false, "a cover letter that fits the template: " + rec.Summary()
+	}
+	return true, "cover-letter.docx: " + rec.Summary()
+}
+
+// buildCover fills the template when the agent wrote new slot values but did not build the letter.
+func (rn *Runner) buildCover(ctx context.Context, run *Run, j store.Job) {
+	dir := apply.Dir(rn.Store, j)
+	if !rn.wordTemplate() || !exists(dir, apply.SlotsName) {
+		return
+	}
+	if rec := apply.LoadProvenance(dir).Cover; rec != nil && len(apply.CoverChanges(dir)) == 0 {
+		return
+	}
+	rec, err := apply.BuildCover(ctx, rn.Store, j, rn.templatePath())
+	if err != nil {
+		run.logf("cover letter: %v", err)
+		return
+	}
+	run.logf("cover letter from %s: %s %s", filepath.Base(rn.CoverTemplate), rec.State, rec.Summary())
+}
+
 // formattedSource is true when config.yaml names a PDF or Word CV: the final resume is made from
 // it, never rendered from the Markdown draft.
 func (rn *Runner) formattedSource() bool {
@@ -100,6 +147,9 @@ func (rn *Runner) fresh(j store.Job, name string, since time.Time) bool {
 	case "tailor":
 		return modTime(dir, "resume.md") >= stamp
 	case "cover":
+		if rn.wordTemplate() {
+			return modTime(dir, apply.SlotsName) >= stamp
+		}
 		return modTime(dir, "cover-letter.md") >= stamp
 	case "review":
 		e, ok := rn.lastEvent(j, "review:")

@@ -35,6 +35,21 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 		item("Tailored resume", kit.Resume, "resume.md", file("resume.md"), "Preview"),
 		item("Cover letter", kit.Cover, "cover-letter.md", file("cover-letter.md"), "Preview"),
 	}
+	prov := apply.ProvenanceOf(dir)
+	if rec := prov.Cover; rec != nil {
+		cover := &items[2]
+		cover.State, cover.Detail, cover.Files = "done", "from "+filepath.Base(rec.Template)+": "+rec.Summary(), covered(rec.Files)
+		if rec.Rendered {
+			cover.Href, cover.Act = file("cover-letter.pdf"), "Preview"
+		}
+		switch {
+		case len(prov.CoverChanged) > 0:
+			cover.State, cover.Detail = "warn", "stale, changed after the build: "+strings.Join(prov.CoverChanged, ", ")
+			cover.Href, cover.Act = base+"#run", "Build again"
+		case rec.State != apply.CoverPass:
+			cover.State = "warn"
+		}
+	}
 	review := checkItem{Label: "Draft review"}
 	for _, e := range events { // newest first
 		if strings.HasPrefix(e.Kind, "review:") {
@@ -46,7 +61,6 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 			break
 		}
 	}
-	prov := apply.ProvenanceOf(dir)
 	if review.State != "" {
 		if prov.Review != nil {
 			review.Files = covered(prov.Review.Files)

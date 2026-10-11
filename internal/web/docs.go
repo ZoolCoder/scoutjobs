@@ -23,17 +23,20 @@ type doc struct {
 	Mod         string
 	Exists      bool
 	Editable    bool
+	Preview     bool
 }
 
 func docs(dir string, names ...string) []doc {
-	labels := map[string]string{"resume.md": "Resume", "cover-letter.md": "Cover letter", "resume.pdf": "Resume PDF", "resume.docx": "Resume DOCX"}
+	labels := map[string]string{"resume.md": "Resume", "cover-letter.md": "Cover letter", "resume.pdf": "Resume PDF", "resume.docx": "Resume DOCX",
+		"cover-letter.docx": "Cover letter DOCX", "cover-letter.pdf": "Cover letter PDF"}
+	optional := map[string]bool{"resume.docx": true, "cover-letter.docx": true, "cover-letter.pdf": true}
 	var out []doc
 	for _, n := range names {
-		d := doc{Name: n, Label: labels[n], Editable: apply.Writable[filepath.Ext(n)]}
+		d := doc{Name: n, Label: labels[n], Editable: apply.Writable[filepath.Ext(n)], Preview: filepath.Ext(n) != ".docx"}
 		if fi, err := os.Stat(filepath.Join(dir, n)); err == nil {
 			d.Exists, d.Size, d.Mod = true, fi.Size(), fi.ModTime().Format("2006-01-02 15:04")
 		}
-		if d.Exists || n != "resume.docx" {
+		if d.Exists || !optional[n] {
 			out = append(out, d)
 		}
 	}

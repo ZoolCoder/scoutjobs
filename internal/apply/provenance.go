@@ -26,6 +26,7 @@ type Provenance struct {
 	Review  *Record           `json:"review,omitempty"`
 	Exports map[string]Record `json:"exports,omitempty"` // by output name: the source .md and the .pdf made
 	ATS     *Record           `json:"ats,omitempty"`
+	Cover   *CoverRecord      `json:"cover,omitempty"` // the cover letter built from a Word template
 }
 
 // finalDocs are the files an application can send; the review covers every one present, except a
@@ -184,12 +185,14 @@ type ProvenanceStatus struct {
 	ReviewChanged []string `json:"review_changed,omitempty"` // final documents edited or added since the review
 	ATSChanged    []string `json:"ats_changed,omitempty"`    // the resume to score, when the score covered other bytes
 	ResumePDF     string   `json:"resume_pdf,omitempty"`     // current | outdated | own
+	CoverChanged  []string `json:"cover_changed,omitempty"`  // edited since the cover letter was built from the template
 }
 
 func ProvenanceOf(dir string) ProvenanceStatus {
 	st := ProvenanceStatus{Provenance: LoadProvenance(dir), ResumePDF: ExportState(dir, "resume")}
 	st.ReviewChanged, _ = ReviewChanges(dir)
 	st.ATSChanged, _ = ATSChanges(dir)
+	st.CoverChanged = CoverChanges(dir)
 	return st
 }
 

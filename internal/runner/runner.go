@@ -391,6 +391,11 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 		run.logf("%v", err)
 	}
 	for _, i := range group {
+		if run.Steps[i].Name == "cover" {
+			rn.buildCover(ctx, run, j)
+		}
+	}
+	for _, i := range group {
 		s := run.Steps[i]
 		if fail := rn.failed(j, s.Name, since); fail != "" {
 			if run.Keep {
@@ -514,6 +519,19 @@ func Prompt(j store.Job, dir, exe string, steps []Step) string {
 	return b.String()
 }
 
+// wordCoverTask replaces the cover step for a Word template: the agent writes the words of each slot
+// and ScoutJobs fills the template, so the layout is never rebuilt.
+func (rn *Runner) wordCoverTask() string {
+	slots, err := apply.TemplateSlots(rn.templatePath())
+	if err != nil {
+		return "Your cover letter template " + rn.templatePath() + " cannot be read (" + err.Error() + "): write no cover letter and note this in the job notes."
+	}
+	return "Write the cover letter for this job into the Word template " + rn.templatePath() + " (never edit the template). " +
+		"Save " + apply.SlotsName + " in the application folder: one JSON object from slot name to plain text, one paragraph per slot, no Markdown, in the voice and length of the template. Slots: " + strings.Join(slots, "; ") + ". " +
+		"Leave a name or postal address empty unless posting.md or the job states it; never guess a recipient, an address, availability, salary, work authorisation or a language level. " +
+		"Then run `scoutjobs cv cover {id}`: it fills the template into cover-letter.docx, cover-letter.md and cover-letter.pdf and lists every problem; fix the slots and run it again until it reports pass or warn. Do not write those three files yourself."
+}
+
 // withSources points the tailor and cover steps at the CV and cover letter named in config.yaml,
 // and the review at the final files the user put in the folder.
 func (rn *Runner) withSources(dir string, steps []Step) []Step {
@@ -527,6 +545,8 @@ func (rn *Runner) withSources(dir string, steps []Step) []Step {
 			if rn.formattedSource() {
 				out[i].Task += " It is not Markdown, so resume.md is only the reviewed text: keep its sections, order and wording style exactly as in the source, so the final file can be made from the source with the same changes. Do not write resume.pdf."
 			}
+		case s.Name == "cover" && rn.wordTemplate():
+			out[i].Task = rn.wordCoverTask()
 		case s.Name == "cover" && rn.CoverTemplate != "":
 			out[i].Task += " Your cover letter template is " + filepath.Join(home, rn.CoverTemplate) + ": use it instead of cv/cover-letter.md and keep its greeting, paragraph count, sign-off and voice."
 		case s.Name == "review":

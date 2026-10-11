@@ -1,6 +1,8 @@
 package web
 
 import (
+	"archive/zip"
+	"context"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -317,5 +319,43 @@ func TestJobPageShowsProvenanceAndStaleResults(t *testing.T) {
 	}
 	if j, _ := s.JobByID(1); j.Status == "applied" {
 		t.Error("reconciling never marks a job applied")
+	}
+}
+
+func TestJobPageShowsTheCoverLetterTemplateCheck(t *testing.T) {
+	s := testStore(t)
+	t.Setenv("SCOUTJOBS_SOFFICE", "off")
+	h, _ := Handler(s, Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5})
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	_ = os.MkdirAll(dir, 0o755)
+	tmpl := filepath.Join(s.Home, "cv", "letter.docx")
+	_ = os.MkdirAll(filepath.Dir(tmpl), 0o755)
+	f, _ := os.Create(tmpl)
+	w := zip.NewWriter(f)
+	fw, _ := w.Create("word/document.xml")
+	fw.Write([]byte(`<w:document xmlns:w="w"><w:body><w:p><w:r><w:t xml:space="preserve">Dear {{salutation}},</w:t></w:r></w:p><w:p><w:r><w:t>{{body_paragraph_1}}</w:t></w:r></w:p></w:body></w:document>`))
+	w.Close()
+	f.Close()
+	_ = os.WriteFile(filepath.Join(dir, apply.SlotsName), []byte(`{"salutation":"Hiring Team","body_paragraph_1":"`+strings.Repeat("I build Go services. ", 20)+`"}`), 0o600)
+	if _, err := apply.BuildCover(context.Background(), s, j, tmpl); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
+	b := rec.Body.String()
+	for _, want := range []string{"Cover letter built from <code>letter.docx</code>", "template warn", "install LibreOffice", "Cover letter DOCX", "/download/cover-letter.docx"} {
+		if !strings.Contains(b, want) {
+			t.Errorf("job page lacks %q", want)
+		}
+	}
+	if strings.Contains(b, `/files/cover-letter.docx"`) {
+		t.Error("a DOCX has no preview")
+	}
+	_ = os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team, edited by hand"), 0o600)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
+	if b := rec.Body.String(); !strings.Contains(b, "stale, changed after the build: cover-letter.md") {
+		t.Errorf("an edited letter no longer matches its DOCX: %s", b)
 	}
 }

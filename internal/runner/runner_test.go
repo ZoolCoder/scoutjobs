@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"archive/zip"
 	"context"
 	"os"
 	"path/filepath"
@@ -259,12 +260,12 @@ func TestReplacedFinalFileReopensReviewAndATS(t *testing.T) {
 
 func TestFormattedCVSourceIsNeverRenderedFromMarkdown(t *testing.T) {
 	rn, j := setup(t, "#!/bin/sh\ncat >/dev/null\n")
-	rn.CVSource, rn.CoverTemplate = "cv/Jane Doe CV.docx", "cv/cover-template.docx"
+	rn.CVSource, rn.CoverTemplate = "cv/Jane Doe CV.docx", "cv/cover-template.md"
 	dir := apply.Dir(rn.Store, j)
 	_ = os.MkdirAll(dir, 0o755)
 	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Jane\n\nGo engineer."), 0o600)
 	p := Prompt(j, dir, "scoutjobs", rn.withSources(dir, Steps[1:3]))
-	if !strings.Contains(p, "Jane Doe CV.docx: tailor from it") || !strings.Contains(p, "Do not write resume.pdf") || !strings.Contains(p, "cover-template.docx: use it") {
+	if !strings.Contains(p, "Jane Doe CV.docx: tailor from it") || !strings.Contains(p, "Do not write resume.pdf") || !strings.Contains(p, "cover-template.md: use it") {
 		t.Errorf("sources not in the prompt: %s", p)
 	}
 	if ok, why := rn.done(j, "export"); ok || !strings.Contains(why, "Jane Doe CV.docx") {
@@ -276,5 +277,40 @@ func TestFormattedCVSourceIsNeverRenderedFromMarkdown(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "resume.pdf")); err == nil {
 		t.Error("no PDF may be rendered from the Markdown draft")
+	}
+}
+
+func TestWordCoverTemplateIsFilledNotRewritten(t *testing.T) {
+	rn, j := setup(t, "#!/bin/sh\ncat >prompt.txt\nprintf '%s' '{\"employer_name\":\"Acme\",\"salutation\":\"Hiring Team\",\"body_paragraph_1\":\"I build payment systems in Go.\",\"signoff\":\"Kind regards\",\"candidate_name\":\"Jane Doe\"}' > cover-letter.slots.json\n")
+	t.Setenv("SCOUTJOBS_SOFFICE", "off")
+	rn.CoverTemplate = "cv/letter.docx"
+	tmpl := filepath.Join(rn.Store.Home, rn.CoverTemplate)
+	_ = os.MkdirAll(filepath.Dir(tmpl), 0o755)
+	f, _ := os.Create(tmpl)
+	w := zip.NewWriter(f)
+	fw, _ := w.Create("word/document.xml")
+	fw.Write([]byte(`<w:document xmlns:w="w"><w:body><w:p><w:r><w:t>{{employer_name}}</w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve">Dear {{salutation}},</w:t></w:r></w:p>` +
+		`<w:p><w:r><w:t>{{body_paragraph_1}}</w:t></w:r></w:p><w:p><w:r><w:t>{{signoff}}</w:t></w:r></w:p><w:p><w:r><w:t>{{candidate_name}}</w:t></w:r></w:p></w:body></w:document>`))
+	w.Close()
+	f.Close()
+
+	if ok, why := rn.done(j, "cover"); ok || !strings.Contains(why, "letter.docx") {
+		t.Errorf("no build yet: %v %q", ok, why)
+	}
+	got := run(t, rn, j, Request{Steps: []string{"cover"}})
+	if got.State != Done || states(got) != "cover=done" {
+		t.Fatalf("%s %s %s %v", got.State, got.Error, states(got), got.Log)
+	}
+	dir := apply.Dir(rn.Store, j)
+	prompt, _ := os.ReadFile(filepath.Join(dir, "prompt.txt"))
+	if !strings.Contains(string(prompt), "body_paragraph_1 (required") || !strings.Contains(string(prompt), "scoutjobs cv cover") {
+		t.Errorf("the agent writes slots, not a letter:\n%.600s", prompt)
+	}
+	md, _ := os.ReadFile(filepath.Join(dir, "cover-letter.md"))
+	if !strings.Contains(string(md), "Dear Hiring Team,") || !exists(dir, "cover-letter.docx") {
+		t.Errorf("letter not built from the slots: %s", md)
+	}
+	if again := run(t, rn, j, Request{Steps: []string{"cover"}}); states(again) != "cover=skipped" {
+		t.Errorf("a built letter is done: %s", states(again))
 	}
 }

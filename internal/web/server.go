@@ -97,6 +97,8 @@ var funcs = template.FuncMap{
 	},
 	"day":       day,
 	"hasSuffix": strings.HasSuffix,
+	"base":      filepath.Base,
+	"join":      strings.Join,
 	// mon and dom feed the calendar tile: "2026-10-14" -> "Oct", "14".
 	"mon": func(s string) string {
 		if t, err := time.Parse("2006-01-02", day(s)); err == nil {
@@ -605,7 +607,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
-		"Docs": docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx"), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
+		"Docs": docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf"), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
 		"CanGmail": v.cfg.Mail.Draft != nil && v.mailSource() == "gmail",
 		"Msg":      r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
 }
