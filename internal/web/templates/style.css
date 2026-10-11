@@ -344,7 +344,7 @@ body.dragging-card .dropbar{display:flex}
 .calmain{padding:0;overflow:hidden}
 .c-screen{--ev:var(--info);--ev-sub:var(--info-sub)}.c-tech{--ev:var(--acc);--ev-sub:var(--acc-sub)}
 .c-behav{--ev:var(--warn);--ev-sub:var(--warn-sub)}.c-final{--ev:var(--ok);--ev-sub:var(--ok-sub)}
-.c-deadline{--ev:var(--bad);--ev-sub:var(--bad-sub)}.c-follow,.c-other{--ev:var(--muted);--ev-sub:var(--subtle)}
+.c-deadline{--ev:var(--bad);--ev-sub:var(--bad-sub)}.c-google{--ev:var(--dim);--ev-sub:var(--subtle)}.c-follow,.c-other{--ev:var(--muted);--ev-sub:var(--subtle)}
 .ev,.chipev{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:1.35;color:var(--fg);background:var(--ev-sub);border-left:3px solid var(--ev);border-radius:6px;padding:2px 6px}
 .ev:hover,.chipev:hover{text-decoration:none;color:var(--fg);box-shadow:var(--pop-shadow);z-index:3}
 .ev b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis}.ev small{display:block;color:var(--muted);font-size:11px}

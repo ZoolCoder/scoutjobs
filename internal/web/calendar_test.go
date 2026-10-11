@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -143,3 +144,22 @@ func TestGoogleURLAllDay(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+func TestGoogleEventMatchesJobAndSkipsDuplicates(t *testing.T) {
+	open := []store.Job{{ID: 7, Company: "Acme", Title: "Go Dev"}, {ID: 8, Company: "Globex Corp", Title: "SRE"}}
+	start := time.Date(2026, 10, 20, 14, 0, 0, 0, time.Local)
+	g := gmail.Event{ID: "e1", Title: "Technical round", Start: start, End: start.Add(time.Hour), Attendees: []string{"jane@globexcorp.com"}}
+	e, ok := googleEvent(g, open, nil)
+	if !ok || e.JobID != 8 || e.Key != "ge1" || e.Start != "14:00" || e.Kind != "google" {
+		t.Fatalf("%+v %v", e, ok)
+	}
+	if _, ok := googleEvent(g, open, []store.Interview{{JobID: 8, At: "2026-10-20T14:00"}}); ok {
+		t.Error("an event already tracked as an interview shows twice")
+	}
+	if _, ok := googleEvent(gmail.Event{ID: "x", Title: "Interview", Start: start, Text: "scoutjobs:interview:3"}, open, nil); ok {
+		t.Error("an event ScoutJobs exported shows twice")
+	}
+	if e, _ := googleEvent(gmail.Event{ID: "d", Title: "Dentist", Start: start}, open, nil); e.JobID != 0 || e.End != "15:00" {
+		t.Errorf("unrelated event: %+v", e)
+	}
+}

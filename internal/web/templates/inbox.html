@@ -7,13 +7,13 @@
 </div>
 {{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
 {{if and .Gmail (ne .Source "gmail")}}<section class="panel gmail-setup">
-<div class="panel-h"><h2>Connect Gmail</h2><span class="muted">reads inbox metadata and creates drafts; never sends, labels or deletes</span></div>
+<div class="panel-h"><h2>Connect Gmail</h2><span class="muted">reads inbox metadata and your calendar, creates drafts; never sends, deletes or changes events</span></div>
 {{if .GmailClient}}<p>Your Google OAuth client is saved. Connect, pick your account and allow access; Google sends you back here.</p>
 <form method="post" action="/gmail/connect"><button class="primary">Connect Gmail</button></form>
 {{else}}<p>Once, about 3 minutes: a Desktop OAuth client in your own Google Cloud project, so your mail goes to no one else.</p>
 <ol class="setup">
   <li><a href="https://console.cloud.google.com/projectcreate" rel="noopener noreferrer" target="_blank">Create a project</a>, any name.</li>
-  <li><a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" rel="noopener noreferrer" target="_blank">Enable the Gmail API</a> in it.</li>
+  <li><a href="https://console.cloud.google.com/flows/enableapi?apiid=gmail.googleapis.com,calendar-json.googleapis.com" rel="noopener noreferrer" target="_blank">Enable the Gmail and Calendar APIs</a> in it.</li>
   <li><a href="https://console.cloud.google.com/auth/overview" rel="noopener noreferrer" target="_blank">Set up the consent screen</a>: app name ScoutJobs, audience External, your e-mail. Then Audience &rsaquo; <b>Publish app</b>; in Testing mode Google drops the connection every 7 days.</li>
   <li><a href="https://console.cloud.google.com/auth/clients/create" rel="noopener noreferrer" target="_blank">Create an OAuth client</a> of type <b>Desktop app</b>, then Download JSON and add it here.</li>
 </ol>

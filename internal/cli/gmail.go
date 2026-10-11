@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
@@ -32,12 +33,12 @@ func gmailClient(s *store.Store, cfg Config) *gmail.Client {
 }
 
 // Google Cloud pages for a Desktop OAuth client, in the order setup needs them.
-const gmailSteps = `Gmail setup: a Desktop OAuth client in your own Google Cloud project (about 3 minutes, once).
+const gmailSteps = `Google setup: a Desktop OAuth client in your own Google Cloud project (about 3 minutes, once).
 
   1. Create a project (any name, e.g. scoutjobs):
      https://console.cloud.google.com/projectcreate
-  2. Enable the Gmail API in it:
-     https://console.cloud.google.com/apis/library/gmail.googleapis.com
+  2. Enable the Gmail and Calendar APIs in it:
+     ` + gmail.EnableAPIs + `
   3. Configure the consent screen: Get started, app name ScoutJobs, audience External, your e-mail:
      https://console.cloud.google.com/auth/overview
      Then Audience > Publish app. In Testing mode Google drops the connection every 7 days.
@@ -45,7 +46,8 @@ const gmailSteps = `Gmail setup: a Desktop OAuth client in your own Google Cloud
      https://console.cloud.google.com/auth/clients/create
 
 Google will say it has not verified the app: it is your own app, so choose Advanced > Go to ScoutJobs.
-ScoutJobs reads inbox metadata and creates drafts. It never sends, labels or deletes.
+ScoutJobs reads inbox metadata and your calendar, and creates drafts.
+It never sends, labels, deletes, or writes to your calendar.
 `
 
 // setupGmail imports the client from --file, or waits for Google's download to land in ~/Downloads.
@@ -103,6 +105,38 @@ func connectGmail(s *store.Store, cfg Config, out io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(out, "gmail connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
+	if !strings.Contains(t.Scope, gmail.CalendarScope) {
+		fmt.Fprintln(out, "calendar was not allowed: the dashboard calendar shows only ScoutJobs events (connect again and tick Calendar to add yours)")
+	}
+	return nil
+}
+
+// testGoogle checks mail and calendar separately, so one failing does not hide the other.
+func testGoogle(c *gmail.Client, out io.Writer) error {
+	if !c.Connected() {
+		return errors.New("gmail not connected: run scoutjobs gmail setup")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	failed := false
+	if ms, err := c.Fetch(ctx, time.Now().AddDate(0, 0, -7), 5); err != nil {
+		failed = true
+		fmt.Fprintf(out, "mail:     FAIL %v\n", err)
+	} else {
+		fmt.Fprintf(out, "mail:     ok, %s (%d recent inbox messages read, metadata only)\n", orDash(c.Account()), len(ms))
+	}
+	switch evs, err := c.Events(ctx, time.Now(), time.Now().AddDate(0, 0, 14)); {
+	case !c.HasCalendar():
+		fmt.Fprintln(out, "calendar: off (scoutjobs gmail connect, and allow Calendar)")
+	case err != nil:
+		failed = true
+		fmt.Fprintf(out, "calendar: FAIL %v\n", err)
+	default:
+		fmt.Fprintf(out, "calendar: ok (%d events in the next 14 days, read-only)\n", len(evs))
+	}
+	if failed {
+		return errors.New("google test failed")
+	}
 	return nil
 }
 
@@ -133,17 +167,19 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		if _, err := parse(fs, rest); err != nil {
 			return err
 		}
-		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "imap_host": cfg.IMAPHost}
+		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "calendar": c.HasCalendar(), "imap_host": cfg.IMAPHost}
 		return emit(out, *asJSON, res, func() {
 			switch {
 			case c.Connected():
-				fmt.Fprintf(out, "gmail: connected as %s\n", orDash(c.Account()))
+				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), map[bool]string{true: "on (read-only)", false: "off"}[c.HasCalendar()])
 			case c.ID == "":
 				fmt.Fprintln(out, "gmail: off (scoutjobs gmail setup connects it in a few minutes)")
 			default:
 				fmt.Fprintln(out, "gmail: client set, not connected (scoutjobs gmail connect)")
 			}
 		})
+	case "test":
+		return testGoogle(c, out)
 	case "disconnect":
 		if err := c.Disconnect(context.Background()); err != nil {
 			return err
@@ -172,7 +208,7 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 			fmt.Fprintf(out, "draft created in Gmail for %s; review and send it there:\n  %s\n", j.Company, link)
 		})
 	}
-	return errors.New("usage: gmail setup [--file client.json] | connect | status | disconnect | draft <job>")
+	return errors.New("usage: gmail setup [--file client.json] | connect | status | test | disconnect | draft <job>")
 }
 
 // gmailDraft uploads the job's application e-mail (email.json from `email draft`) as a Gmail draft with

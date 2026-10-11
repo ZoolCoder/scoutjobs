@@ -174,8 +174,10 @@ func mailChecks(cfg Config) []check {
 func gmailCheck(home string, cfg Config) check {
 	c := gmail.Client{Home: home}
 	switch {
+	case c.Connected() && !c.HasCalendar():
+		return check{"warn", "gmail", "connected as " + orDash(c.Account()) + ", Calendar not allowed", "scoutjobs gmail connect, and allow Calendar (read-only)"}
 	case c.Connected():
-		return check{"ok", "gmail", "connected as " + orDash(c.Account()), "scoutjobs email sync reads replies through the API"}
+		return check{"ok", "gmail", "connected as " + orDash(c.Account()) + ", with Calendar", "scoutjobs gmail test checks both"}
 	case cfg.GmailClientID != "" || gmail.LoadCredentials(home).ID != "":
 		return check{"warn", "gmail", "OAuth client set, not connected", "scoutjobs gmail connect"}
 	}

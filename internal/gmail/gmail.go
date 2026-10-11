@@ -24,8 +24,9 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 )
 
-// Scopes: read for reply matching, compose for drafts. Compose cannot send without the user pressing Send.
-const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose"
+// Scopes: read for reply matching, compose for drafts, calendar read for interviews already in Google Calendar.
+// Compose cannot send without the user pressing Send; nothing here writes to the calendar.
+const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose " + CalendarScope
 
 const TokenFile = "gmail-token.json"
 
@@ -38,6 +39,7 @@ type Client struct {
 	TokenURL   string
 	APIBase    string
 	RevokeURL  string
+	CalBase    string
 }
 
 // Token is what gmail-token.json holds. The refresh token is the long-lived secret; the file is 0600.
@@ -46,6 +48,7 @@ type Token struct {
 	RefreshToken string    `json:"refresh_token"`
 	Expiry       time.Time `json:"expiry"`
 	Email        string    `json:"email"`
+	Scope        string    `json:"scope,omitempty"` // granted scopes; tokens from before Calendar have none
 }
 
 func (c *Client) defaults() {
@@ -63,6 +66,9 @@ func (c *Client) defaults() {
 	}
 	if c.RevokeURL == "" {
 		c.RevokeURL = "https://oauth2.googleapis.com/revoke"
+	}
+	if c.CalBase == "" {
+		c.CalBase = "https://www.googleapis.com/calendar/v3"
 	}
 }
 
@@ -168,6 +174,7 @@ func (c *Client) grant(ctx context.Context, form url.Values) (Token, error) {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
 		Error        string `json:"error"`
 		Desc         string `json:"error_description"`
 	}
@@ -177,7 +184,7 @@ func (c *Client) grant(ctx context.Context, form url.Values) (Token, error) {
 	if out.Error != "" || out.AccessToken == "" {
 		return Token{}, fmt.Errorf("token endpoint: %s %s", out.Error, out.Desc)
 	}
-	return Token{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, Expiry: time.Now().Add(time.Duration(out.ExpiresIn) * time.Second)}, nil
+	return Token{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, Scope: out.Scope, Expiry: time.Now().Add(time.Duration(out.ExpiresIn) * time.Second)}, nil
 }
 
 // access returns a valid access token, refreshing and saving it when it is about to expire.
@@ -201,16 +208,23 @@ func (c *Client) access(ctx context.Context) (string, error) {
 	if n.RefreshToken != "" {
 		t.RefreshToken = n.RefreshToken
 	}
+	if n.Scope != "" {
+		t.Scope = n.Scope
+	}
 	return t.AccessToken, c.save(t)
 }
 
 func (c *Client) call(ctx context.Context, tok, method, path string, body, out any) error {
+	return c.callURL(ctx, tok, method, c.APIBase+path, body, out)
+}
+
+func (c *Client) callURL(ctx context.Context, tok, method, u string, body, out any) error {
 	var rd io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
 		rd = bytes.NewReader(b)
 	}
-	req, _ := http.NewRequestWithContext(ctx, method, c.APIBase+path, rd)
+	req, _ := http.NewRequestWithContext(ctx, method, u, rd)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -222,7 +236,8 @@ func (c *Client) call(ctx context.Context, tok, method, path string, body, out a
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("gmail %s %s: %s %s", method, strings.SplitN(path, "?", 2)[0], resp.Status, strings.TrimSpace(string(msg)))
+		path := strings.TrimPrefix(strings.SplitN(u, "?", 2)[0], c.APIBase)
+		return apiError(fmt.Errorf("google %s %s: %s %s", method, path, resp.Status, strings.TrimSpace(string(msg))))
 	}
 	if out == nil {
 		return nil

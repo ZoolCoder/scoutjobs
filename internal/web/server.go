@@ -33,6 +33,7 @@ type server struct {
 	tpl   *template.Template
 	cfg   Config
 	gmail gmailFlows
+	gcal  googleCal
 }
 
 // Config is the subset of config.yaml the dashboard needs; cli passes it in to avoid an import cycle.

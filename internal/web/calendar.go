@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -41,6 +42,7 @@ type calEvent struct {
 	start, stop time.Time
 	allDay      bool
 	iv          *store.Interview
+	google      *gmail.Event
 }
 
 type calDay struct {
@@ -70,6 +72,8 @@ type calView struct {
 	FeedURL, FeedNote     string
 	FeedDownload          string
 	Counts                map[string]int
+	GoogleCal             string // on | reconnect | setup | "" when Gmail is not offered
+	GoogleErr             string
 	Stages, Formats, Mins []string
 }
 
@@ -82,6 +86,8 @@ type calDetail struct {
 	Job       store.Job
 	Date      string
 	Time      string
+	Open      string // Google Calendar's own page for an event read from it
+	Track     string // the new-interview form, filled from that event
 }
 
 type calNew struct {
@@ -203,6 +209,10 @@ func (v *server) events(today time.Time) []calEvent {
 			out = append(out, e)
 		}
 	}
+	return sortEvents(out)
+}
+
+func sortEvents(out []calEvent) []calEvent {
 	sort.SliceStable(out, func(a, b int) bool {
 		if out[a].allDay != out[b].allDay {
 			return out[a].allDay
@@ -215,6 +225,11 @@ func (v *server) events(today time.Time) []calEvent {
 func (v *server) eventByKey(key string, today time.Time) (calEvent, store.Job, bool) {
 	if len(key) < 2 {
 		return calEvent{}, store.Job{}, false
+	}
+	if key[0] == 'g' {
+		e, ok := v.googleByKey(key[1:])
+		j, _ := v.s.JobByID(e.JobID)
+		return e, j, ok
 	}
 	id, err := strconv.ParseInt(key[1:], 10, 64)
 	if err != nil {
@@ -260,6 +275,8 @@ func (v *server) calendar(w http.ResponseWriter, r *http.Request) {
 		d = t
 	}
 	all := v.events(today)
+	gev, gerr := v.googleEvents(r.Context(), d)
+	all = sortEvents(append(all, gev...))
 	cv := calView{View: view, D: d.Format(dayLayout), Today: today.Format(dayLayout), Counts: map[string]int{},
 		Stages:  []string{"screen", "technical", "system_design", "behavioral", "case", "onsite", "final", "other"},
 		Formats: []string{"video", "phone", "onsite"}, Mins: []string{"15", "30", "45", "60", "90", "120", "180", "240"}}
@@ -306,6 +323,17 @@ func (v *server) calendar(w http.ResponseWriter, r *http.Request) {
 			cv.New = &calNew{Date: nd, Time: nt}
 			cv.New.JobID, _ = strconv.ParseInt(q.Get("job"), 10, 64)
 			cv.Jobs, _ = v.s.ListJobs(store.JobFilter{Open: true})
+		}
+	}
+	cv.GoogleErr = gerr
+	if c := v.gmailClient(); c != nil {
+		switch {
+		case c.HasCalendar():
+			cv.GoogleCal = "on"
+		case c.Connected():
+			cv.GoogleCal = "reconnect"
+		default:
+			cv.GoogleCal = "setup"
 		}
 	}
 	cv.FeedURL, cv.FeedNote = v.feedURL(r)
@@ -446,7 +474,19 @@ func monthGrid(first time.Time, all []calEvent, today time.Time) [][]calDay {
 }
 
 func (v *server) detail(r *http.Request, e calEvent, j store.Job) *calDetail {
-	d := &calDetail{Event: e, Job: j, Interview: e.iv, Google: googleURL(e, v.jobURL(r, e.JobID)), ICS: "/calendar/event/" + e.Key}
+	d := &calDetail{Event: e, Job: j, Interview: e.iv}
+	if g := e.google; g != nil {
+		d.Open = g.Link
+		d.Track = "/calendar?view=week&d=" + e.Date + "&new=" + e.Date
+		if !e.allDay {
+			d.Track += "T" + e.Start
+		}
+		if e.JobID != 0 {
+			d.Track += fmt.Sprintf("&job=%d", e.JobID)
+		}
+	} else {
+		d.Google, d.ICS = googleURL(e, v.jobURL(r, e.JobID)), "/calendar/event/"+e.Key
+	}
 	if e.allDay {
 		d.When = e.start.Format("Monday 2 January 2006") + " · all day"
 	} else {

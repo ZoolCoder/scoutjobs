@@ -32,7 +32,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   email draft|show|send   application e-mail from the cover letter; send needs --yes
   email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
   email log <job>         record a message an agent's Gmail connector matched to a job
-  gmail setup [--file client.json]|connect|status|disconnect|draft <job>
+  gmail setup [--file client.json]|connect|status|test|disconnect|draft <job>
                                      Gmail API with your own OAuth client: setup links the Google Cloud pages, imports the
                                      downloaded client from ~/Downloads and connects; reads replies, creates drafts (never sends)
   decision log|summary

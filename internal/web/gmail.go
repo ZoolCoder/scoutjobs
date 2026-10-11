@@ -125,7 +125,7 @@ func (v *server) gmailCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, withParam("/inbox", "err", "Gmail was not connected: "+err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, withParam("/inbox", "msg", "Gmail connected as "+t.Email+". Sync now reads replies to your applications."), http.StatusSeeOther)
+	http.Redirect(w, r, withParam("/inbox", "msg", "Gmail connected as "+t.Email+". Sync now reads replies to your applications"+calendarNote(t)+"."), http.StatusSeeOther)
 }
 
 func (v *server) gmailDisconnect(w http.ResponseWriter, r *http.Request) {
@@ -140,4 +140,11 @@ func (v *server) gmailDisconnect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.Redirect(w, r, withParam("/inbox", "msg", "Gmail disconnected: access revoked at Google, token deleted"), http.StatusSeeOther)
+}
+
+func calendarNote(t gmail.Token) string {
+	if strings.Contains(t.Scope, gmail.CalendarScope) {
+		return "; your Google Calendar shows on the Calendar page"
+	}
+	return "; Calendar was not allowed, so connect again and tick it to see your events here"
 }
