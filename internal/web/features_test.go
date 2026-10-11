@@ -243,3 +243,18 @@ func mustQuery(t *testing.T, s string) url.Values {
 	}
 	return q
 }
+
+func TestVersionBadgeAndEndpoint(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{Version: "0.3.1"})
+	b := get(h, "/").Body.String()
+	if !strings.Contains(b, `data-version="0.3.1"`) || !strings.Contains(b, `class="ver"`) || !strings.Contains(b, `src="/app.js"`) {
+		t.Error("layout lacks the version badge or app.js")
+	}
+	if rec := get(h, "/version"); rec.Body.String() != "0.3.1" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Errorf("/version: %q %q", rec.Body.String(), rec.Header().Get("Cache-Control"))
+	}
+	if rec := get(h, "/app.js"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "/version") {
+		t.Errorf("/app.js: %d", rec.Code)
+	}
+}

@@ -1,5 +1,5 @@
 {{define "head"}}<!doctype html>
-<html lang="en" data-theme="{{.Theme}}">
+<html lang="en" data-theme="{{.Theme}}" data-version="{{.Cfg.Version}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,6 +7,7 @@
 <title>ScoutJobs · {{.Title}}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
+<script src="/app.js" defer></script>
 </head>
 <body>
 <div class="shell">
@@ -31,7 +32,7 @@
       <a href="/theme?set=dark&amp;back={{.Path}}" {{if eq .Theme "dark"}}class="on" aria-current="true"{{end}}>dark</a>
       <a href="/theme?set=auto&amp;back={{.Path}}" {{if eq .Theme "auto"}}class="on" aria-current="true"{{end}} title="follow system">auto</a>
     </div>
-    <div class="led"><i></i><span>Local workspace<small>data stays on this device</small></span></div>
+    <div class="led"><i></i><span>Local workspace<small>data stays on this device</small>{{if .Cfg.Version}}<a class="ver" href="https://github.com/zoolcoder/scoutjobs/releases" rel="noopener noreferrer" target="_blank" title="running version; scoutjobs update installs the latest">v{{.Cfg.Version}}</a>{{end}}</span></div>
   </div>
 </aside>
 <div class="body">

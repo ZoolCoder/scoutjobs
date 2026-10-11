@@ -1,10 +1,13 @@
 BIN := bin/scoutjobs
 PKG := ./...
+# local builds carry the git version with a -dev suffix: shown in the dashboard, never replaced by scoutjobs update
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')-dev
+LDFLAGS := -X github.com/zoolcoder/scoutjobs/internal/cli.Version=$(VERSION)
 
 .PHONY: build run test test-unit lint fmt clean install dash docs docs-serve skills evals
 
 build:
-	go build -o $(BIN) ./cmd/scoutjobs
+	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/scoutjobs
 
 run: build
 	$(BIN) $(ARGS)
@@ -27,8 +30,9 @@ fmt:
 
 install: build
 	mkdir -p $(HOME)/.local/bin
-	cp $(BIN) $(HOME)/.local/bin/scoutjobs
-	@echo "installed to ~/.local/bin/scoutjobs (add to PATH if needed)"
+	cp $(BIN) $(HOME)/.local/bin/scoutjobs.new
+	mv $(HOME)/.local/bin/scoutjobs.new $(HOME)/.local/bin/scoutjobs
+	@echo "installed $(VERSION) to ~/.local/bin/scoutjobs (add to PATH if needed); a running dashboard restarts on it"
 
 skills: ## regenerate the agent mirror skills from agents/*.md
 	sh scripts/agents-to-skills.sh

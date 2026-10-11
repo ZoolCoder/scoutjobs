@@ -631,3 +631,7 @@ fieldset.filters label.check{flex:0 0 auto;align-self:center}
 details.preview summary{cursor:pointer;font-size:12px;color:var(--acc);margin-top:4px}
 details.preview .pre{max-height:260px;overflow:auto;font-size:12.5px;margin:6px 0 0;padding:8px 10px;background:var(--subtle);border-radius:8px}
 @media (max-width:720px){.outcomes li{grid-template-columns:1fr}.saveas{margin-left:0;width:100%}.saveas input{flex:1}}
+/* ---- version ---- */
+.led .ver{display:inline-block;margin-top:5px;font:500 11px var(--mono,ui-monospace,monospace);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+.led .ver:hover{color:var(--acc);border-color:var(--acc);text-decoration:none}
+.upgraded{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;background:var(--surface);border:1px solid var(--acc);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);font-size:13px}
