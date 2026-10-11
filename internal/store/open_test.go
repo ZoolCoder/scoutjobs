@@ -29,3 +29,18 @@ func TestOpenErrorNamesPathAndHint(t *testing.T) {
 		}
 	}
 }
+
+func TestProtectedHint(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS privacy folders only")
+	}
+	user, _ := os.UserHomeDir()
+	if h := protectedHint(filepath.Join(user, "Documents", "Codex", "scoutjobs-data")); !strings.Contains(h, "~/Documents") {
+		t.Errorf("no hint for a Documents data dir: %q", h)
+	}
+	for _, home := range []string{filepath.Join(user, ".scoutjobs"), filepath.Join(user, "DocumentsArchive")} {
+		if h := protectedHint(home); h != "" {
+			t.Errorf("hint for %s: %q", home, h)
+		}
+	}
+}

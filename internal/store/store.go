@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -123,6 +124,9 @@ func openHint(home, path string, err error) string {
 	case code != 14 && !errors.Is(err, fs.ErrPermission):
 		return ""
 	}
+	if h := protectedHint(home); h != "" {
+		return h
+	}
 	if st, e := os.Stat(home); e != nil || !st.IsDir() {
 		return home + " is not a directory; set SCOUTJOBS_HOME to a folder or run scoutjobs init"
 	}
@@ -142,6 +146,35 @@ func openHint(home, path string, err error) string {
 		}
 	}
 	return "SQLite cannot open " + path + "; check the path exists, is writable, and is not on a network or synced drive"
+}
+
+// protectedHint covers macOS privacy protection: Documents, Desktop, Downloads and cloud
+// folders open fine from a terminal that has access, but not from a dashboard started by an
+// app, launch agent or agent sandbox that lacks it.
+func protectedHint(home string) string {
+	if runtime.GOOS != "darwin" {
+		return ""
+	}
+	user, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	abs, err := filepath.Abs(home)
+	if err != nil {
+		return ""
+	}
+	for _, dir := range []string{"Documents", "Desktop", "Downloads", "Library/Mobile Documents", "Library/CloudStorage"} {
+		if within(abs, filepath.Join(user, dir)) {
+			return home + " is in ~/" + dir + ", which macOS only lets apps with Files and Folders or Full Disk Access open. " +
+				"If scoutjobs works in your terminal but not here, start serve from that terminal, grant the launching app access in System Settings > Privacy & Security, or move the data dir (e.g. ~/.scoutjobs)"
+		}
+	}
+	return ""
+}
+
+func within(path, dir string) bool {
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func (s *Store) Close() error { return s.DB.Close() }
