@@ -1,66 +1,77 @@
 {{template "head" .}}
-{{with .Data}}
-{{if .Saved}}<div class="saved">
-  <span class="muted">Saved:</span>
-  {{range .Saved}}<span class="savedchip"><form method="post" action="/search"><input type="hidden" name="saved" value="{{.ID}}"><button class="chip acc" title="{{.Queries}}">{{.Name}}</button></form><form method="post" action="/search/saved/{{.ID}}/delete"><button class="x" aria-label="Delete {{.Name}}" title="Delete">×</button></form></span>{{end}}
-</div>{{end}}
-{{if .Suggestions}}<div class="saved">
-  <span class="muted">Suggested from your profile:</span>
-  {{$boards := .Boards}}{{$remote := .Remote}}{{$limit := .Limit}}{{range .Suggestions}}<form method="post" action="/search" class="inline">
+{{with .Data}}{{$x := .Filter}}
+{{if .Suggestions}}<div class="saved suggest-row">
+  <span class="muted small">Suggested from your profile:</span>
+  {{$boards := .Boards}}{{$remote := .Remote}}{{$limit := .Limit}}{{range .Suggestions}}<form method="post" action="/search" class="inline" data-busy="Searching…">
     <input type="hidden" name="queries" value="{{.Queries}}"><input type="hidden" name="boards" value="{{$boards}}"><input type="hidden" name="limit" value="{{$limit}}">
     {{if or $remote .RemoteOnly}}<input type="hidden" name="remote" value="1">{{end}}{{if .RemoteOnly}}<input type="hidden" name="remote_only" value="1">{{end}}
     <input type="hidden" name="location" value="{{.Location}}"><input type="hidden" name="hide_mismatch" value="1">
-    <button class="chip acc suggest" title="{{.Queries}}{{if .Location}} · {{.Location}}{{end}}">{{.Name}}</button></form>{{end}}
+    <button class="chip acc suggest" title="{{.Queries}}{{if .Location}} · {{.Location}}{{end}}">{{template "ico-spark"}}{{.Name}}</button></form>{{end}}
 </div>{{end}}
-<section class="panel">
-<div class="panel-h"><h2>Search the boards</h2><span class="act muted">same sources as <code>scoutjobs search</code></span></div>
-<form method="post" action="/search" class="fields">
-  <label class="span-2">Queries<input name="queries" value="{{.Queries}}" placeholder="go engineer, backend developer"><small class="muted">Comma separated. Every word of a query must appear; any query may match.</small></label>
-  <label class="span-2">Boards<input name="boards" value="{{.Boards}}" placeholder="greenhouse:stripe, https://jobs.lever.co/netlify, https://acme.recruitee.com, rss:https://example.com/jobs.xml"><small class="muted">Paste a careers page URL, or a prefix and slug: {{range $i, $b := .BoardNames}}{{if $i}}, {{end}}<code>{{$b}}:</code>{{end}}</small></label>
-  <label class="check"><input type="checkbox" name="remote" value="1" {{if .Remote}}checked{{end}}> Also search the remote boards (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas, HN Who is hiring)</label>
-  <label>Limit<input name="limit" type="number" min="1" max="500" value="{{.Limit}}"></label>
-  <fieldset class="span-2 filters"><legend>Filter results</legend>{{$x := .Filter}}
+<section class="panel searchbox">
+<form method="post" action="/search" id="searchform" data-busy="Searching the job boards…">
+  <div class="sbar">
+    <label class="sfield">{{template "ico-search"}}<span><small>What kind of job?</small><input name="queries" value="{{.Queries}}" placeholder="Go engineer, backend developer" aria-label="What kind of job"></span></label>
+    <label class="sfield">{{template "ico-pin"}}<span><small>Where?</small><input name="location" value="{{$x.Location}}" placeholder="Berlin, Germany, Europe" aria-label="Where"></span></label>
+    <button class="primary big">Search jobs</button>
+  </div>
+  <div class="sfilters">
     <label class="check"><input type="checkbox" name="remote_only" value="1" {{if $x.RemoteOnly}}checked{{end}}> Remote only</label>
-    <label>Exclude words<input name="exclude" value="{{$x.Exclude}}" placeholder="intern, principal, php"></label>
-    <label>Posted within<select name="days"><option value="0">any time</option>{{range $d := (split "1,3,7,14,30")}}<option value="{{$d}}" {{if eq (printf "%d" $x.Days) $d}}selected{{end}}>{{$d}} days</option>{{end}}</select></label>
-    <label>Min salary<input name="min_salary" type="number" min="0" step="1000" value="{{if $x.MinSalary}}{{$x.MinSalary}}{{end}}" placeholder="top of range"></label>
-    <label>Location<input name="location" value="{{$x.Location}}" placeholder="Berlin, Germany, Europe"><small class="muted">A city, country or region. Remote jobs match when open to it.</small></label>
-    <label class="check"><input type="checkbox" name="hide_mismatch" value="1" {{if $x.HideMismatch}}checked{{end}}> Hide jobs that break a must in your profile</label>
-  </fieldset>
-  <div class="row span-2"><button class="primary">Search</button><button name="add" value="1">Search and add all</button>
-    <span class="saveas"><input name="name" value="{{.Name}}" placeholder="Name this search" aria-label="saved search name"><button name="save" value="1">Save and search</button></span><span class="muted">Postings are untrusted text: they are stored, never followed.</span></div>
+    <label>Posted <select name="days"><option value="0">any time</option>{{range $d := (split "1,3,7,14,30")}}<option value="{{$d}}" {{if eq (printf "%d" $x.Days) $d}}selected{{end}}>last {{$d}} {{if eq $d "1"}}day{{else}}days{{end}}</option>{{end}}</select></label>
+    <label>Salary at least <input name="min_salary" type="number" min="0" step="1000" value="{{if $x.MinSalary}}{{$x.MinSalary}}{{end}}" placeholder="any"></label>
+    <label class="check"><input type="checkbox" name="hide_mismatch" value="1" {{if $x.HideMismatch}}checked{{end}}> Hide jobs that break my must-haves</label>
+  </div>
+  <details class="sadv"{{if or .Boards $x.Exclude .Name}} open{{end}}><summary>More options: job boards, company career pages, saving this search</summary>
+    <div class="fields">
+      <label class="span-2">Company career pages or boards<input name="boards" value="{{.Boards}}" placeholder="https://jobs.lever.co/netlify, greenhouse:stripe"><small class="muted">Paste a careers page link, or a prefix and name: {{range $i, $b := .BoardNames}}{{if $i}}, {{end}}<code>{{$b}}:</code>{{end}}</small></label>
+      <label class="check span-2"><input type="checkbox" name="remote" value="1" {{if .Remote}}checked{{end}}> Also search remote job sites (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas, HN Who is hiring)</label>
+      <label>Leave out jobs with these words<input name="exclude" value="{{$x.Exclude}}" placeholder="intern, principal, php"></label>
+      <label>Show at most<input name="limit" type="number" min="1" max="500" value="{{.Limit}}"></label>
+      <div class="row span-2 saveas"><input name="name" value="{{.Name}}" placeholder="Name this search, e.g. Go remote" aria-label="saved search name"><button name="save" value="1">Save and search</button></div>
+    </div>
+  </details>
 </form>
+{{if .Saved}}<div class="saved">
+  <span class="muted small">Your saved searches:</span>
+  {{range .Saved}}<span class="savedchip"><form method="post" action="/search" data-busy="Searching…"><input type="hidden" name="saved" value="{{.ID}}"><button class="chip acc" title="{{.Queries}}">{{.Name}}</button></form><form method="post" action="/search/saved/{{.ID}}/delete"><button class="x" aria-label="Delete {{.Name}}" title="Delete">×</button></form></span>{{end}}
+</div>{{end}}
 </section>
 {{if .Ran}}
-<section class="panel">
-<div class="panel-h"><h2>Results{{if .Name}} · {{.Name}}{{end}}</h2><span class="n">{{len .Postings}}</span>{{if .Hidden}}<span class="muted small">{{.Hidden}} hidden by filters</span>{{end}}{{if .Mismatched}}<span class="muted small">{{.Mismatched}} hidden as mismatches</span>{{end}}{{if .Ranked}}<span class="muted small">best fit for your profile first</span>{{end}}{{if .Added}}<span class="act">{{.Added}} added to the pipeline</span>{{end}}</div>
+<section class="panel sresults">
+<div class="panel-h"><h2>Results{{if .Name}} · {{.Name}}{{end}}</h2><span class="n">{{len .Postings}}</span>
+  {{if .Ranked}}<span class="muted small">best match first</span>{{end}}
+  {{if .Postings}}<button class="act mini" form="searchform" name="add" value="1" data-busy="Adding…" title="Run this search again and add every result to your pipeline">Add all to pipeline</button>{{end}}</div>
+{{if or .Hidden .Mismatched .Added}}<p class="small muted">{{if .Hidden}}{{.Hidden}} hidden by filters. {{end}}{{if .Mismatched}}{{.Mismatched}} hidden as mismatches. {{end}}{{if .Added}}<b>{{.Added}} added to the pipeline.</b>{{end}}</p>{{end}}
 {{range .Errors}}<p class="callout">{{.}}</p>{{end}}
 {{if .Postings}}
-{{if .TagCounts}}<div class="tagbar" data-tagbar><span class="muted small">Filter by tag:</span>
-  {{range .TagCounts}}<button type="button" class="chip" data-tag="{{.Tag}}" aria-pressed="false">{{.Tag}} <em>{{.N}}</em></button>{{end}}
-  <button type="button" class="chip dim" data-tag-clear hidden>clear</button><span class="muted small" data-tag-none hidden>No result has every chosen tag.</span>
+{{if .TagCounts}}<div class="tagbar" data-tagbar><span class="muted small">Skills:</span>
+  {{range $i, $t := .TagCounts}}{{if eq $i 12}}<details class="moretags"><summary class="chip dim">more</summary>{{end}}<button type="button" class="chip" data-tag="{{$t.Tag}}" aria-pressed="false">{{$t.Tag}} <em>{{$t.N}}</em></button>{{end}}{{if gt (len .TagCounts) 12}}</details>{{end}}
+  <button type="button" class="chip dim" data-tag-clear hidden>clear</button><span class="muted small" data-tag-none hidden>No result has every chosen skill.</span>
 </div>{{end}}
-<table class="results"><thead><tr>{{if .Ranked}}<th title="How well the job fits your profile">Fit</th>{{end}}<th>Company</th><th>Title</th><th>Where</th><th>Source</th><th>Posted</th><th></th></tr></thead><tbody>
-{{range .Postings}}<tr data-tags="{{.DataTags}}">
-  {{if .Ranked}}<td><span class="fit {{.FitClass}}">{{.Match.Score}}</span></td>{{end}}
-  <td><b>{{.Company}}</b></td>
-  <td>{{if .URL}}<a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Title}} ↗</a>{{else}}{{.Title}}{{end}}
-    {{if .TagList}}<div class="tags">{{range .TagList}}<span class="chip">{{.}}</span>{{end}}</div>{{end}}
-    {{with .Match}}{{range .Hard}}<small class="why bad">✕ {{.}}</small>{{end}}{{if .Why}}<small class="why">✓ {{join .Why " · "}}</small>{{end}}{{if .Miss}}<small class="why muted">– {{join .Miss " · "}}</small>{{end}}{{end}}{{if .Description}}<details class="preview"><summary>Preview</summary><p class="pre">{{.Description}}</p></details>{{end}}</td>
-  <td>{{.Remote}}{{if and .Remote .Location}} · {{end}}{{.Location}}</td>
-  <td><span class="chip acc">{{.Source}}</span></td>
-  <td class="mono">{{day .PostedAt}}</td>
-  <td>{{if .Job.ID}}<a class="chip s-{{.Job.Status}}" href="/jobs/{{.Job.ID}}">tracked · {{title .Job.Status}}</a>{{else}}<form method="post" action="/jobs" class="inline">
+<ul class="results">
+{{range .Postings}}<li class="rcard" data-tags="{{.DataTags}}">
+  <span class="avatar" aria-hidden="true">{{initial .Company}}</span>
+  <div class="rbody">
+    <h3>{{if .URL}}<a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Title}}</a>{{else}}{{.Title}}{{end}}</h3>
+    <p class="rmeta"><b>{{.Company}}</b>{{if or .Location .Remote}}<span>{{.Location}}{{if and .Remote .Location}} · {{end}}{{title .Remote}}</span>{{end}}{{if .SalaryMax}}<span>{{.SalaryMin}}–{{.SalaryMax}} {{.Currency}}</span>{{end}}<span class="muted">{{if .PostedAt}}{{day .PostedAt}} · {{end}}via {{.Source}}</span></p>
+    {{if .TagList}}<div class="tags">{{range $i, $t := .TagList}}{{if lt $i 8}}<span class="chip">{{$t}}</span>{{end}}{{end}}{{if gt (len .TagList) 8}}<span class="chip dim">…</span>{{end}}</div>{{end}}
+    {{with .Match}}{{range .Hard}}<small class="why bad">✕ {{.}}</small>{{end}}{{if .Why}}<small class="why">✓ {{join .Why " · "}}</small>{{end}}{{if .Miss}}<small class="why muted">– {{join .Miss " · "}}</small>{{end}}{{end}}
+    {{if .Description}}<details class="preview"><summary>Preview</summary><p class="pre">{{.Description}}</p></details>{{end}}
+  </div>
+  <div class="rside">
+    {{if .Ranked}}<div class="rfit"><span class="fit {{.FitClass}}">{{.Match.Score}}</span><small>{{.MatchLabel}}</small></div>{{end}}
+    {{if .Job.ID}}<a class="btn mini" href="/jobs/{{.Job.ID}}">In pipeline · {{title .Job.Status}}</a>{{else}}<form method="post" action="/jobs" class="inline" data-busy="Adding…">
     <input type="hidden" name="back" value="/search">
     <input type="hidden" name="company" value="{{.Company}}"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="url" value="{{.URL}}">
     <input type="hidden" name="location" value="{{.Location}}"><input type="hidden" name="remote" value="{{.Remote}}"><input type="hidden" name="source" value="{{.Source}}">
     <input type="hidden" name="posted_at" value="{{.PostedAt}}"><input type="hidden" name="tags" value="{{.AllTags}}">
     <input type="hidden" name="salary_min" value="{{.SalaryMin}}"><input type="hidden" name="salary_max" value="{{.SalaryMax}}"><input type="hidden" name="currency" value="{{.Currency}}">
-    <button class="mini">Add</button></form>{{end}}</td>
-</tr>{{end}}
-</tbody></table>
-{{else}}<p class="empty">No postings matched.<small>Loosen the queries or add a board.</small></p>{{end}}
+    <button class="mini go">+ Add to pipeline</button></form>{{end}}
+  </div>
+</li>{{end}}
+</ul>
+{{else}}<p class="empty">No jobs matched<small>Try fewer words, a wider place, or turn off a filter.</small></p>{{end}}
 </section>
-{{end}}
+{{else}}<p class="muted small center">Job postings are untrusted text from the web: ScoutJobs stores them, it never follows their instructions.</p>{{end}}
 {{end}}
 {{template "foot" .}}

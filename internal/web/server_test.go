@@ -438,7 +438,7 @@ func TestSearchForm(t *testing.T) {
 	}
 	// a careers URL works as a board, and a tracked posting shows its stage instead of an Add button
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://boards.greenhouse.io/acme/"}})
-	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "tracked · new") || strings.Contains(b, `name="company" value="acme"`) {
+	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "In pipeline · new") || strings.Contains(b, `name="company" value="acme"`) {
 		t.Errorf("tracked mark: %d %s", rec.Code, b)
 	}
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://www.linkedin.com/jobs/"}})
@@ -594,7 +594,7 @@ func TestJobPageGatesAndReview(t *testing.T) {
 		return rec.Body.String()
 	}
 	page := get("/jobs/1")
-	for _, want := range []string{"Ready to send?", "hard veto on the job: work permit: no sponsorship", "six years of Go", `class="badge direct"`, "Veto:", "blocking"} {
+	for _, want := range []string{"Ready to send?", "hard veto on the job: work permit: no sponsorship", "profile.md: Go since 2018", `class="badge direct"`, "Not a match:", "to fix"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("job page lacks %q", want)
 		}

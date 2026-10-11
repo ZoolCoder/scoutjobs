@@ -28,7 +28,7 @@ func TestDocumentsPreviewAndDownload(t *testing.T) {
 		return rec
 	}
 	page := get("/jobs/1").Body.String()
-	if !strings.Contains(page, `id="docs"`) || !strings.Contains(page, "not written yet") {
+	if !strings.Contains(page, `id="docs"`) || !strings.Contains(page, "Not written yet") {
 		t.Fatalf("documents panel missing: %s", page)
 	}
 	if strings.Contains(page, `href="/jobs/1/files/resume.md"`) {
@@ -107,7 +107,7 @@ func TestProposedEmails(t *testing.T) {
 	st := "offer"
 	_ = s.UpdateJob(1, store.JobPatch{Status: &st})
 	page := httptest.NewRecorder()
-	h.ServeHTTP(page, httptest.NewRequest("GET", "/jobs/1", nil))
+	h.ServeHTTP(page, httptest.NewRequest("GET", "/jobs/1?tab=mail", nil))
 	if b := page.Body.String(); !strings.Contains(b, `id="emails"`) || !strings.Contains(b, "/jobs/1/emails/offer-accept") {
 		t.Fatalf("offer replies missing: %s", b)
 	}
@@ -206,9 +206,9 @@ func TestJobChecklistAndGroupedNav(t *testing.T) {
 	list = list[:strings.Index(list, "</section>")]
 	for _, want := range []string{
 		`<li class="done"><span class="tick" aria-hidden="true"></span><div><b>Tailored resume</b>`,
-		`<div class="ns next"><span class="eyebrow">Next step</span><h2>Cover letter</h2>`,
+		`<li class="next"><span class="tick" aria-hidden="true"></span><div><b>Cover letter</b>`,
 		`<li class="warn"><span class="tick" aria-hidden="true"></span><div><b>Draft review</b><small title="drop the Kafka claim">drop the Kafka claim`,
-		`<li class="blocked"><span class="tick" aria-hidden="true"></span><div><b>Quality gates</b><small title="sending blocked`,
+		`<li class="blocked"><span class="tick" aria-hidden="true"></span><div><b>Final checks</b><small title="to fix`,
 	} {
 		if !strings.Contains(list, want) {
 			t.Errorf("checklist lacks %q:\n%s", want, list)

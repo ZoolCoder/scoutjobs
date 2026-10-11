@@ -126,7 +126,7 @@
 (function () {
   var bar = document.querySelector('[data-tagbar]');
   if (!bar) return;
-  var rows = document.querySelectorAll('table.results tbody tr');
+  var rows = document.querySelectorAll('ul.results > li');
   var clear = bar.querySelector('[data-tag-clear]');
   var none = bar.querySelector('[data-tag-none]');
   var count = bar.closest('section').querySelector('.panel-h .n');

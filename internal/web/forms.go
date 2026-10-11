@@ -188,6 +188,19 @@ func (r searchRow) FitClass() string {
 }
 
 // DataTags is the row's tags for the tag filter, lower case and "|" separated.
+// MatchLabel says in words how well a ranked posting fits.
+func (r searchRow) MatchLabel() string {
+	switch {
+	case len(r.Match.Hard) > 0:
+		return "Breaks a must-have"
+	case r.Match.Score >= 70:
+		return "Great match"
+	case r.Match.Score >= 45:
+		return "Good match"
+	}
+	return "Weak match"
+}
+
 func (r searchRow) DataTags() string {
 	return "|" + strings.ToLower(strings.Join(r.TagList, "|")) + "|"
 }

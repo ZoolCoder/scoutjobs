@@ -89,8 +89,9 @@ var funcs = template.FuncMap{
 		}
 		return p
 	},
-	"kindcls": func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
-	"evrow":   activityRowOf,
+	"kindcls":   func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
+	"evrow":     activityRowOf,
+	"gatelabel": gateLabel, "steplabel": stepLabel, "plain": plainDetail, "filelabel": fileLabel,
 	"mailto": func(m any) string {
 		switch m := m.(type) {
 		case *mail.Message:
@@ -454,7 +455,7 @@ var subtitles = map[string]string{
 	"profile":     "The source of truth behind every CV claim.",
 	"activity":    "Everything ScoutJobs recorded, newest first.",
 	"reviews":     "The weekly look back: numbers, funnel, commitments.",
-	"search":      "Public boards and feeds, deduplicated, nothing followed.",
+	"search":      "Find open jobs that fit you and add the good ones to your pipeline.",
 	"add_job":     "Track a posting you found elsewhere.",
 }
 
@@ -628,7 +629,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
-		"Docs": docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf"), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
+		"Cards": docCards(docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf")), "Points": fitPoints(review, 6), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
 		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(),
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
 }
