@@ -44,6 +44,7 @@ The SMTP password is never a config key. It comes from `SCOUTJOBS_SMTP_PASSWORD`
 | `SCOUTJOBS_IMAP_PASSWORD` | IMAP password for `scoutjobs email sync`; falls back to `SCOUTJOBS_SMTP_PASSWORD`
 | `SCOUTJOBS_PLATFORMS` | which agents `install.sh` links, for example `"codex cursor"`
 | `SCOUTJOBS_BIN_DIR` | where `install.sh` puts the binary; default `~/.local/bin`
+| `SCOUTJOBS_VERSION` | the release `install.sh` downloads without Go, for example `v0.5.1`; default: the tag of the checkout, else the latest
 |===
 
 == Data layout

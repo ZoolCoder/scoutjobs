@@ -40,6 +40,7 @@ link_prompts() { # $1 = prompts dir
 }
 
 say "ScoutJobs install"
+GO_REQ="$(awk '/^go /{print $2; exit}' "$ROOT/go.mod")"
 
 if command -v go >/dev/null 2>&1; then
   say "building scoutjobs CLI into $BIN_DIR"
@@ -47,24 +48,45 @@ if command -v go >/dev/null 2>&1; then
   (cd "$ROOT" && go build -ldflags "-s -w -X github.com/zoolcoder/scoutjobs/internal/cli.Version=$(git -C "$ROOT" describe --tags --always 2>/dev/null || echo dev)" -o "$BIN_DIR/scoutjobs" ./cmd/scoutjobs)
   case ":$PATH:" in *":$BIN_DIR:"*) ;; *) say "  add $BIN_DIR to PATH";; esac
 else
-  say "go not found: downloading the latest release binary into $BIN_DIR"
+  # the release matching this checkout, or SCOUTJOBS_VERSION; latest only when neither names one
+  version="${SCOUTJOBS_VERSION:-$(git -C "$ROOT" describe --tags --exact-match 2>/dev/null || true)}"
+  if [ -n "$version" ]; then
+    case "$version" in v*) ;; *) version="v$version";; esac
+    base="https://github.com/zoolcoder/scoutjobs/releases/download/$version"
+  else
+    base="https://github.com/zoolcoder/scoutjobs/releases/latest/download"
+  fi
+  say "go not found: downloading the ${version:-latest} release binary into $BIN_DIR"
   os="$(uname -s | tr '[:upper:]' '[:lower:]')"
   case "$(uname -m)" in x86_64|amd64) arch=amd64;; arm64|aarch64) arch=arm64;; *) arch="";; esac
   if [ -z "$arch" ] || { [ "$os" != darwin ] && [ "$os" != linux ]; }; then
-    say "  no prebuilt binary for $os/$(uname -m): install Go 1.24+ and re-run, or see https://github.com/zoolcoder/scoutjobs/releases"
+    say "  no prebuilt binary for $os/$(uname -m): install Go $GO_REQ or newer and re-run, or see https://github.com/zoolcoder/scoutjobs/releases"
   else
     mkdir -p "$BIN_DIR"
-    url="https://github.com/zoolcoder/scoutjobs/releases/latest/download/scoutjobs_${os}_${arch}.tar.gz"
-    if curl -fsSL "$url" | tar -xz -C "$BIN_DIR" scoutjobs; then
-      chmod +x "$BIN_DIR/scoutjobs"
-      say "  installed $("$BIN_DIR/scoutjobs" version 2>/dev/null || echo scoutjobs) from $url"
-      case ":$PATH:" in *":$BIN_DIR:"*) ;; *) say "  add $BIN_DIR to PATH";; esac
-    else
-      say "  download failed ($url): install Go 1.24+ and re-run, or brew install --cask zoolcoder/scoutjobs/scoutjobs"
+    name="scoutjobs_${os}_${arch}.tar.gz"
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' EXIT
+    if ! curl -fsSL -o "$tmp/$name" "$base/$name" || ! curl -fsSL -o "$tmp/checksums.txt" "$base/checksums.txt"; then
+      say "  no published binaries for ${version:-the latest release} at $base"
+      say "  install Go $GO_REQ or newer and re-run, or brew install --cask zoolcoder/scoutjobs/scoutjobs"
+      exit 1
     fi
+    want="$(awk -v n="$name" '$2 == n {print $1}' "$tmp/checksums.txt")"
+    if command -v sha256sum >/dev/null 2>&1; then got="$(sha256sum "$tmp/$name" | awk '{print $1}')"; else got="$(shasum -a 256 "$tmp/$name" | awk '{print $1}')"; fi
+    if [ -z "$want" ] || [ "$want" != "$got" ]; then
+      say "  checksum mismatch for $name: nothing installed"
+      exit 1
+    fi
+    # unpack beside the old binary, then swap, so a failure leaves the previous one usable
+    tar -xzf "$tmp/$name" -C "$tmp" scoutjobs
+    chmod +x "$tmp/scoutjobs"
+    kept=""
+    if [ -f "$BIN_DIR/scoutjobs" ]; then cp -p "$BIN_DIR/scoutjobs" "$BIN_DIR/scoutjobs.prev" && kept="; previous binary kept as scoutjobs.prev"; fi
+    mv -f "$tmp/scoutjobs" "$BIN_DIR/scoutjobs"
+    say "  installed $("$BIN_DIR/scoutjobs" version 2>/dev/null || echo scoutjobs) from $base/$name (sha256 verified$kept)"
+    case ":$PATH:" in *":$BIN_DIR:"*) ;; *) say "  add $BIN_DIR to PATH";; esac
   fi
 fi
-
 for p in $PLATFORMS; do
   case "$p" in
     claude)  say "claude code"; link_skills "$HOME/.claude/skills"

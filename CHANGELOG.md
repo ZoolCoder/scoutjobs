@@ -21,6 +21,11 @@ All notable changes to ScoutJobs. The format follows
 ### Fixed
 - The job page records the agent results a stopped run left behind, so the
   run panel shows the steps as they stand now (#32).
+- `install.sh` without Go installs the release of the checked-out tag (or
+  `SCOUTJOBS_VERSION`) instead of the latest one, verifies its sha256, keeps
+  the previous binary as `scoutjobs.prev`, and names the Go version `go.mod`
+  needs. `scoutjobs update` refuses a release without `checksums.txt` and
+  explains a tag whose binaries are not published yet (#35).
 - Connecting Google without the OAuth client secret no longer fails at
   Google's token endpoint with a Gmail error (#33). Connect checks the client
   ID and secret first and names what is missing; a reconnect from the Calendar

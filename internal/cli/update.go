@@ -137,7 +137,7 @@ func runUpdate(rest []string, out io.Writer) error {
 			return err
 		}
 	} else {
-		fmt.Fprintln(out, "warn: release has no checksums.txt, archive not verified")
+		return fmt.Errorf("release %s has no checksums.txt: refusing an unverified binary (nothing was installed)", rel.Tag)
 	}
 	bin, err := extractBinary(name, archive)
 	if err != nil {
@@ -192,7 +192,7 @@ func fetchRelease(ctx context.Context, tag string) (release, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound && tag != "" {
-		return release{}, fmt.Errorf("no release %s", tag)
+		return release{}, fmt.Errorf("no published release %s: the tag may exist while its binaries are still being built, so try again in a few minutes (nothing was installed)", tag)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return release{}, fmt.Errorf("GitHub answered %s", resp.Status)
