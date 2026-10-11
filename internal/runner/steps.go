@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -24,32 +25,115 @@ func (rn *Runner) done(j store.Job, name string) (bool, string) {
 	case "tailor":
 		return exists(dir, "resume.md"), "resume.md"
 	case "cover":
+		if rn.wordTemplate() {
+			return rn.coverBuilt(dir)
+		}
 		return exists(dir, "cover-letter.md"), "cover-letter.md"
 	case "review":
 		e, ok := rn.lastEvent(j, "review:")
-		if !ok || e.At < modTime(dir, "resume.md", "cover-letter.md") {
+		if !ok {
+			return false, "a review verdict on the current drafts"
+		}
+		if changed, known := apply.ReviewChanges(dir); known && len(changed) > 0 {
+			return false, "changed since the review: " + strings.Join(changed, ", ")
+		} else if !known && e.At < modTime(dir, "resume.md", "cover-letter.md") {
 			return false, "a review verdict on the current drafts"
 		}
 		// a fix verdict is a finished review too: the drafts were read and the findings are on the job
 		return true, e.Kind + " " + e.Note
 	case "export":
-		pdf := filepath.Join(dir, "resume.pdf")
-		st, err := os.Stat(pdf)
-		if err != nil {
-			return false, "resume.pdf"
-		}
-		md, err := os.Stat(filepath.Join(dir, "resume.md"))
-		return err != nil || !md.ModTime().After(st.ModTime()), "resume.pdf"
+		return rn.exported(dir)
 	case "ats":
 		events, _ := rn.Store.Events(j.ID, 200)
-		if k, _, _ := apply.Status(rn.Store, j, events); k.ATS != nil {
-			return true, fmt.Sprintf("ATS %d, content %d", k.ATS.ATSScore, k.ATS.Score)
+		k, _, _ := apply.Status(rn.Store, j, events)
+		if k.ATS == nil {
+			return false, "a CV check logged for this job"
 		}
-		return false, "a CV check logged for this job"
+		if changed, _ := apply.ATSChanges(dir); len(changed) > 0 {
+			return false, "changed since the score: " + strings.Join(changed, ", ")
+		}
+		return true, fmt.Sprintf("ATS %d, content %d", k.ATS.ATSScore, k.ATS.Score)
 	case "draft":
 		return exists(dir, apply.DraftName), apply.DraftName
 	}
 	return false, ""
+}
+
+// exported reports whether resume.pdf is the one to send: rendered from the current resume.md, or
+// the user's own file, which a run never overwrites.
+func (rn *Runner) exported(dir string) (bool, string) {
+	st, err := os.Stat(filepath.Join(dir, "resume.pdf"))
+	if err != nil {
+		if rn.formattedSource() {
+			return false, "resume.pdf made from " + rn.CVSource
+		}
+		return false, "resume.pdf"
+	}
+	switch apply.ExportState(dir, "resume") {
+	case apply.ExportCurrent, apply.ExportOutdated:
+		if rn.formattedSource() {
+			return false, "resume.pdf made from " + rn.CVSource
+		}
+		if apply.ExportState(dir, "resume") == apply.ExportOutdated {
+			return false, "resume.pdf from an older resume.md"
+		}
+		return true, "resume.pdf"
+	case apply.ExportOwn:
+		return true, "resume.pdf, your own file"
+	}
+	// no record of an export: an older version made it, or the user put it there
+	md, err := os.Stat(filepath.Join(dir, "resume.md"))
+	return rn.formattedSource() || err != nil || !md.ModTime().After(st.ModTime()), "resume.pdf"
+}
+
+// wordTemplate is true when config.yaml names a Word cover letter template: every letter is that
+// file with its slots filled, never a Markdown letter of its own.
+func (rn *Runner) wordTemplate() bool { return apply.IsWordTemplate(rn.CoverTemplate) }
+
+func (rn *Runner) templatePath() string {
+	if filepath.IsAbs(rn.CoverTemplate) {
+		return rn.CoverTemplate
+	}
+	return filepath.Join(rn.Store.Home, rn.CoverTemplate)
+}
+
+// coverBuilt reports whether the cover letter was built from the template, is unchanged since, and
+// kept the template. A letter not rendered for want of LibreOffice counts; the checklist warns.
+func (rn *Runner) coverBuilt(dir string) (bool, string) {
+	rec := apply.LoadProvenance(dir).Cover
+	switch {
+	case rec == nil:
+		return false, "cover-letter.docx built from " + filepath.Base(rn.CoverTemplate)
+	case len(apply.CoverChanges(dir)) > 0:
+		return false, "a cover letter rebuilt after changes to " + strings.Join(apply.CoverChanges(dir), ", ")
+	case rec.State == apply.CoverFail:
+		return false, "a cover letter that fits the template: " + rec.Summary()
+	}
+	return true, "cover-letter.docx: " + rec.Summary()
+}
+
+// buildCover fills the template when the agent wrote new slot values but did not build the letter.
+func (rn *Runner) buildCover(ctx context.Context, run *Run, j store.Job) {
+	dir := apply.Dir(rn.Store, j)
+	if !rn.wordTemplate() || !exists(dir, apply.SlotsName) {
+		return
+	}
+	if rec := apply.LoadProvenance(dir).Cover; rec != nil && len(apply.CoverChanges(dir)) == 0 {
+		return
+	}
+	rec, err := apply.BuildCover(ctx, rn.Store, j, rn.templatePath())
+	if err != nil {
+		run.logf("cover letter: %v", err)
+		return
+	}
+	run.logf("cover letter from %s: %s %s", filepath.Base(rn.CoverTemplate), rec.State, rec.Summary())
+}
+
+// formattedSource is true when config.yaml names a PDF or Word CV: the final resume is made from
+// it, never rendered from the Markdown draft.
+func (rn *Runner) formattedSource() bool {
+	ext := strings.ToLower(filepath.Ext(rn.CVSource))
+	return ext != "" && ext != ".md" && ext != ".txt"
 }
 
 // fresh is true when the output was written during this session, so the watcher does not mark a
@@ -63,6 +147,9 @@ func (rn *Runner) fresh(j store.Job, name string, since time.Time) bool {
 	case "tailor":
 		return modTime(dir, "resume.md") >= stamp
 	case "cover":
+		if rn.wordTemplate() {
+			return modTime(dir, apply.SlotsName) >= stamp
+		}
 		return modTime(dir, "cover-letter.md") >= stamp
 	case "review":
 		e, ok := rn.lastEvent(j, "review:")
@@ -92,6 +179,9 @@ func (rn *Runner) local(j store.Job, name string) (detail string, warn bool, err
 	events, _ := rn.Store.Events(j.ID, 200)
 	switch name {
 	case "export":
+		if rn.formattedSource() {
+			return "not rendered from Markdown: your CV source is " + rn.CVSource + "; save the final resume.pdf made from it in the application folder", true, nil
+		}
 		dst, size, err := apply.ExportPDF(dir, "resume.md", "")
 		if err != nil {
 			return "", false, err
@@ -178,6 +268,24 @@ func modTime(dir string, names ...string) string {
 		return ""
 	}
 	return newest.UTC().Format(time.RFC3339)
+}
+
+// Stale maps each step whose recorded result no longer covers the current files to what changed.
+func (rn *Runner) Stale(j store.Job) map[string]string {
+	dir := apply.Dir(rn.Store, j)
+	out := map[string]string{}
+	if _, ok := rn.lastEvent(j, "review:"); ok {
+		if changed, _ := apply.ReviewChanges(dir); len(changed) > 0 {
+			out["review"] = "changed since the review: " + strings.Join(changed, ", ")
+		}
+	}
+	if apply.ExportState(dir, "resume") == apply.ExportOutdated {
+		out["export"] = "resume.md changed since resume.pdf was made"
+	}
+	if changed, _ := apply.ATSChanges(dir); len(changed) > 0 {
+		out["ats"] = "changed since the score: " + strings.Join(changed, ", ")
+	}
+	return out
 }
 
 // Finished maps each step whose output exists to what it found, for the job page.

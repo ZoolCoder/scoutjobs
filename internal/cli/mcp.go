@@ -78,6 +78,8 @@ var mcpTools = []mcpTool{
 	{"cv_list", "CV check history.", []string{"cv", "list"}, []mcpProp{p("limit", "integer", "", "limit")}, true},
 	{"cv_export", "Render resume.md (master cv/ or a job's folder) to PDF next to it.", []string{"cv", "export"}, []mcpProp{
 		p("job", "string", "job id; omit for the master resume", ""), p("file", "string", "markdown file, default resume.md", "file")}, true},
+	{"cv_cover", "Fill the Word cover letter template (cover_template in config.yaml) with cover-letter.slots.json: writes cover-letter.docx, cover-letter.md and, with LibreOffice, cover-letter.pdf, and reports template and page problems.", []string{"cv", "cover"}, []mcpProp{jobRef,
+		p("template", "string", "Word template; default cover_template", "template")}, true},
 	{"email_draft", "Build the application e-mail (email.json and email.eml) from the cover letter. Nothing is sent.", []string{"email", "draft"}, []mcpProp{jobRef,
 		p("to", "string", "recipient; default the job's contact", "to"), p("subject", "string", "", "subject"),
 		p("body", "string", "file in the application folder used as body", "body"), p("attach", "array", "extra files to attach", "attach")}, true},

@@ -21,12 +21,12 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/web"
 )
 
-// gmailClient takes the OAuth client from config.yaml when set there, else from the file gmail setup imported.
+// gmailClient takes the OAuth client from config.yaml when set there, else from the file gmail setup
+// imported. A config.yaml ID without a secret takes the secret of the imported client with the same ID.
 func gmailClient(s *store.Store, cfg Config) *gmail.Client {
 	id, secret := cfg.GmailClientID, cfg.GmailSecret
-	if id == "" {
-		c := gmail.LoadCredentials(s.Home)
-		id, secret = c.ID, c.Secret
+	if f := gmail.LoadCredentials(s.Home); id == "" || (secret == "" && f.ID == id) {
+		id, secret = f.ID, f.Secret
 	}
 	if env := os.Getenv("SCOUTJOBS_GMAIL_CLIENT_SECRET"); env != "" {
 		secret = env
@@ -49,7 +49,7 @@ const gmailSteps = `Google setup: a Desktop OAuth client in your own Google Clou
 
 Google will say it has not verified the app: it is your own app, so choose Advanced > Go to ScoutJobs.
 ScoutJobs reads inbox metadata and your calendar, and creates drafts.
-It never sends, labels, deletes, or writes to your calendar.
+It never sends, labels or deletes mail, and in your calendar it writes only the interviews it adds.
 `
 
 // setupGmail imports the client from --file, or waits for Google's download to land in ~/Downloads.
@@ -330,7 +330,7 @@ func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 			return "", cfg.EmailFrom
 		},
 		Sync:  func() (int, error) { return SyncMail(s, cfg) },
-		Gmail: func() *gmail.Client { return gmailClient(s, cfg) },
+		Gmail: func() *gmail.Client { return gmailClient(s, LoadConfig(s.Home)) }, // config.yaml edits apply without a restart
 		Draft: func(id int64, kind string) (string, error) {
 			j, err := s.JobByID(id)
 			if err != nil {

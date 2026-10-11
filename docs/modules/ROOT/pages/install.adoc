@@ -26,7 +26,7 @@ $ scoutjobs init
 
 == Prebuilt binaries
 
-Without Go, `install.sh` downloads the latest release binary for macOS or Linux (amd64, arm64) into `~/.local/bin` (`SCOUTJOBS_BIN_DIR` to change it). The same binaries, plus Windows, are on https://github.com/zoolcoder/scoutjobs/releases[Releases], built by GoReleaser on every `v*` tag with `checksums.txt` next to them. Homebrew:
+Without Go, `install.sh` downloads a release binary for macOS or Linux (amd64, arm64) into `~/.local/bin` (`SCOUTJOBS_BIN_DIR` to change it): the release of the tag the checkout is on, or `SCOUTJOBS_VERSION=v0.5.1`, else the latest. It checks the archive's sha256 against the release's `checksums.txt`, keeps the previous binary as `scoutjobs.prev`, and stops with an error when the requested version has no published binaries instead of installing another one. The same binaries, plus Windows, are on https://github.com/zoolcoder/scoutjobs/releases[Releases], built by GoReleaser on every `v*` tag with `checksums.txt` next to them. Homebrew:
 
 [source,console]
 ----
@@ -54,7 +54,7 @@ $ scoutjobs update --yes          # no question; for scripts
 $ scoutjobs update --version v0.6.0   # a specific tag, also a downgrade
 ----
 
-`update` looks at where the binary lives. A plain binary (from `install.sh` or a release archive) is replaced in place: the archive for this OS and architecture is downloaded, its sha256 is checked against the release's `checksums.txt`, and the new file is renamed over the old one, so a failed download leaves the installed version untouched. A Homebrew cask is handed to `brew upgrade --cask scoutjobs`. A `deb`, `rpm` or `apk` install prints the package commands instead of touching `/usr/bin`. A `dev` build from `make install` refuses unless `--version` names a release. `scoutjobs doctor --online` reports the same check, and the dashboard footer links the running version to the release page.
+`update` looks at where the binary lives. A plain binary (from `install.sh` or a release archive) is replaced in place: the archive for this OS and architecture is downloaded, its sha256 is checked against the release's `checksums.txt`, and the new file is renamed over the old one, so a failed download leaves the installed version untouched. A Homebrew cask is handed to `brew upgrade --cask scoutjobs`. A `deb`, `rpm` or `apk` install prints the package commands instead of touching `/usr/bin`. A `dev` build from `make install` refuses unless `--version` names a release. A tag without published binaries, or a release without `checksums.txt`, is refused and nothing is installed. `scoutjobs doctor --online` reports the same check, and the dashboard footer links the running version to the release page.
 
 == Claude Code
 

@@ -187,8 +187,8 @@ dl.facts{display:grid;grid-template-columns:96px 1fr;gap:10px 12px;margin:0;alig
 /* tags, badges, chips */
 .tag,.badge{display:inline-block;font-size:11px;font-weight:500;line-height:18px;padding:0 8px;border-radius:999px;background:var(--subtle);border:1px solid var(--line);color:var(--muted);text-transform:capitalize;white-space:nowrap}
 .badge.applied,.badge.interview,.badge.in_progress,.badge.learned,.badge.pending{background:var(--info-sub);color:var(--info);border-color:transparent}
-.badge.offer,.badge.hired,.badge.ready,.badge.passed,.badge.done,.badge.stated,.badge.filled,.badge.ok{background:var(--ok-sub);color:var(--ok);border-color:transparent}
-.badge.drafted,.badge.todo,.badge.warn,.badge.template{background:var(--warn-sub);color:var(--warn);border-color:transparent}
+.badge.offer,.badge.hired,.badge.ready,.badge.passed,.badge.done,.badge.recovered,.badge.stated,.badge.filled,.badge.ok{background:var(--ok-sub);color:var(--ok);border-color:transparent}
+.badge.drafted,.badge.todo,.badge.warn,.badge.stale,.badge.template{background:var(--warn-sub);color:var(--warn);border-color:transparent}
 .badge.rejected,.badge.failed,.badge.cancelled,.badge.bad,.badge.no_response{background:var(--bad-sub);color:var(--bad);border-color:transparent}
 .badge.ranked,.badge.practiced,.badge.note,.badge.scored{background:var(--acc-sub);color:var(--acc);border-color:transparent}
 .badge.skipped,.badge.status{background:var(--subtle);color:var(--muted)}
@@ -681,7 +681,8 @@ details.preview .pre{max-height:260px;overflow:auto;font-size:12.5px;margin:6px 
 details.rejected ul{margin:6px 0 0;padding-left:18px}
 
 /* job checklist */
-ol.checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ol.checklist .prov{display:block;font-family:var(--mono,ui-monospace,monospace);font-size:11px;color:var(--muted)}
+.checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 ol.checklist>li{display:grid;grid-template-columns:22px 1fr auto auto;gap:12px;align-items:center;padding:9px 4px;border-top:1px solid var(--line)}
 ol.checklist>li:first-child{border-top:0}
 ol.checklist b{font-weight:600;font-size:13.5px}ol.checklist small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}

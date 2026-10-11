@@ -7,6 +7,43 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-11
+
+### Added
+- Document provenance (#32): the draft review, each PDF export and the ATS
+  score record the SHA-256 of the files they covered in `provenance.json`.
+  A changed file makes the step stale: Prepare application runs it again, the
+  checklist and the last run show it, and `GET /api/jobs/{id}` returns the
+  files and hashes. Replacing the exported PDF with your own final CV reopens
+  the review and the ATS check, and a run never overwrites that file.
+- `cv_source` and `cover_template` in config.yaml: the CV and cover letter
+  every tailored document starts from. A PDF or Word source is never replaced
+  by a PDF rendered from Markdown.
+- Cover letters from a Word template (#36): with a `.docx` `cover_template`
+  holding `{{slot}}` placeholders, the agent writes only the slot values and
+  `scoutjobs cv cover <id>` fills a copy of the template, keeping its styles,
+  page setup, headers and run formatting, and writes cover-letter.docx, the
+  same words as cover-letter.md, and with LibreOffice cover-letter.pdf. It
+  checks required slots and lengths, the employer, unstated recipients or
+  addresses, leftover placeholders, design drift, the page count against the
+  template and the PDF text layer. The dashboard shows the template check, and
+  a `cover_template` gate blocks sending while it fails or is out of date.
+
+### Fixed
+- The job page records the agent results a stopped run left behind, so the
+  run panel shows the steps as they stand now (#32).
+- `install.sh` without Go installs the release of the checked-out tag (or
+  `SCOUTJOBS_VERSION`) instead of the latest one, verifies its sha256, keeps
+  the previous binary as `scoutjobs.prev`, and names the Go version `go.mod`
+  needs. `scoutjobs update` refuses a release without `checksums.txt` and
+  explains a tag whose binaries are not published yet (#35).
+- Connecting Google without the OAuth client secret no longer fails at
+  Google's token endpoint with a Gmail error (#33). Connect checks the client
+  ID and secret first and names what is missing; a reconnect from the Calendar
+  page reports as Google Calendar and returns there; a config.yaml client ID
+  without a secret uses the imported client's secret; config.yaml edits apply
+  without restarting `serve`.
+
 ## [0.5.0] - 2026-10-11
 
 ### Added
@@ -204,7 +241,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.2

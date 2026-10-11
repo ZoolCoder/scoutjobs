@@ -13,7 +13,7 @@ The server started by `scoutjobs serve` answers `/api/*` with JSON. With `api_to
 | GET | `/api/stats` | | funnel and rates, same as `scoutjobs stats --json`
 | GET | `/api/jobs` | `?status=new&q=stripe&open=1&limit=20` | job rows
 | POST | `/api/jobs` | `{"company","title","url","location","remote","source","posted_at","tags","salary_min","salary_max","currency","notes"}` | 201 created, 200 existing (same company and normalised title, or the same posting URL, returns the tracked row)
-| GET | `/api/jobs/\{id}` | | job, events, interviews
+| GET | `/api/jobs/\{id}` | | job, events, interviews, and `provenance`: the SHA-256 of every file the draft review (`review.files`), each export (`exports`) and the ATS score (`ats.files`) covered, with `review_changed` and `ats_changed` listing the files changed since and `resume_pdf` (`current`, `outdated` or `own`); with a Word cover letter template, `cover` holds the last build (template, files, pages, `state` and `problems`) and `cover_changed` what changed since
 | POST | `/api/jobs/\{id}/status` | `{"status":"applied","reason":"..."}` | updated job; skip, withdraw and decline also log a decision
 | POST | `/api/jobs/\{id}/note` | `{"note":"..."}` | 201
 | GET | `/api/jobs/\{id}/check` | | the quality gates: `ok` and `report.gates` with `name`, `state` (`pass`, `warn`, `fail`, `skip`), `detail`, `items`; same as `scoutjobs job check --json`

@@ -76,16 +76,46 @@ func FindDownload(dir string, since time.Time) string {
 	return best
 }
 
-// Pending is an authorization in flight: what the callback needs to finish it.
+// ConfigError is a Google OAuth client that cannot finish a sign-in. It names what is missing,
+// never the values.
+type ConfigError struct{ Missing []string }
+
+func (e ConfigError) Error() string {
+	return "the Google OAuth client " + strings.Join(e.Missing, " and ") + " is missing. Import the Desktop client JSON again " +
+		"(Inbox page, or scoutjobs gmail setup --file <client_secret_….json>), or set both gmail_client_id and " +
+		"gmail_client_secret in config.yaml ($SCOUTJOBS_GMAIL_CLIENT_SECRET also works), then connect again"
+}
+
+// CheckConfig refuses a client without an ID or secret: Google rejects the code exchange of a Desktop
+// client without its secret, after the user has already been through the consent screen.
+func (c *Client) CheckConfig() error {
+	var missing []string
+	if c.ID == "" {
+		missing = append(missing, "ID")
+	}
+	if c.Secret == "" {
+		missing = append(missing, "secret")
+	}
+	if len(missing) > 0 {
+		return ConfigError{missing}
+	}
+	return nil
+}
+
+// Pending is an authorization in flight: what the callback needs to finish it. Feature is what the
+// user was connecting ("gmail" or "calendar"), so a failure is reported where it started.
 type Pending struct {
-	State, Verifier, Redirect string
+	State, Verifier, Redirect, Feature string
 }
 
 // Begin returns Google's consent URL for a redirect on loopback. PKCE makes an intercepted code useless.
 func (c *Client) Begin(redirect string) (string, Pending, error) {
 	c.defaults()
-	if c.ID == "" {
-		return "", Pending{}, errors.New("no Gmail OAuth client yet: run scoutjobs gmail setup")
+	if c.ID == "" && c.Secret == "" {
+		return "", Pending{}, errors.New("no Google OAuth client yet: run scoutjobs gmail setup")
+	}
+	if err := c.CheckConfig(); err != nil {
+		return "", Pending{}, err
 	}
 	p := Pending{State: randomString(16), Verifier: randomString(48), Redirect: redirect}
 	sum := sha256.Sum256([]byte(p.Verifier))
@@ -111,6 +141,9 @@ func (p Pending) Code(q url.Values) (string, error) {
 // Finish trades the code from the callback for tokens, looks up the address and saves the token.
 func (c *Client) Finish(ctx context.Context, p Pending, code string) (Token, error) {
 	c.defaults()
+	if err := c.CheckConfig(); err != nil {
+		return Token{}, err
+	}
 	t, err := c.grant(ctx, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {p.Redirect}, "code_verifier": {p.Verifier}})
 	if err != nil {
 		return Token{}, err

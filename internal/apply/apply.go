@@ -220,7 +220,10 @@ func ExportPDF(dir, name, title string) (string, int, error) {
 	}
 	out := pdf.Render(string(md), title, time.Now())
 	dst := filepath.Join(dir, name+".pdf")
-	return dst, len(out), os.WriteFile(dst, out, 0o600)
+	if err := os.WriteFile(dst, out, 0o600); err != nil {
+		return dst, 0, err
+	}
+	return dst, len(out), stampExport(dir, src, dst)
 }
 
 func pdfTitle(md, fallback string) string {

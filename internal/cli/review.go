@@ -103,6 +103,9 @@ func runJobReview(s *store.Store, rest []string, out io.Writer) error {
 	if err := s.AddEvent(j.ID, "review:"+*verdict, *notes); err != nil {
 		return err
 	}
+	if err := apply.StampReview(apply.Dir(s, j)); err != nil {
+		return err
+	}
 	fmt.Fprintf(out, "review:%s logged for #%d\n", *verdict, j.ID)
 	return nil
 }

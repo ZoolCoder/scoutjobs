@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
@@ -17,6 +18,7 @@ type checkItem struct {
 	Detail string
 	Href   string // where to look or act
 	Act    string
+	Files  string // the files and SHA-256 prefixes the result covered
 }
 
 type checklist struct {
@@ -33,6 +35,21 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 		item("Tailored resume", kit.Resume, "resume.md", file("resume.md"), "Preview"),
 		item("Cover letter", kit.Cover, "cover-letter.md", file("cover-letter.md"), "Preview"),
 	}
+	prov := apply.ProvenanceOf(dir)
+	if rec := prov.Cover; rec != nil {
+		cover := &items[2]
+		cover.State, cover.Detail, cover.Files = "done", "from "+filepath.Base(rec.Template)+": "+rec.Summary(), covered(rec.Files)
+		if rec.Rendered {
+			cover.Href, cover.Act = file("cover-letter.pdf"), "Preview"
+		}
+		switch {
+		case len(prov.CoverChanged) > 0:
+			cover.State, cover.Detail = "warn", "stale, changed after the build: "+strings.Join(prov.CoverChanged, ", ")
+			cover.Href, cover.Act = base+"#run", "Build again"
+		case rec.State != apply.CoverPass:
+			cover.State = "warn"
+		}
+	}
 	review := checkItem{Label: "Draft review"}
 	for _, e := range events { // newest first
 		if strings.HasPrefix(e.Kind, "review:") {
@@ -44,9 +61,28 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 			break
 		}
 	}
+	if review.State != "" {
+		if prov.Review != nil {
+			review.Files = covered(prov.Review.Files)
+		}
+		if len(prov.ReviewChanged) > 0 {
+			review.State, review.Detail = "warn", "stale, changed since the review: "+strings.Join(prov.ReviewChanged, ", ")
+			review.Href, review.Act = base+"#run", "Review again"
+		}
+	}
 	items = append(items, review)
 	_, err := os.Stat(filepath.Join(dir, "resume.pdf"))
-	items = append(items, item("Resume PDF", err == nil, "resume.pdf", file("resume.pdf"), "Preview"))
+	pdf := item("Resume PDF", err == nil, "resume.pdf", file("resume.pdf"), "Preview")
+	switch prov.ResumePDF {
+	case apply.ExportOwn:
+		pdf.Detail = "resume.pdf, your own file"
+	case apply.ExportOutdated:
+		pdf.State, pdf.Detail = "warn", "stale, made from an older resume.md"
+	}
+	if e, ok := prov.Exports["resume.pdf"]; ok && pdf.State != "" {
+		pdf.Files = covered(e.Files)
+	}
+	items = append(items, pdf)
 	ats := checkItem{Label: "ATS check"}
 	if c := kit.ATS; c != nil {
 		ats.State, ats.Detail = "done", fmt.Sprintf("ATS %d, content %d", c.ATSScore, c.Score)
@@ -55,6 +91,15 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 			if c.Gaps != "" {
 				ats.Detail += ": " + c.Gaps
 			}
+		}
+	}
+	if ats.State != "" {
+		if prov.ATS != nil {
+			ats.Files = covered(prov.ATS.Files)
+		}
+		if len(prov.ATSChanged) > 0 {
+			ats.State, ats.Detail = "warn", "stale, the score covers another version of "+strings.Join(prov.ATSChanged, ", ")
+			ats.Href, ats.Act = base+"#run", "Score again"
 		}
 	}
 	items = append(items, ats)
@@ -100,6 +145,19 @@ func item(label string, done bool, detail, href, act string) checkItem {
 		return checkItem{Label: label}
 	}
 	return checkItem{Label: label, State: "done", Detail: detail, Href: href, Act: act}
+}
+
+// covered lists files with their SHA-256 prefix, in a stable order.
+func covered(files map[string]string) string {
+	names := make([]string, 0, len(files))
+	for n := range files {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for i, n := range names {
+		names[i] = n + " " + apply.Short(files[n])
+	}
+	return strings.Join(names, " · ")
 }
 
 func orNone(s string) string {

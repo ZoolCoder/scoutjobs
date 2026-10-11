@@ -157,7 +157,10 @@ func RecordReview(s *store.Store, j store.Job, events []store.Event) (bool, erro
 	if v.Verdict != "send" && v.Verdict != "fix" {
 		return false, fmt.Errorf("%s: verdict must be send or fix, got %q", ReviewResult, v.Verdict)
 	}
-	return true, s.AddEvent(j.ID, "review:"+v.Verdict, v.Notes)
+	if err := s.AddEvent(j.ID, "review:"+v.Verdict, v.Notes); err != nil {
+		return false, err
+	}
+	return true, StampReview(dir)
 }
 
 // RecordATS logs ats-result.json as the CV check of the job when it is newer than the last one logged.
@@ -171,12 +174,11 @@ func RecordATS(s *store.Store, j store.Job, events []store.Event) (bool, error) 
 	if v.Score < 0 || v.Score > 100 || v.ATS < 0 || v.ATS > 100 {
 		return false, fmt.Errorf("%s: score and ats must be 0-100", ATSResult)
 	}
-	file := "resume.pdf"
-	if !exists(filepath.Join(dir, file)) {
-		file = "resume.md"
+	file := ScoredFile(dir)
+	if _, err = s.AddCVCheck(store.CVCheck{File: file, Score: v.Score, ATSScore: v.ATS, Summary: v.Summary, Gaps: strings.Join(v.Gaps, ", "), JobID: j.ID}); err != nil {
+		return false, err
 	}
-	_, err = s.AddCVCheck(store.CVCheck{File: file, Score: v.Score, ATSScore: v.ATS, Summary: v.Summary, Gaps: strings.Join(v.Gaps, ", "), JobID: j.ID})
-	return err == nil, err
+	return true, StampATS(dir, file)
 }
 
 // readResult decodes an agent result; at is its modification time, comparable with event times.

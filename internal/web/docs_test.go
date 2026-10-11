@@ -1,12 +1,15 @@
 package web
 
 import (
+	"archive/zip"
+	"context"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/runner"
@@ -158,6 +161,10 @@ func TestPrepareAllAndAutoPrepare(t *testing.T) {
 	if b := page.Body.String(); !strings.Contains(b, "data-run") || !strings.Contains(b, "<progress") {
 		t.Errorf("job page should show live progress: %s", b)
 	}
+	// the queue may not have started the run yet; it must not outlive the temp dir
+	for i := 0; i < 300 && (m.Latest(1) == nil || len(m.Waiting()) > 0); i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
 	if run := m.Latest(1); run != nil {
 		m.Cancel(run.ID)
 		run.Wait()
@@ -276,4 +283,79 @@ func hasKind(events []store.Event, kind string) bool {
 		}
 	}
 	return false
+}
+
+func TestJobPageShowsProvenanceAndStaleResults(t *testing.T) {
+	s := testStore(t)
+	m := runner.NewManager(&runner.Runner{Store: s, Exe: "scoutjobs", Custom: "/bin/true"})
+	h, _ := Handler(s, Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5, Runner: m, APIToken: "secret"})
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Jane\n\n"+strings.Repeat("Go services. ", 40)), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team, "+strings.Repeat("I build Go services. ", 20)), 0o600)
+	// the agent left its verdict but the run stopped before recording it: the page load records it
+	_ = os.WriteFile(filepath.Join(dir, apply.ReviewResult), []byte(`{"verdict":"send","notes":"all claims in profile.md"}`), 0o600)
+	page := func() string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
+		return rec.Body.String()
+	}
+	b := page()
+	sum := apply.Short(apply.LoadProvenance(dir).Review.Files["resume.md"])
+	if !strings.Contains(b, "all claims in profile.md") || !strings.Contains(b, "resume.md "+sum) {
+		t.Fatalf("recorded review and its hashes: %s", b)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "resume.pdf"), []byte("%PDF-1.7 the styled final CV"), 0o600)
+	if b := page(); !strings.Contains(b, "stale, changed since the review: resume.pdf") || !strings.Contains(b, "stale: changed since the review: resume.pdf") {
+		t.Errorf("a replaced final file must reopen the review: %s", b)
+	}
+	req := httptest.NewRequest("GET", "/api/jobs/1", nil)
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if b := rec.Body.String(); !strings.Contains(b, `"review_changed":["resume.pdf"]`) || !strings.Contains(b, `"resume.md":"`) {
+		t.Errorf("api provenance: %s", b)
+	}
+	if j, _ := s.JobByID(1); j.Status == "applied" {
+		t.Error("reconciling never marks a job applied")
+	}
+}
+
+func TestJobPageShowsTheCoverLetterTemplateCheck(t *testing.T) {
+	s := testStore(t)
+	t.Setenv("SCOUTJOBS_SOFFICE", "off")
+	h, _ := Handler(s, Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5})
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	_ = os.MkdirAll(dir, 0o755)
+	tmpl := filepath.Join(s.Home, "cv", "letter.docx")
+	_ = os.MkdirAll(filepath.Dir(tmpl), 0o755)
+	f, _ := os.Create(tmpl)
+	w := zip.NewWriter(f)
+	fw, _ := w.Create("word/document.xml")
+	fw.Write([]byte(`<w:document xmlns:w="w"><w:body><w:p><w:r><w:t xml:space="preserve">Dear {{salutation}},</w:t></w:r></w:p><w:p><w:r><w:t>{{body_paragraph_1}}</w:t></w:r></w:p></w:body></w:document>`))
+	w.Close()
+	f.Close()
+	_ = os.WriteFile(filepath.Join(dir, apply.SlotsName), []byte(`{"salutation":"Hiring Team","body_paragraph_1":"`+strings.Repeat("I build Go services. ", 20)+`"}`), 0o600)
+	if _, err := apply.BuildCover(context.Background(), s, j, tmpl); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
+	b := rec.Body.String()
+	for _, want := range []string{"Cover letter built from <code>letter.docx</code>", "template warn", "install LibreOffice", "Cover letter DOCX", "/download/cover-letter.docx"} {
+		if !strings.Contains(b, want) {
+			t.Errorf("job page lacks %q", want)
+		}
+	}
+	if strings.Contains(b, `/files/cover-letter.docx"`) {
+		t.Error("a DOCX has no preview")
+	}
+	_ = os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team, edited by hand"), 0o600)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
+	if b := rec.Body.String(); !strings.Contains(b, "stale, changed after the build: cover-letter.md") {
+		t.Errorf("an edited letter no longer matches its DOCX: %s", b)
+	}
 }

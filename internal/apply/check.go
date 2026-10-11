@@ -98,6 +98,9 @@ func Check(s *store.Store, j store.Job, events []store.Event, o CheckOptions) Re
 		add(gateATS(dir))
 		add(gateFilenames(dir))
 	}
+	if g, ok := gateCover(dir); ok {
+		add(g)
+	}
 	if o.AllowAcknowledged {
 		r.allowAcknowledged(events, review, drafts)
 	}
@@ -244,13 +247,15 @@ func gateGrounding(dir string, events []store.Event, drafts map[string]string) G
 	if err != nil {
 		return Gate{"grounding", Fail, "cannot read the review time " + latest.At, nil}
 	}
-	var stale []string
-	for n := range drafts {
-		if st, err := os.Stat(filepath.Join(dir, n)); err == nil && st.ModTime().After(at.Add(time.Second)) {
-			stale = append(stale, n)
+	stale, known := ReviewChanges(dir)
+	if !known { // a review recorded before provenance: compare modification times
+		for n := range drafts {
+			if st, err := os.Stat(filepath.Join(dir, n)); err == nil && st.ModTime().After(at.Add(time.Second)) {
+				stale = append(stale, n)
+			}
 		}
+		sort.Strings(stale)
 	}
-	sort.Strings(stale)
 	if len(stale) > 0 {
 		return Gate{"grounding", Fail, "edited after the last review: " + strings.Join(stale, ", "), stale}
 	}
@@ -294,6 +299,25 @@ func gateDuplicates(s *store.Store, dir string, drafts map[string]string) Gate {
 		return Gate{"duplicates", Fail, fmt.Sprintf("%d duplicate(s)", len(hits)), hits}
 	}
 	return Gate{"duplicates", Pass, "no repeated paragraphs, cover letter unique", nil}
+}
+
+// gateCover holds a letter built from a Word template to the template check, and to the words the
+// review read: a cover letter edited after the build no longer matches its DOCX and PDF.
+func gateCover(dir string) (Gate, bool) {
+	rec := LoadProvenance(dir).Cover
+	if rec == nil {
+		return Gate{}, false
+	}
+	if changed := CoverChanges(dir); len(changed) > 0 {
+		return Gate{"cover_template", Fail, "changed after the cover letter was built, so the DOCX, PDF and Markdown may differ: " + strings.Join(changed, ", ") + "; run `scoutjobs cv cover <id>`", changed}, true
+	}
+	switch rec.State {
+	case CoverFail:
+		return Gate{"cover_template", Fail, "the cover letter does not fit its template", rec.Problems}, true
+	case CoverWarn:
+		return Gate{"cover_template", Warn, rec.Summary(), nil}, true
+	}
+	return Gate{"cover_template", Pass, rec.Summary(), nil}, true
 }
 
 // gateATS inspects resume.pdf: a text layer with fonts, no encryption, sane size.
