@@ -21,20 +21,21 @@
 </li>{{end}}</ul>
 </section>
 {{end}}
-<section class="panel">
-<div class="panel-h"><h2>Upcoming</h2><span class="n">{{len .Upcoming}}</span><a class="act" href="/calendar?view=schedule">Calendar</a></div>
-{{if .Upcoming}}
-<table>
-<thead><tr><th>When</th><th>Company</th><th>Stage</th><th>Format</th><th>Interviewer</th><th>Prep</th><th>Outcome</th></tr></thead><tbody>
-{{range .Upcoming}}<tr>
-  <td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/pipeline?job={{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td class="muted">{{.Format}}</td><td class="muted">{{.Interviewer}}</td>
-  <td><details class="prep-pop"><summary><span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span></summary>{{template "prep-check" (prepArgs . "/interviews")}}</details></td>
-  <td><form method="post" action="/interviews/{{.ID}}" class="inline"><input type="hidden" name="back" value="/interviews"><select name="outcome"><option value="">—</option>{{range $o := $oc}}<option value="{{$o}}">{{title $o}}</option>{{end}}</select><button class="mini">Save</button></form></td>
-</tr>{{end}}
-</tbody></table>
-{{else}}<p class="empty">Nothing scheduled. <a href="/calendar?view=schedule&amp;new={{today}}">Schedule an interview</a> or run <code>scoutjobs interview add &lt;job&gt; --stage screen --at YYYY-MM-DD</code></p>{{end}}
+{{if not .Upcoming}}<section class="panel">
+<div class="panel-h"><h2>Upcoming</h2><a class="act" href="/calendar?view=schedule">Calendar</a></div>
+<p class="empty">Nothing scheduled. <a href="/calendar?view=schedule&amp;new={{today}}">Schedule an interview</a> or run <code>scoutjobs interview add &lt;job&gt; --stage screen --at YYYY-MM-DD</code></p>
 </section>
-<section class="panel">
+{{else if gt (len .Upcoming) 1}}<section class="panel">
+<div class="panel-h"><h2>Later</h2><span class="n">{{add (len .Upcoming) -1}}</span><a class="act" href="/calendar?view=schedule">Calendar</a></div>
+<ul class="irows">{{range $n, $i := .Upcoming}}{{if $n}}<li>
+  <span class="cal"><small>{{mon .At}}</small><b>{{dom .At}}</b></span>
+  <div class="who"><a href="/pipeline?job={{.JobID}}"><b>{{.Company}}</b></a> <span class="muted">{{.Title}}</span><small>{{title .Stage}}{{with hm .At}} · {{.}}{{end}}{{with .Format}} · {{.}}{{end}}{{with .Interviewer}} · with {{.}}{{end}}</small></div>
+  <details class="prep-pop"><summary><span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span></summary>{{template "prep-check" (prepArgs . "/interviews")}}</details>
+  <details class="prep-pop outcome"><summary class="btn mini" title="Set the outcome">…</summary><form method="post" action="/interviews/{{.ID}}" class="seg-btns"><input type="hidden" name="back" value="/interviews">{{range $oc}}<button name="outcome" value="{{.}}" class="mini">{{title .}}</button>{{end}}</form></details>
+</li>{{end}}{{end}}</ul>
+</section>
+{{end}}
+{{if .Past}}<section class="panel">
 <div class="panel-h"><h2>Past</h2><span class="n">{{len .Past}}</span></div>
 {{if .Past}}
 <table>
@@ -42,7 +43,7 @@
 {{range .Past}}<tr><td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td><span class="badge {{.Outcome}}">{{title .Outcome}}</span></td>
 <td><form method="post" action="/interviews/{{.ID}}" class="inline wide"><input type="hidden" name="back" value="/interviews"><input name="feedback" value="{{.Feedback}}" placeholder="What did you learn?"><button class="mini primary">Save</button></form></td></tr>{{end}}
 </tbody></table>
-{{else}}<p class="empty">No past interviews yet. Outcomes you set above move here.</p>{{end}}
-</section>
+{{end}}
+</section>{{end}}
 {{end}}
 {{template "foot" .}}
