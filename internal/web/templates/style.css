@@ -831,8 +831,6 @@ ul.feed small{display:block;font-size:11.5px;color:var(--muted)}
 .jobmain ol.checklist b{flex:none}
 .jobmain ol.checklist small{display:block;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jobmain ol.checklist .prov{flex:0 1 auto;max-width:30%}
-.jobmain .pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
-.jobmain .pair #docs{order:-1}
 .jobmain #docs thead{display:none}
 .jobmain #docs td{padding:6px 4px;vertical-align:middle}
 .jobmain #docs td.mono{font-size:11.5px;color:var(--muted);white-space:nowrap}
@@ -848,7 +846,7 @@ ul.feed small{display:block;font-size:11.5px;color:var(--muted)}
 .jobmain .fold[open]>summary::after{transform:rotate(45deg)}
 .jobmain .fold>summary:hover h2{color:var(--acc)}
 .jobmain .fold>summary .act{margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-@media (max-width:1100px){.jobmain .pair,.jobmain .folds{grid-template-columns:1fr}}
+@media (max-width:1100px){.jobmain .folds{grid-template-columns:1fr}}
 .jobmain #docs tr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n a" "d a";align-items:center;border-top:1px solid var(--line);padding:6px 0}
 .jobmain #docs tbody tr:first-child{border-top:0}
 .jobmain #docs td{border:0;padding:0 4px}
@@ -857,4 +855,35 @@ ul.feed small{display:block;font-size:11.5px;color:var(--muted)}
 .jobmain #docs td.acts{grid-area:a;white-space:nowrap}
 .jobmain .fold>summary h2,.jobmain .fold>summary .n{white-space:nowrap}
 .jobmain #docs td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.jobmain .pair .panel-h .act{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* job page: header with one menu, next step first, sections as links */
+.jobhead{flex-wrap:wrap}
+.jobacts{display:flex;gap:8px;margin-left:auto;align-items:center}
+.jobacts .btn svg,.menu-list svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-right:6px;vertical-align:-2px}
+.jobmenu{position:relative}
+.jobmenu>summary{list-style:none;cursor:pointer}.jobmenu>summary::-webkit-details-marker{display:none}
+.menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:210px;display:flex;flex-direction:column;padding:6px;background:var(--surface);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--shadow)}
+.menu-list a,.menu-list button{display:flex;align-items:center;width:100%;padding:8px 10px;border:0;border-radius:7px;background:none;color:var(--fg);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.menu-list a:hover,.menu-list button:hover{background:var(--subtle);text-decoration:none}
+.menu-list form{display:block}
+.jobtop .stepper{max-width:none;margin-top:4px}
+.jobmain .folds{grid-template-columns:1fr;gap:10px}
+.nextstep .ns{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:center}
+.nextstep .eyebrow{grid-column:1;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--acc)}
+.nextstep .ns h2{grid-column:1;font-size:18px;font-weight:650;margin:2px 0}
+.nextstep .ns p{grid-column:1;margin:0;color:var(--muted);font-size:13px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
+.nextstep .ns .btn{grid-column:2;grid-row:1/span 3}
+.nextstep .ns.blocked .eyebrow{color:var(--bad)}.nextstep .ns.warn .eyebrow{color:var(--warn)}
+.nextstep .prog{display:flex;align-items:center;gap:12px;margin:16px 0 6px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.nextstep .prog meter{flex:1}
+.nextstep ol.checklist:empty{display:none}
+.donesteps{margin-top:4px}
+.donesteps>summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:6px 4px}
+.donesteps>summary:hover{color:var(--fg)}
+nav.joblinks{display:flex;flex-direction:column;padding:8px}
+nav.joblinks a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--fg);font-size:13.5px}
+nav.joblinks a:hover{background:var(--subtle);text-decoration:none}
+nav.joblinks a.on{background:var(--subtle);color:var(--acc)}
+nav.joblinks svg{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.joblinks .n{margin-left:auto;font-size:11.5px;color:var(--muted);background:var(--subtle);border-radius:999px;padding:0 8px}
+.nextstep ol.checklist li.next{background:none;box-shadow:none}

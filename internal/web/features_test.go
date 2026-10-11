@@ -127,11 +127,11 @@ func TestJobTabsAndCalendarPrefill(t *testing.T) {
 	s := testStore(t)
 	h, _ := Handler(s, Config{})
 	for tab, want := range map[string]string{
-		"":           "Checklist",
+		"":           "Next step",
 		"interviews": `name="prep_form"`,
 		"files":      "Files",
 		"activity":   `name="note"`,
-		"nonsense":   "Checklist",
+		"nonsense":   "Next step",
 	} {
 		path := "/jobs/1"
 		if tab != "" {

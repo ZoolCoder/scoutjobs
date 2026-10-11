@@ -12,6 +12,7 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -97,7 +98,13 @@ var funcs = template.FuncMap{
 		}
 		return ""
 	},
-	"day":       day,
+	"day": day,
+	"host": func(u string) string {
+		if p, err := url.Parse(u); err == nil && p.Host != "" {
+			return strings.TrimPrefix(p.Host, "www.")
+		}
+		return u
+	},
 	"hasSuffix": strings.HasSuffix,
 	"base":      filepath.Base,
 	"join":      strings.Join,

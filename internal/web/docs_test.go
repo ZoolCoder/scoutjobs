@@ -202,11 +202,11 @@ func TestJobChecklistAndGroupedNav(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
 	page := rec.Body.String()
-	list := page[strings.Index(page, `<ol class="checklist">`):]
-	list = list[:strings.Index(list, "</ol>")]
+	list := page[strings.Index(page, `id="checklist"`):]
+	list = list[:strings.Index(list, "</section>")]
 	for _, want := range []string{
 		`<li class="done"><span class="tick" aria-hidden="true"></span><div><b>Tailored resume</b>`,
-		`<li class="next"><span class="tick" aria-hidden="true"></span><div><b>Cover letter</b>`,
+		`<div class="ns next"><span class="eyebrow">Next step</span><h2>Cover letter</h2>`,
 		`<li class="warn"><span class="tick" aria-hidden="true"></span><div><b>Draft review</b><small title="drop the Kafka claim">drop the Kafka claim`,
 		`<li class="blocked"><span class="tick" aria-hidden="true"></span><div><b>Quality gates</b><small title="sending blocked`,
 	} {
@@ -214,7 +214,7 @@ func TestJobChecklistAndGroupedNav(t *testing.T) {
 			t.Errorf("checklist lacks %q:\n%s", want, list)
 		}
 	}
-	if strings.Count(list, `class="next"`) != 1 {
+	if strings.Count(list, `class="next"`)+strings.Count(list, `class="ns next"`) != 1 {
 		t.Error("exactly one item is next")
 	}
 	if !strings.Contains(page, `<p class="navh">Apply</p>`) || !strings.Contains(page, "Find jobs") {
