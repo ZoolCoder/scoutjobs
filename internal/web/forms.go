@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -217,10 +218,15 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 	res.Postings = kept
 	if r.FormValue("add") != "" {
 		for _, p := range res.Postings {
-			if _, created, err := v.s.UpsertJob(p.Job()); err != nil {
+			j, created, err := v.s.UpsertJob(p.Job())
+			if err == nil {
+				err = apply.SavePosting(v.s, j, p.Description)
+			}
+			if err != nil {
 				fail(w, err)
 				return
-			} else if created {
+			}
+			if created {
 				f.Added++
 			}
 		}

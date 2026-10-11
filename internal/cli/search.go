@@ -70,6 +70,9 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 			if err != nil {
 				return err
 			}
+			if err := apply.SavePosting(s, j, p.Description); err != nil {
+				return err
+			}
 			rw.ID, rw.Created = j.ID, created
 			if created {
 				added++
@@ -158,6 +161,9 @@ func runImport(s *store.Store, rest []string, out io.Writer) error {
 		}
 		j, c, err := s.UpsertJob(p.Job())
 		if err != nil {
+			return err
+		}
+		if err := apply.SavePosting(s, j, p.Description); err != nil {
 			return err
 		}
 		ids = append(ids, j.ID)

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -443,6 +444,9 @@ func (v *server) apiSearch(w http.ResponseWriter, r *http.Request) {
 		rw := row{Posting: p}
 		if in.Add {
 			j, created, err := v.s.UpsertJob(p.Job())
+			if err == nil {
+				err = apply.SavePosting(v.s, j, p.Description)
+			}
 			if err != nil {
 				apiErr(w, 500, err)
 				return

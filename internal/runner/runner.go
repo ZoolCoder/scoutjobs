@@ -367,6 +367,7 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	rn.ensurePosting(ctx, run, j)
 	var steps []Step
 	for _, i := range group {
 		steps = append(steps, run.Steps[i].Step)

@@ -7,6 +7,12 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Jobs added from a search keep the posting: its text is saved to
+  `posting.md`, and Prepare application fetches a missing one from the job's
+  URL (Remotive links included) before the agent starts, so the fit and draft
+  reviews check the drafts against the posting, not the board's tags.
+
 ## [0.6.0] - 2026-10-11
 
 ### Added
