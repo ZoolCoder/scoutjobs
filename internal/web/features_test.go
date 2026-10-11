@@ -414,3 +414,35 @@ func TestGmailConnectFromInbox(t *testing.T) {
 		t.Errorf("missing secret: %s", back)
 	}
 }
+
+func TestPreferenceForms(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{})
+	if rec := post(h, "/preferences", url.Values{"key": {" Company size "}, "value": {"50-500"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("set: %d %s", rec.Code, rec.Body)
+	}
+	pref := func(key string) (store.Preference, bool) {
+		prefs, _ := s.Preferences()
+		for _, p := range prefs {
+			if p.Key == key {
+				return p, true
+			}
+		}
+		return store.Preference{}, false
+	}
+	if p, ok := pref("company_size"); !ok || p.Source != "stated" || p.Value != "50-500" {
+		t.Fatalf("company_size = %+v", p)
+	}
+	if b := get(h, "/preferences").Body.String(); !strings.Contains(b, "<b>company size</b>") || !strings.Contains(b, "You set it") {
+		t.Error("preference row missing")
+	}
+	if rec := post(h, "/preferences", url.Values{"key": {"salary"}}); rec.Code == http.StatusSeeOther {
+		t.Error("empty value accepted")
+	}
+	if rec := post(h, "/preferences/delete", url.Values{"key": {"company_size"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("delete: %d", rec.Code)
+	}
+	if _, ok := pref("company_size"); ok {
+		t.Error("not deleted")
+	}
+}

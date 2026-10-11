@@ -310,6 +310,8 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
 	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
+	mux.HandleFunc("POST /preferences", srv.setPreferenceForm)
+	mux.HandleFunc("POST /preferences/delete", srv.deletePreferenceForm)
 	mux.HandleFunc("GET /profile", srv.profile)
 	mux.HandleFunc("GET /cv/{name}", srv.cvDownload)
 	mux.HandleFunc("GET /cv/view/{name}", srv.cvView)
@@ -927,6 +929,34 @@ func (v *server) reviewForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+}
+
+// setPreferenceForm stores a preference in the user's own words, so learning never overwrites it.
+func (v *server) setPreferenceForm(w http.ResponseWriter, r *http.Request) {
+	key := prefKey(r.FormValue("key"))
+	value := strings.TrimSpace(r.FormValue("value"))
+	if key == "" || value == "" {
+		fail(w, errors.New("name the preference and give it a value"))
+		return
+	}
+	if err := v.s.SetPreference(store.Preference{Key: key, Value: value, Confidence: 1, Source: "stated"}); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+}
+
+func (v *server) deletePreferenceForm(w http.ResponseWriter, r *http.Request) {
+	if err := v.s.DeletePreference(r.FormValue("key")); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+}
+
+// prefKey turns "Company size" into the stored key "company_size".
+func prefKey(s string) string {
+	return strings.Join(strings.Fields(strings.ToLower(s)), "_")
 }
 
 // profile shows profile.md, the cv/ folder and the CV check history. Files are read, never written, from here.
