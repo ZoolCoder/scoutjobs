@@ -12,9 +12,38 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
-// newJob shows the manual add form; the fields match `scoutjobs job add`.
+// newJob shows the manual add form; the fields match `scoutjobs job add`. ?from=<posting url>
+// prefills them from the ATS, like `job add --from`; the user still reviews before saving.
 func (v *server) newJob(w http.ResponseWriter, r *http.Request) {
-	v.render(w, r, "add.html", "add_job", map[string]any{"Job": store.Job{Currency: v.cfg.Currency}, "Back": back(r, "/pipeline")})
+	j := store.Job{Currency: v.cfg.Currency}
+	data := map[string]any{"Back": back(r, "/pipeline"), "From": strings.TrimSpace(r.URL.Query().Get("from"))}
+	if from, _ := data["From"].(string); from != "" {
+		if existing, ok := v.s.JobByURL(from); ok {
+			http.Redirect(w, r, fmt.Sprintf("/jobs/%d", existing.ID), http.StatusSeeOther)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		defer cancel()
+		p, err := search.FetchPosting(ctx, from, nil, v.cfg.SearchBaseURL)
+		if err != nil {
+			data["Error"] = err.Error()
+			j.URL = from
+		} else {
+			j = p.Job()
+			j.URL, j.Notes, j.Currency = from, search.Excerpt(p.Description, 4000), first(j.Currency, v.cfg.Currency)
+		}
+	}
+	data["Job"] = j
+	v.render(w, r, "add.html", "add_job", data)
+}
+
+func first(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // createJob is the form twin of POST /api/jobs: an existing company+title is updated, not duplicated.
@@ -52,10 +81,30 @@ type searchForm struct {
 	Remote          bool
 	Limit           int
 	Ran             bool
-	Postings        []search.Posting
+	Postings        []searchRow
 	Added           int
 	Errors          []string
 	BoardNames      []string
+}
+
+// searchRow is a posting plus the tracked job it already matches, if any.
+type searchRow struct {
+	search.Posting
+	Job store.Job
+}
+
+func (v *server) searchRows(ps []search.Posting) []searchRow {
+	rows := make([]searchRow, 0, len(ps))
+	for _, p := range ps {
+		row := searchRow{Posting: p}
+		if j, err := v.s.JobByKey(store.JobKey(p.Company, p.Title)); err == nil {
+			row.Job = j
+		} else if j, ok := v.s.JobByURL(p.URL); ok {
+			row.Job = j
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 func (v *server) searchPage(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +135,7 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 	res := search.Run(ctx, search.Options{Queries: splitList(f.Queries), Boards: boards, Remote: f.Remote, Limit: f.Limit, BaseURL: v.cfg.SearchBaseURL})
-	f.Postings, f.Errors = res.Postings, res.Errors
+	f.Errors = res.Errors
 	if r.FormValue("add") != "" {
 		for _, p := range res.Postings {
 			if _, created, err := v.s.UpsertJob(p.Job()); err != nil {
@@ -97,6 +146,7 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	f.Postings = v.searchRows(res.Postings)
 	v.render(w, r, "search.html", "search", f)
 }
 

@@ -19,13 +19,13 @@ One Go binary, SQLite, HTML templates, no JavaScript, no external assets, strict
 | Your next best move, the funnel, applied this week against `weekly_apply_target`, follow-ups due, stale jobs, upcoming interviews, activity streak.
 
 | Pipeline
-| One column per open status. *Due this week* keeps only open jobs with a deadline within 7 days or a follow-up due; the search box filters company, title and tags. Every card opens the job. *Add job* opens a form with the same fields as `scoutjobs job add`; an existing company and title is updated, not duplicated. Each card has one-click buttons for the stages that follow (`new` offers ranked, drafted, skipped; `applied` offers interview, rejected, no response, withdrawn) and a *more* disclosure for any other status with a reason. See xref:pipeline.adoc[].
+| One column per open status. *Due this week* keeps only open jobs with a deadline within 7 days or a follow-up due; the search box filters company, title and tags. Every card opens the job and can be dragged onto another column, or onto the closing stages shown below the board while dragging. *Add job* opens a form with the same fields as `scoutjobs job add`; paste a posting URL from Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee or BambooHR into *Fill from a posting URL* and the form is filled, description included, for you to check. An existing company and title is updated, not duplicated. Each card has one-click buttons for the stages that follow (`new` offers ranked, drafted, skipped; `applied` offers interview, rejected, no response, withdrawn) and a *more* disclosure for any other status with a reason. See xref:pipeline.adoc[].
 
 | Job
 | Everything about one posting: score and fit notes, contact, tags, notes, events, interviews, and the *Get selected* kit: tailored resume, cover letter, ATS check at 70 or more, e-mail draft. Each file in the application folder opens in the drafts viewer (`.md`, `.txt`, `.json`, `.eml`). A `mailto:` link opens your own mail app with the subject and body prefilled.
 
 | Search
-| The same sources as `scoutjobs search`: queries, boards (`greenhouse:stripe`, `rss:https://...`) and the remote aggregators, prefilled from `search_queries`, `search_boards` and `search_remote`. Results list company, title, place, source and date with an *Add* button each, or *Search and add all* tracks every hit as `new`. Postings are stored as text and never followed.
+| The same sources as `scoutjobs search`: queries, boards (`greenhouse:stripe`, a careers URL such as `https://jobs.lever.co/netlify`, `rss:https://...`) and the remote aggregators including the Hacker News "Who is hiring" thread, prefilled from `search_queries`, `search_boards` and `search_remote`. Results list company, title, place, source and date with an *Add* button each, or *Search and add all* tracks every hit as `new`; a posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
 
 | Interviews
 | Scheduled and past interviews with prep status, plus the mock sessions and their scores.

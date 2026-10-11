@@ -17,8 +17,8 @@ Your job search, on your machine. An open-source job-search operating system for
 
 - **Skills** (Agent Skills standard) for the whole loop: find jobs, score fit, check your CV, tailor resume and cover letter, track applications, prep and mock interviews, debrief, negotiate, upskill.
 - **A learning loop**: every skip, apply, withdraw and declined offer is logged with your reason. `learn-preferences` turns those into preferences you confirm, and the scorer and tailoring skills read them. It gets better the longer you use it.
-- **A dashboard**: a single Go binary, SQLite, no Node, no JavaScript, no external assets, bound to localhost. Overview with your next best move, pipeline board where every card opens the job and moves to the next stage with one click, a per-job "get selected" checklist (tailored CV, cover letter, ATS check), drafts you can edit in place, a "due this week" filter, an add-job form and a board search page, weekly reviews next to the live funnel, interviews, learning progress, preferences it learned, profile and CV health, activity log. Light by default, dark and auto available.
-- **A built-in job search**: `scoutjobs search` queries public ATS boards (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio), any RSS feed and remote aggregators (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas) without an API key, deduplicates by posting URL and normalised title, converts salaries to your currency, and adds results to the pipeline.
+- **A dashboard**: a single Go binary, SQLite, no Node, no JavaScript, no external assets, bound to localhost. Overview with your next best move, pipeline board where every card opens the job and moves to the next stage with one click or a drag, a per-job "get selected" checklist (tailored CV, cover letter, ATS check), drafts you can edit in place, a "due this week" filter, an add-job form and a board search page, weekly reviews next to the live funnel, interviews, learning progress, preferences it learned, profile and CV health, activity log. Light by default, dark and auto available.
+- **A built-in job search**: `scoutjobs search` queries public ATS boards (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR) by slug or careers URL, any RSS feed and remote aggregators (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas, HN Who is hiring) without an API key, imports a single posting by URL (`job add --from`), deduplicates by posting URL and normalised title, converts salaries to your currency, and adds results to the pipeline.
 - **Apply by e-mail**: `scoutjobs email draft|send` builds the application from your cover letter and tailored resume and sends it through your own SMTP account. The CLI refuses without `--yes`, and the skill asks you first. Every job page also offers a `mailto:` link for your own mail app.
 - **Automation hooks**: a JSON API on the dashboard and an outgoing webhook for n8n, Make, Zapier or cron. See `integrations/n8n/`.
 - **Every platform**: Claude Code (plugin with slash commands and subagents), Codex (skills plus generated `/scoutjobs-*` prompts), Cursor, Gemini CLI, GitHub Copilot, and anything else that reads `SKILL.md`. Agents without a shell on your machine (Claude Code web, Codex cloud, hosted n8n) use the same features through the JSON API.
@@ -63,7 +63,7 @@ scoutjobs init           # creates ~/.scoutjobs with profile.md, preferences.md,
 scoutjobs serve          # dashboard at http://127.0.0.1:7070
 ```
 
-CLI only: `brew install --cask zoolcoder/scoutjobs/scoutjobs`, a `deb`, `rpm` or `apk` package, or a binary for macOS, Linux and Windows from [Releases](https://github.com/zoolcoder/scoutjobs/releases). `scoutjobs doctor` checks the install.
+CLI only: `brew install --cask zoolcoder/scoutjobs/scoutjobs`, a `deb`, `rpm` or `apk` package, or a binary for macOS, Linux and Windows from [Releases](https://github.com/zoolcoder/scoutjobs/releases). `scoutjobs doctor` checks the install, `scoutjobs update` installs the next release (checksum verified; Homebrew and package installs are handed to their manager).
 
 Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds your profile from a CV, records what you want). After that the daily loop is:
 
@@ -131,8 +131,9 @@ Skills never touch the database. They call `scoutjobs`, which is also what you u
 
 ```bash
 scoutjobs search --query "senior go engineer" --remote --add        # remote boards, add as new
-scoutjobs search --board greenhouse:stripe --board lever:netlify     # company ATS boards: greenhouse, lever, ashby, workable, smartrecruiters, personio
+scoutjobs search --board greenhouse:stripe --board https://jobs.lever.co/netlify   # company ATS boards by slug or careers URL
 scoutjobs search --rss https://example.com/jobs.rss --query go         # any RSS or Atom job feed
+scoutjobs job add --from https://boards.greenhouse.io/stripe/jobs/123  # one posting by URL, description into notes
 scoutjobs job add --company Stripe --title "Backend Engineer" --url ... --remote hybrid --tags go,postgres
 scoutjobs job import jobs.json       # bulk add from any JSON list (n8n, scrapers you own)
 scoutjobs job list --open            # or --status applied, --q stripe, --json

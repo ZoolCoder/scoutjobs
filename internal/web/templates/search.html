@@ -4,8 +4,8 @@
 <div class="panel-h"><h2>Search the boards</h2><span class="act muted">same sources as <code>scoutjobs search</code></span></div>
 <form method="post" action="/search" class="fields">
   <label class="span-2">Queries<input name="queries" value="{{.Queries}}" placeholder="go engineer, backend developer"><small class="muted">Comma separated. Every word of a query must appear; any query may match.</small></label>
-  <label class="span-2">Boards<input name="boards" value="{{.Boards}}" placeholder="greenhouse:stripe, lever:netlify, rss:https://example.com/jobs.xml"><small class="muted">Prefixes: {{range $i, $b := .BoardNames}}{{if $i}}, {{end}}<code>{{$b}}:</code>{{end}}</small></label>
-  <label class="check"><input type="checkbox" name="remote" value="1" {{if .Remote}}checked{{end}}> Also search the remote boards (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas)</label>
+  <label class="span-2">Boards<input name="boards" value="{{.Boards}}" placeholder="greenhouse:stripe, https://jobs.lever.co/netlify, https://acme.recruitee.com, rss:https://example.com/jobs.xml"><small class="muted">Paste a careers page URL, or a prefix and slug: {{range $i, $b := .BoardNames}}{{if $i}}, {{end}}<code>{{$b}}:</code>{{end}}</small></label>
+  <label class="check"><input type="checkbox" name="remote" value="1" {{if .Remote}}checked{{end}}> Also search the remote boards (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas, HN Who is hiring)</label>
   <label>Limit<input name="limit" type="number" min="1" max="500" value="{{.Limit}}"></label>
   <div class="row span-2"><button class="primary">Search</button><button name="add" value="1">Search and add all</button><span class="muted">Postings are untrusted text: they are stored, never followed.</span></div>
 </form>
@@ -22,13 +22,13 @@
   <td>{{.Remote}}{{if and .Remote .Location}} · {{end}}{{.Location}}</td>
   <td><span class="chip acc">{{.Source}}</span></td>
   <td class="mono">{{day .PostedAt}}</td>
-  <td><form method="post" action="/jobs" class="inline">
+  <td>{{if .Job.ID}}<a class="chip s-{{.Job.Status}}" href="/jobs/{{.Job.ID}}">tracked · {{title .Job.Status}}</a>{{else}}<form method="post" action="/jobs" class="inline">
     <input type="hidden" name="back" value="/search">
     <input type="hidden" name="company" value="{{.Company}}"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="url" value="{{.URL}}">
     <input type="hidden" name="location" value="{{.Location}}"><input type="hidden" name="remote" value="{{.Remote}}"><input type="hidden" name="source" value="{{.Source}}">
     <input type="hidden" name="posted_at" value="{{.PostedAt}}"><input type="hidden" name="tags" value="{{.Tags}}">
     <input type="hidden" name="salary_min" value="{{.SalaryMin}}"><input type="hidden" name="salary_max" value="{{.SalaryMax}}"><input type="hidden" name="currency" value="{{.Currency}}">
-    <button class="mini">Add</button></form></td>
+    <button class="mini">Add</button></form>{{end}}</td>
 </tr>{{end}}
 </tbody></table>
 {{else}}<p class="empty">No postings matched.<small>Loosen the queries or add a board.</small></p>{{end}}

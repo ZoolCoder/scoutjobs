@@ -20,7 +20,7 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
-//go:embed templates/*.html templates/style.css templates/mark.svg
+//go:embed templates/*.html templates/style.css templates/mark.svg templates/board.js
 var assets embed.FS
 
 type server struct {
@@ -39,6 +39,7 @@ type Config struct {
 	SearchRemote                               bool              // search page default for the remote boards
 	Currency                                   string            // default on the add-job form
 	SearchBaseURL                              map[string]string // test override per search source
+	Version                                    string            // shown in the footer next to the release link
 }
 
 func day(s string) string {
@@ -181,6 +182,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
+	mux.HandleFunc("GET /board.js", static("templates/board.js", "text/javascript; charset=utf-8", false))
 	mux.HandleFunc("GET /logo.svg", static("templates/mark.svg", "image/svg+xml", true))
 	mux.HandleFunc("GET /favicon.svg", static("templates/mark.svg", "image/svg+xml", true))
 
@@ -408,13 +410,15 @@ func (v *server) pipeline(w http.ResponseWriter, r *http.Request) {
 		by[j.Status] = append(by[j.Status], j)
 	}
 	var cols []column
+	var hidden []string // empty final stages get no column but stay reachable as drop targets
 	for _, st := range store.Statuses {
 		if len(by[st]) == 0 && store.FinalStatuses[st] {
+			hidden = append(hidden, st)
 			continue
 		}
 		cols = append(cols, column{st, by[st]})
 	}
-	v.render(w, r, "pipeline.html", "pipeline", map[string]any{"Columns": cols, "Query": q, "Due": due, "Count": len(jobs)})
+	v.render(w, r, "pipeline.html", "pipeline", map[string]any{"Columns": cols, "Hidden": hidden, "Query": q, "Due": due, "Count": len(jobs)})
 }
 
 // dueJobs keeps what needs a hand this week: a deadline within 7 days (or passed) on an open job, or a follow-up due.
