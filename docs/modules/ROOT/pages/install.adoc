@@ -44,6 +44,18 @@ $ sudo apk add --allow-untrusted scoutjobs_linux_amd64.apk   # Alpine
 
 The binary alone gives you the CLI, dashboard, API and MCP server. Skills still come from a clone (`install.sh`) or the Claude Code plugin. `scoutjobs doctor` lists what is in place.
 
+== Updating
+
+[source,console]
+----
+$ scoutjobs update --check        # one GET to GitHub: prints the newer release, changes nothing
+$ scoutjobs update                # asks, then installs the latest release over this binary
+$ scoutjobs update --yes          # no question; for scripts
+$ scoutjobs update --version v0.6.0   # a specific tag, also a downgrade
+----
+
+`update` looks at where the binary lives. A plain binary (from `install.sh` or a release archive) is replaced in place: the archive for this OS and architecture is downloaded, its sha256 is checked against the release's `checksums.txt`, and the new file is renamed over the old one, so a failed download leaves the installed version untouched. A Homebrew cask is handed to `brew upgrade --cask scoutjobs`. A `deb`, `rpm` or `apk` install prints the package commands instead of touching `/usr/bin`. A `dev` build from `make install` refuses unless `--version` names a release. `scoutjobs doctor --online` reports the same check, and the dashboard footer links the running version to the release page.
+
 == Claude Code
 
 The plugin adds slash commands and the subagents (`draft-reviewer`, `fit-scorer`, three interviewers):
