@@ -3,6 +3,7 @@
 package web
 
 import (
+	"context"
 	"crypto/subtle"
 	"embed"
 	"encoding/json"
@@ -21,7 +22,7 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
-//go:embed templates/*.html templates/style.css templates/mark.svg templates/board.js
+//go:embed templates/*.html templates/style.css templates/mark.svg templates/board.js templates/app.js
 var assets embed.FS
 
 type server struct {
@@ -160,12 +161,26 @@ var funcs = template.FuncMap{
 
 // Serve blocks.
 func Serve(s *store.Store, addr string, cfg Config) error {
+	return ServeContext(context.Background(), s, addr, cfg)
+}
+
+// ServeContext serves until ctx ends, then lets requests in flight finish and returns nil.
+func ServeContext(ctx context.Context, s *store.Store, addr string, cfg Config) error {
 	h, err := Handler(s, cfg)
 	if err != nil {
 		return err
 	}
 	hs := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
-	return hs.ListenAndServe()
+	errc := make(chan error, 1)
+	go func() { errc <- hs.ListenAndServe() }()
+	select {
+	case err := <-errc:
+		return err
+	case <-ctx.Done():
+		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return hs.Shutdown(sctx)
+	}
 }
 
 // Handler builds the dashboard routes; tests drive it without a listener.
@@ -210,6 +225,12 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
 	mux.HandleFunc("GET /board.js", static("templates/board.js", "text/javascript; charset=utf-8", false))
+	mux.HandleFunc("GET /app.js", static("templates/app.js", "text/javascript; charset=utf-8", false))
+	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(cfg.Version))
+	})
 	mux.HandleFunc("GET /logo.svg", static("templates/mark.svg", "image/svg+xml", true))
 	mux.HandleFunc("GET /favicon.svg", static("templates/mark.svg", "image/svg+xml", true))
 

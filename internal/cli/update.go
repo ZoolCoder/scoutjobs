@@ -74,7 +74,7 @@ func runUpdate(rest []string, out io.Writer) error {
 	}
 	cur, latest := strings.TrimPrefix(Version, "v"), strings.TrimPrefix(rel.Tag, "v")
 	method := installMethod(exe)
-	newer := Version != "dev" && semverLess(cur, latest)
+	newer := !devBuild() && semverLess(cur, latest)
 	res := map[string]any{"current": Version, "latest": rel.Tag, "newer": newer, "method": method, "path": exe, "url": rel.URL}
 
 	switch {
@@ -82,13 +82,13 @@ func runUpdate(rest []string, out io.Writer) error {
 		return emit(out, *asJSON, res, func() {
 			if newer {
 				fmt.Fprintf(out, "update available: %s -> %s (%s)\n  run: %s\n", Version, rel.Tag, rel.URL, updateHint(method))
-			} else if Version == "dev" {
+			} else if devBuild() {
 				fmt.Fprintf(out, "dev build; latest release is %s\n", rel.Tag)
 			} else {
 				fmt.Fprintf(out, "up to date: %s is the latest release\n", Version)
 			}
 		})
-	case Version == "dev" && *want == "":
+	case devBuild() && *want == "":
 		return fmt.Errorf("dev build at %s: rebuild with make install, or pass --version %s to install that release here", exe, rel.Tag)
 	case !newer && *want == "":
 		return emit(out, *asJSON, res, func() { fmt.Fprintf(out, "up to date: %s is the latest release\n", Version) })
@@ -141,7 +141,10 @@ func runUpdate(rest []string, out io.Writer) error {
 		return err
 	}
 	res["installed"] = rel.Tag
-	return emit(out, *asJSON, res, func() { fmt.Fprintf(out, "updated %s: %s -> %s\n", exe, Version, rel.Tag) })
+	return emit(out, *asJSON, res, func() {
+		fmt.Fprintf(out, "updated %s: %s -> %s\n", exe, Version, rel.Tag)
+		fmt.Fprintln(out, "a running dashboard (scoutjobs serve) restarts on the new version by itself")
+	})
 }
 
 func updateHint(method string) string {

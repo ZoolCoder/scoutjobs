@@ -117,17 +117,21 @@ func Run(args []string, out io.Writer) error {
 	case "serve":
 		fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 		addr := fs.String("addr", LoadConfig(store.Home()).DashboardAddr, "listen address")
+		noRestart := fs.Bool("no-restart", false, "keep running the old version when the binary is upgraded")
 		if err := fs.Parse(rest); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "ScoutJobs dashboard on http://%s  (data: %s)\n", *addr, s.Home)
-		return web.Serve(s, *addr, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg)})
+		fmt.Fprintf(out, "ScoutJobs %s dashboard on http://%s  (data: %s)\n", Version, *addr, s.Home)
+		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg)})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
 
-// Version is set by -ldflags at release time.
+// Version is set by -ldflags: the tag at release time, git describe plus -dev for make builds.
 var Version = "dev"
+
+// devBuild is a local build; scoutjobs update leaves it alone.
+func devBuild() bool { return Version == "dev" || strings.HasSuffix(Version, "-dev") }
 
 // parse accepts "<positional...> --flags" and "--flags <positional...>" alike,
 // because the flag package stops at the first non-flag argument.

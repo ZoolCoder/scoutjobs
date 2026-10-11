@@ -219,7 +219,7 @@ var releaseURL = "https://api.github.com/repos/zoolcoder/scoutjobs/releases/late
 // updateCheck compares the running Version with the latest tag. Only with --online, so a
 // plain doctor run never leaves the machine. A dev build is reported, not compared.
 func updateCheck() check {
-	if Version == "dev" {
+	if devBuild() {
 		return check{"ok", "update", "dev build, not compared", ""}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
