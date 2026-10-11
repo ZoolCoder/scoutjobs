@@ -44,7 +44,7 @@ func (p Posting) Job() store.Job {
 // Options drive one search run.
 type Options struct {
 	Queries []string // every word of a query must appear; any query may match
-	Boards  []string // "greenhouse:stripe", "lever:netlify", "ashby:linear", "workable:acme", "smartrecruiters:Acme", "personio:acme", "rss:https://..."
+	Boards  []string // "greenhouse:stripe", "lever:netlify", "recruitee:acme", "rss:https://..." or a careers URL (see ParseBoard)
 	Remote  bool     // also query the remote boards (remotive, remoteok, arbeitnow, jobicy, himalayas)
 	Limit   int
 	Client  *http.Client
@@ -58,10 +58,10 @@ type Result struct {
 }
 
 // Boards lists the board sources that need a company slug.
-var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "rss"}
+var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "recruitee", "bamboohr", "rss"}
 
 // RemoteBoards lists the keyword-searchable remote boards.
-var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas"}
+var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas", "hn"}
 
 var defaultBase = map[string]string{
 	"greenhouse":      "https://boards-api.greenhouse.io/v1/boards",
@@ -72,6 +72,7 @@ var defaultBase = map[string]string{
 	"arbeitnow":       "https://www.arbeitnow.com/api/job-board-api",
 	"jobicy":          "https://jobicy.com/api/v2/remote-jobs",
 	"himalayas":       "https://himalayas.app/jobs/api",
+	"hn":              "https://hn.algolia.com/api/v1",
 	"workable":        "https://apply.workable.com/api/v3/accounts",
 	"smartrecruiters": "https://api.smartrecruiters.com/v1/companies",
 }
@@ -124,11 +125,9 @@ func Run(ctx context.Context, o Options) Result {
 		fn   func(context.Context) ([]Posting, error)
 	}
 	var feeds []feed
-	for _, b := range o.Boards {
-		src, slug, ok := strings.Cut(b, ":")
-		if !ok || slug == "" {
-			continue
-		}
+	boards, errs := NormalizeBoards(o.Boards)
+	for _, b := range boards {
+		src, slug, _ := strings.Cut(b, ":")
 		switch src {
 		case "greenhouse":
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.greenhouse(ctx, slug, o.Queries, o.Limit) }})
@@ -142,6 +141,10 @@ func Run(ctx context.Context, o Options) Result {
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.smartrecruiters(ctx, slug) }})
 		case "personio":
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.personio(ctx, slug) }})
+		case "recruitee":
+			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.recruitee(ctx, slug) }})
+		case "bamboohr":
+			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.bamboohr(ctx, slug) }})
 		case "rss":
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.rss(ctx, slug) }})
 		}
@@ -157,12 +160,13 @@ func Run(ctx context.Context, o Options) Result {
 				feed{"arbeitnow:" + q, func(ctx context.Context) ([]Posting, error) { return f.arbeitnow(ctx, q) }},
 				feed{"jobicy:" + q, func(ctx context.Context) ([]Posting, error) { return f.jobicy(ctx, q) }},
 				feed{"himalayas:" + q, func(ctx context.Context) ([]Posting, error) { return f.himalayas(ctx, q) }},
+				feed{"hn:" + q, func(ctx context.Context) ([]Posting, error) { return f.hn(ctx, q) }},
 			)
 		}
 		feeds = append(feeds, feed{"remoteok", func(ctx context.Context) ([]Posting, error) { return f.remoteok(ctx) }})
 	}
 
-	var r Result
+	r := Result{Errors: errs}
 	seen := map[string]bool{}
 	for _, fd := range feeds {
 		rows, err := fd.fn(ctx)

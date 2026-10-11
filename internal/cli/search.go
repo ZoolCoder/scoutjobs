@@ -27,7 +27,7 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	var queries, boards listFlag
 	fs.Var(&queries, "query", "keyword query, repeatable (all words must match; any query may)")
-	fs.Var(&boards, "board", "company board, repeatable: greenhouse:<slug> | lever:<slug> | ashby:<slug> | workable:<slug> | smartrecruiters:<company> | personio:<slug> | rss:<url>")
+	fs.Var(&boards, "board", "company board, repeatable: source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, or the careers page URL")
 	var feeds listFlag
 	fs.Var(&feeds, "rss", "RSS or Atom job feed url, repeatable (same as --board rss:<url>)")
 	remote := fs.Bool("remote", cfg.SearchRemote, "query the remote boards too")
