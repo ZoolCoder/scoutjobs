@@ -68,7 +68,8 @@ way unless an issue agrees otherwise.
   API changes.
 - A new or changed skill comes with an eval case under `evals/` when it
   makes a claim, sends something, or reads a posting.
-- Rebase on `main`; no merge commits.
+- Git flow: branch from `develop`, open the pull request against `develop`,
+  rebase on `develop` before merge. `main` only receives release merges.
 
 ## Skills
 
@@ -81,7 +82,8 @@ over the skill; change the skill, not the wrapper.
 
 ## Releases
 
-Maintainers tag `vX.Y.Z` on `main`; GoReleaser builds the binaries, publishes
-the GitHub release and updates `Casks/scoutjobs.rb`. The plugin version in
+Maintainers merge `develop` into `main` (`git merge --no-ff develop`) and tag
+`vX.Y.Z` there; GoReleaser builds the binaries, publishes the GitHub release
+and updates `Casks/scoutjobs.rb`. The manual is published from `main`. The plugin version in
 `.claude-plugin/plugin.json` and `marketplace.json` is bumped in the same
 commit as the tag.

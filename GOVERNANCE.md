@@ -25,7 +25,8 @@ decides when there is no consensus. These points are not up for a vote:
 
 ## Releases
 
-Semantic versioning. A tag `vX.Y.Z` on `main` triggers the release workflow.
+Semantic versioning. Work lands on `develop`; a release is `develop` merged
+into `main` and a tag `vX.Y.Z` there, which triggers the release workflow.
 `CHANGELOG.md` is updated in the same commit as the tag. Breaking changes to
 the CLI output, the JSON API or the data layout bump the minor version
 before 1.0 and the major version after.
