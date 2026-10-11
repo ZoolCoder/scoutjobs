@@ -146,14 +146,22 @@ func (v *server) inbox(w http.ResponseWriter, r *http.Request) {
 		}
 		days[len(days)-1].Rows = append(days[len(days)-1].Rows, row)
 	}
-	v.render(w, r, "inbox.html", "inbox", map[string]any{"Google": v.googleView(), "Days": days, "Total": len(ms), "Kind": kind, "Counts": counts,
+	v.render(w, r, "inbox.html", "inbox", map[string]any{"Google": v.googleView(), "AI": v.agentView(src, account), "Choose": src == "" || r.URL.Query().Get("connect") != "", "Days": days, "Total": len(ms), "Kind": kind, "Counts": counts,
 		"Kinds":  []string{"interview", "offer", "request", "rejected", "ack"},
-		"Source": src, "Account": account, "CanSync": src != "" && v.cfg.Mail.Sync != nil,
+		"Source": src, "Account": account, "CanSync": src == "agent" && v.cfg.Runner != nil || src != "" && src != "agent" && v.cfg.Mail.Sync != nil,
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err")})
 }
 
 func (v *server) syncInbox(w http.ResponseWriter, r *http.Request) {
 	dest := back(r, "/inbox")
+	if src, agent := v.mailSourceAccount(); src == "agent" && v.cfg.Runner != nil {
+		if err := v.startAgentSync(agent); err != nil {
+			http.Redirect(w, r, withParam(dest, "err", err.Error()), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/inbox#agent", http.StatusSeeOther)
+		return
+	}
 	if v.cfg.Mail.Sync == nil {
 		http.Redirect(w, r, withParam(dest, "err", "mail sync is not available"), http.StatusSeeOther)
 		return
@@ -166,7 +174,7 @@ func (v *server) syncInbox(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, withParam(dest, "msg", fmt.Sprintf("%d new %s matched to jobs", n, plural(n, "reply", "replies"))), http.StatusSeeOther)
 }
 
-// gmailDraft puts the job's application e-mail into Gmail's drafts and returns to the page with a link.
+// gmailDraft puts the job's application e-mail into the mailbox's drafts and returns to the page.
 func (v *server) gmailDraft(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
 	if err != nil {
@@ -174,16 +182,15 @@ func (v *server) gmailDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dest := back(r, fmt.Sprintf("/jobs/%d", id))
-	if v.cfg.Mail.Draft == nil {
-		http.Redirect(w, r, withParam(dest, "err", "gmail is not connected"), http.StatusSeeOther)
-		return
-	}
-	link, err := v.cfg.Mail.Draft(id, r.FormValue("kind"))
-	if err != nil {
+	link, note, err := v.fileDraft(id, r.FormValue("kind"))
+	switch {
+	case err != nil:
 		http.Redirect(w, r, withParam(dest, "err", err.Error()), http.StatusSeeOther)
-		return
+	case note != "":
+		http.Redirect(w, r, withParam(dest, "msg", note), http.StatusSeeOther)
+	default:
+		http.Redirect(w, r, withParam(dest, "drafted", link), http.StatusSeeOther)
 	}
-	http.Redirect(w, r, withParam(dest, "drafted", link), http.StatusSeeOther)
 }
 
 func withParam(u, k, val string) string {

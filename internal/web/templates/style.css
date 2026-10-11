@@ -564,14 +564,24 @@ ul.mails.wide .msnip{-webkit-line-clamp:3}
 .callout.ok{background:var(--ok-sub);border-left-color:var(--ok)}
 ol.setup{margin:8px 0 0;padding-left:20px;display:grid;gap:10px;font-size:13.5px}
 .inbox-top .src form{margin-left:6px}
-.gmail-setup{border-color:var(--acc)}
-.gmail-setup .detect{margin:14px 0 6px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px}
-.gmail-setup .detect form{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
-.gmail-setup .detect p{margin:0}
-.gmail-setup details.manual{margin:8px 0}
-.gmail-setup details.manual summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.connect{border-color:var(--acc)}
+#google .detect{margin:14px 0 6px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px}
+#google .detect form{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+#google .detect p{margin:0}
+#google details.manual{margin:8px 0}
+#google details.manual summary{cursor:pointer;font-size:13px;color:var(--muted)}
 .grants{display:inline-flex;gap:4px;margin-left:6px}
 .grants span{font-size:11px;padding:1px 6px;border-radius:999px;background:var(--ok-sub);color:var(--ok)}
+.connect .option{margin:12px 0 0;padding:12px 14px;border:1px solid var(--line);border-radius:10px}
+.connect .option.rec{border-color:var(--acc)}
+.connect .option h3{margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px}
+.connect details.option>summary{cursor:pointer;font-size:13.5px}
+.connect ul.agents{list-style:none;margin:12px 0 8px;padding:0;display:grid;gap:8px}
+.connect ul.agents li{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.agentname{text-transform:capitalize}
+.conns .ready{color:var(--ok)}
+.conns .auth{color:var(--warn)}
+.conns .hint{display:block;width:100%;font-size:12.5px}
 form.gmail-client{display:grid;gap:10px;margin:14px 0 8px;max-width:640px}
 form.gmail-client label{display:grid;gap:4px;font-size:12.5px;color:var(--muted)}
 form.gmail-client textarea{font:12px/1.5 var(--mono)}

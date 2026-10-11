@@ -8,6 +8,14 @@ All notable changes to ScoutJobs. The format follows
 ## [Unreleased]
 
 ### Added
+- Read mail through your AI agent: on the Inbox page pick Claude Code or
+  Codex, and it reads replies with the connectors you signed in to (Gmail and
+  Google Calendar, Microsoft 365, any mail MCP server), logs them, adds
+  interviews and calendar events, and files drafts. No Google Cloud project or
+  password needed; nothing is sent. `scoutjobs email sync --via agent` does
+  the same in a terminal. The Inbox's *Connect mail & calendar* panel offers
+  it first, with the own Google client, IMAP (iCloud and others) and other MCP
+  apps as the alternatives.
 - Search finds the jobs that fit: with a filled `profile.md`, results are
   ranked by a match score with the reasons (target role, skills, level, work
   mode, place, avoided stacks), and *Hide jobs that break a must* drops the

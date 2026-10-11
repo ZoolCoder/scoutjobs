@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/mail"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -239,5 +240,41 @@ func TestMatchReplyByThreadAndCompany(t *testing.T) {
 	}
 	if th, ref := s.JobThread(1); th != "t-acme" || ref != "<d1@me>" {
 		t.Errorf("job thread %q %q", th, ref)
+	}
+}
+
+func TestMailSourceAgent(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	s, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	cfg := Config{IMAPHost: "imap.mail.me.com:993"}
+	if src, _ := mailSource(s, cfg, "auto"); src != "imap" {
+		t.Errorf("before choosing the agent: %q", src)
+	}
+	if err := s.SetSetting(runner.MailVia, "agent"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSetting(runner.MailAgent, "codex"); err != nil {
+		t.Fatal(err)
+	}
+	if src, _ := mailSource(s, cfg, ""); src != "agent" {
+		t.Errorf("agent chosen: %q", src)
+	}
+	if got := mailAgentName(s, Config{Agent: "claude"}); got != "codex" {
+		t.Errorf("mail agent: %q", got)
+	}
+	if err := agentSync(s, cfg, time.Now(), &mcpOutput{}); err == nil || !strings.Contains(err.Error(), "email_log") {
+		t.Errorf("an MCP client must not start another agent: %v", err)
+	}
+	t.Setenv("SCOUTJOBS_RUNNER", "1")
+	if err := agentSync(s, cfg, time.Now(), io.Discard); err == nil || !strings.Contains(err.Error(), "email_log") {
+		t.Errorf("the agent's own email_sync call must not start another agent: %v", err)
+	}
+	if _, err := draftTask(s, cfg, store.Job{ID: 1, Company: "Acme"}, "nonsense"); err == nil {
+		t.Error("unknown kind accepted")
 	}
 }

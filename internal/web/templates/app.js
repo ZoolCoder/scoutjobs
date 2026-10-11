@@ -166,7 +166,7 @@
   var giveUp = function (text) {
     clearInterval(timer);
     box.querySelector('p').textContent = text;
-    var manual = document.querySelector('.gmail-setup details.manual');
+    var manual = document.querySelector('#google details.manual');
     if (manual) manual.open = true;
   };
   var timer = setInterval(function () {
@@ -176,4 +176,37 @@
       if (d.file || d.client) { clearInterval(timer); location.reload(); }
     }).catch(function () {});
   }, 3000);
+})();
+
+// Inbox › Connect: show which mail and calendar connectors each AI agent can reach.
+(function () {
+  var rows = document.querySelectorAll('[data-mail-check]');
+  if (!rows.length) return;
+  var add = function (parent, tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    el.textContent = text;
+    parent.appendChild(el);
+    return el;
+  };
+  var check = function (row, fresh) {
+    var out = row.querySelector('.conns');
+    out.textContent = fresh ? 'checking again…' : 'looking for mail connectors…';
+    fetch(row.dataset.mailCheck + (fresh ? '&fresh=1' : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      out.textContent = '';
+      if (d.error) return add(out, 'span', 'auth', d.error);
+      var list = (d.connectors || []);
+      if (!list.length) add(out, 'span', '', 'no mail connector yet');
+      list.forEach(function (c, i) {
+        if (i) out.appendChild(document.createTextNode(', '));
+        add(out, 'span', c.ready ? 'ready' : 'auth', c.name + (c.ready ? ' ✓' : ' (sign in)'));
+      });
+      if (d.hint) add(out, 'span', 'hint', d.hint);
+    }).catch(function () { out.textContent = 'could not ask the agent'; });
+  };
+  rows.forEach(function (row) {
+    check(row, false);
+    var again = row.querySelector('[data-recheck]');
+    if (again) again.addEventListener('click', function () { check(row, true); });
+  });
 })();

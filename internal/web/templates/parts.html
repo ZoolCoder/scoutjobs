@@ -20,7 +20,7 @@
       {{if $j.URL}}<a class="btn mini" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}Posting</a>{{end}}
       <a class="btn mini" href="{{.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
       <a class="btn mini" href="/calendar?new={{today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a>
-      {{if .CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Back}}"><button class="mini go">Draft in Gmail</button></form>{{end}}
+      {{if .CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Back}}"><button class="mini go">{{.DraftLabel}}</button></form>{{end}}
     </div>
     {{template "stepper" .Steps}}
     {{if $j.FitNotes}}<section><h3>Why it fits</h3><p class="pre clamp">{{$j.FitNotes}}</p></section>{{end}}

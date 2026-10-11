@@ -355,7 +355,8 @@ type jobPanel struct {
 	Close      string // the board without the panel
 	Compose    string // Gmail compose to the contact
 	MailSearch string // Gmail search for everything from the company
-	CanDraft   bool   // Gmail connected and an email draft exists
+	CanDraft   bool   // a mailbox takes drafts and an email draft exists
+	DraftLabel string
 	Contacts   int
 }
 
@@ -385,7 +386,7 @@ func (v *server) panel(j store.Job, backURL, closeURL string) *jobPanel {
 	p.Kit = []kitItem{{"Tailored CV", kit.Resume}, {"Cover letter", kit.Cover}, {"ATS check", kit.ATS != nil}, {"Sent", kit.Sent}}
 	p.Compose = composeTo(j)
 	p.MailSearch = mailSearch(j)
-	p.CanDraft = kit.Draft != nil && !kit.Sent && v.mailSource() == "gmail" && v.cfg.Mail.Draft != nil
+	p.CanDraft, p.DraftLabel = kit.Draft != nil && !kit.Sent && v.canDraft(), v.draftLabel()
 	if cs, err := v.s.ContactsAt(j.Company); err == nil {
 		p.Contacts = len(cs)
 	}

@@ -423,7 +423,11 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 
 // agent runs the agent CLI once in dir, which is the only folder it may write, and logs what it does.
 func (rn *Runner) agent(ctx context.Context, run *Run, ag Agent, dir, prompt string) error {
-	argv := ag.command(rn.Exe, rn.Store.Home, dir)
+	return rn.agentArgv(ctx, run, ag, ag.command(rn.Exe, rn.Store.Home, dir), dir, prompt)
+}
+
+// agentArgv runs argv in dir with the prompt on stdin and logs what the agent does.
+func (rn *Runner) agentArgv(ctx context.Context, run *Run, ag Agent, argv []string, dir, prompt string) error {
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "SCOUTJOBS_HOME="+rn.Store.Home, "SCOUTJOBS_RUNNER=1")

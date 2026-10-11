@@ -348,7 +348,7 @@ func TestGmailConnectFromInbox(t *testing.T) {
 		h.ServeHTTP(rec, req)
 		return rec
 	}
-	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, "Connect Google") || !strings.Contains(b, `action="/gmail/client"`) || !strings.Contains(b, "Watching Downloads") {
+	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, "Connect mail &amp; calendar") || !strings.Contains(b, "Your own Google client") || !strings.Contains(b, `action="/gmail/client"`) || !strings.Contains(b, "Watching Downloads") {
 		t.Fatal("inbox lacks the Google setup wizard")
 	}
 	if b := get(h, "/gmail/detect").Body.String(); !strings.Contains(b, `"file":""`) || !strings.Contains(b, `"blind":false`) {

@@ -7,7 +7,7 @@
   {{if $j.URL}}<a class="btn mini" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}Posting</a>{{end}}
   <a class="btn mini" href="{{$p.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
   <a class="btn mini" href="/calendar?new={{today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a>
-  {{if $p.CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Self}}"><button class="mini go">Draft in Gmail</button></form>{{end}}
+  {{if $p.CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Self}}"><button class="mini go">{{$p.DraftLabel}}</button></form>{{end}}
   <a class="btn mini" href="/pipeline?job={{$j.ID}}">Show on board</a>
 </div>
 {{template "stepper" $p.Steps}}
@@ -60,7 +60,7 @@
   </tbody></table>
   {{with .CoverBuild}}{{with .Cover}}<p class="small cover-build"><span class="badge {{if $.Data.CoverBuild.CoverChanged}}stale{{else}}{{.State}}{{end}}">{{if $.Data.CoverBuild.CoverChanged}}stale{{else}}template {{.State}}{{end}}</span> Cover letter built from <code>{{base .Template}}</code> {{day .At}}{{if .Rendered}}, {{.Pages}} of {{.TemplatePages}} {{if eq .TemplatePages 1}}page{{else}}pages{{end}}{{end}}. {{.Summary}}{{if $.Data.CoverBuild.CoverChanged}} Changed since: {{join $.Data.CoverBuild.CoverChanged ", "}}; run <code>scoutjobs cv cover {{$j.ID}}</code>.{{end}}</p>
   {{if .Problems}}<ul class="gates-left">{{range .Problems}}<li>{{.}}</li>{{end}}</ul>{{end}}{{end}}{{end}}
-  {{if .Draft}}<p class="small">Application e-mail ready for {{.Draft.To}}: <b>{{.Draft.Subject}}</b>. <a href="{{mailto .Draft}}">Open in your mail app</a>{{if .CanGmail}} or{{end}}</p>{{if .CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="/jobs/{{$j.ID}}"><button class="mini go">Draft in Gmail</button></form>{{end}}{{end}}
+  {{if .Draft}}<p class="small">Application e-mail ready for {{.Draft.To}}: <b>{{.Draft.Subject}}</b>. <a href="{{mailto .Draft}}">Open in your mail app</a>{{if .CanGmail}} or{{end}}</p>{{if .CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="/jobs/{{$j.ID}}"><button class="mini go">{{$.Data.DraftLabel}}</button></form>{{end}}{{end}}
 </section>
 {{if .Emails}}<section class="panel" id="emails">
   <div class="panel-h"><h2>Proposed e-mails</h2><span class="n">{{len .Emails}}</span><span class="act muted">edit, save, draft; you send</span></div>
@@ -69,7 +69,7 @@
     <label>To <input name="to" value="{{.Msg.To}}" autocomplete="off"></label>
     <label>Subject <input name="subject" value="{{.Msg.Subject}}" autocomplete="off"></label>
     <label>Message <textarea name="body" rows="10">{{.Msg.Body}}</textarea></label>
-    <div class="runbar"><button class="mini" name="action" value="save">Save</button>{{if $.Data.CanGmail}}<button class="mini go" name="action" value="gmail">Save &amp; draft in Gmail</button>{{end}}<a class="btn mini" href="{{mailto .Msg}}">Open in mail app</a></div>
+    <div class="runbar"><button class="mini" name="action" value="save">Save</button>{{if $.Data.CanGmail}}<button class="mini go" name="action" value="gmail">Save &amp; {{lower $.Data.DraftLabel}}</button>{{end}}<a class="btn mini" href="{{mailto .Msg}}">Open in mail app</a></div>
   </form></details>{{end}}
 </section>{{end}}
 <section class="panel" id="gates">

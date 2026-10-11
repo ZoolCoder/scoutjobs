@@ -67,9 +67,24 @@ A match logs `reply:received` on the job. When the wording is clear the status m
 $ scoutjobs email sync                      # last 14 days
 $ scoutjobs email sync --since 3w --dry-run # show matches, change nothing
 $ scoutjobs email sync --json               # for scripts and agents
+$ scoutjobs email sync --via agent          # your AI agent reads the mail through its connectors
 ----
 
 Run it by hand, from cron, or let the `daily-brief` skill run it first so the briefing already knows who answered.
+
+=== Through your AI agent's connectors
+
+No Google Cloud project and no password: Claude Code or Codex reads the mail with the connectors you already signed in to, Gmail and Google Calendar, Microsoft 365 (Outlook mail and calendar), or any mail MCP server.
+
+. *Claude*: open https://claude.ai/settings/connectors[claude.ai › Settings › Connectors] and connect Gmail and Google Calendar, or Microsoft 365. *Codex*: `codex mcp add` a mail server, then `codex mcp login <name>`.
+. On the dashboard's Inbox page, under *Connect mail & calendar*, press *Use claude* or *Use codex*. The page shows which mail and calendar connectors the agent can reach and which still need a sign-in.
+. Press *Sync now*. The agent reads the mail received since the last sync (two weeks at most), logs each reply to a tracked application with `email_log`, adds interviews with a fixed time, and, when a calendar connector is there, creates the missing `Interview: <company>` events with no guests. *Draft in your mailbox* on a job page has it file the application e-mail or a follow-up as a draft.
+
+In a terminal, `scoutjobs email sync --via agent` does the same and prints the agent's steps.
+
+Claude is started with only the connectors' reading, draft and new-event tools and the scoutjobs tools: no send, delete, label, move or invite tool, no shell and no files. Codex runs in its read-only sandbox and cannot be held to a tool list, so the same rules come from its instructions. Either way nothing is sent.
+
+Trade-offs against the own Google client and IMAP: the agent's provider reads the messages it opens, a sync takes a minute or two and costs agent tokens, and mail comes in only when you press *Sync now*. On a claude.ai Team or Enterprise plan an admin has to allow the connectors.
 
 == Rules the skill follows
 

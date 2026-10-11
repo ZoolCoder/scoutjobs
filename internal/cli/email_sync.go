@@ -98,7 +98,7 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) (err
 	since := fs.String("since", "14d", "how far back to look: 14d, 3w, 2026-09-01; never before your first tracked job")
 	limit := fs.Int("limit", 500, "newest messages to inspect at most")
 	dry := fs.Bool("dry-run", false, "show matches, change nothing")
-	via := fs.String("via", "auto", "gmail (API, after gmail connect), imap (imap_host), or auto")
+	via := fs.String("via", "auto", "agent (your AI agent's mail connector), gmail (API, after gmail connect), imap (imap_host), or auto")
 	asJSON := fs.Bool("json", false, "")
 	if _, err := parse(fs, rest); err != nil {
 		return err
@@ -110,6 +110,9 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) (err
 	source, err := mailSource(s, cfg, *via)
 	if err != nil {
 		return err
+	}
+	if source == "agent" {
+		return agentSync(s, cfg, from, out)
 	}
 	// a sync stopped by Gmail's rate limit still logs the replies among the messages it read
 	mails, fetchErr := fetchMail(s, cfg, source, from, *limit)
@@ -150,6 +153,9 @@ func SyncMail(s *store.Store, cfg Config) (int, error) {
 	source, err := mailSource(s, cfg, "auto")
 	if err != nil {
 		return 0, err
+	}
+	if source == "agent" {
+		return 0, errors.New("mail is read by your AI agent: start it from the Inbox page")
 	}
 	mails, fetchErr := fetchMail(s, cfg, source, time.Now().AddDate(0, 0, -14), 500)
 	replies, err := syncReplies(s, mails, source, false)

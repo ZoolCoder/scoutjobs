@@ -17,6 +17,7 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/calsync"
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/mail"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 	"github.com/zoolcoder/scoutjobs/internal/web"
 )
@@ -300,21 +301,25 @@ func proposal(s *store.Store, cfg Config, j store.Job, kind string) (mail.Messag
 	return mail.Message{}, fmt.Errorf("no %s e-mail is proposed for job %d now", kind, j.ID)
 }
 
-// mailSource picks where `email sync` reads: Gmail when connected, IMAP when imap_host is set.
+// mailSource picks where `email sync` reads: the AI agent when the user chose it on the dashboard,
+// else Gmail when connected, else IMAP when imap_host is set.
 func mailSource(s *store.Store, cfg Config, via string) (string, error) {
 	switch via {
-	case "gmail", "imap":
+	case "agent", "gmail", "imap":
 		return via, nil
 	case "", "auto":
+		if s.Setting(runner.MailVia) == "agent" {
+			return "agent", nil
+		}
 		if gmailClient(s, cfg).Connected() {
 			return "gmail", nil
 		}
 		if cfg.IMAPHost != "" {
 			return "imap", nil
 		}
-		return "", errors.New("no inbox to read: run scoutjobs gmail setup, or set imap_host in config.yaml")
+		return "", errors.New("no inbox to read: connect one on the dashboard's Inbox page, run scoutjobs gmail setup, or set imap_host in config.yaml")
 	}
-	return "", fmt.Errorf("--via %q: use gmail, imap or auto", via)
+	return "", fmt.Errorf("--via %q: use agent, gmail, imap or auto", via)
 }
 
 // fetchMail never reads mail from before the first tracked job: an older message cannot be a reply to
@@ -355,6 +360,9 @@ func sentSince(mails []mail.Mail, start time.Time) []mail.Mail {
 func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 	return web.MailHooks{
 		Status: func() (string, string) {
+			if s.Setting(runner.MailVia) == "agent" {
+				return "agent", mailAgentName(s, cfg)
+			}
 			c := gmailClient(s, cfg)
 			if c.Connected() {
 				return "gmail", c.Account()
@@ -366,6 +374,13 @@ func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 		},
 		Sync:  func() (int, error) { return SyncMail(s, cfg) },
 		Gmail: func() *gmail.Client { return gmailClient(s, LoadConfig(s.Home)) }, // config.yaml edits apply without a restart
+		Compose: func(id int64, kind string) (runner.MailTask, error) {
+			j, err := s.JobByID(id)
+			if err != nil {
+				return runner.MailTask{}, err
+			}
+			return draftTask(s, cfg, j, kind)
+		},
 		Draft: func(id int64, kind string) (string, error) {
 			j, err := s.JobByID(id)
 			if err != nil {

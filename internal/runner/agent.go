@@ -126,6 +126,9 @@ func summarize(line string) string {
 		case "agent_message":
 			return clip(str(it, "text"))
 		case "mcp_tool_call":
+			if srv := str(it, "server"); srv != "" && srv != "scoutjobs" {
+				return srv + " " + str(it, "tool")
+			}
 			return "scoutjobs " + str(it, "tool")
 		case "file_change":
 			ch, _ := it["changes"].([]any)

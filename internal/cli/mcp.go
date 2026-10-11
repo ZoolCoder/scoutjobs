@@ -86,7 +86,7 @@ var mcpTools = []mcpTool{
 		p("to", "string", "recipient; default the job's contact", "to"), p("subject", "string", "", "subject"),
 		p("body", "string", "file in the application folder used as body", "body"), p("attach", "array", "extra files to attach", "attach")}, true},
 	{"email_show", "Show the e-mail draft of a job.", []string{"email", "show"}, []mcpProp{jobRef}, true},
-	{"email_sync", "Read the inbox on this machine (Gmail API after gmail setup, or IMAP), log replies matched to applications (rejections and interview invitations move the status), and return under review the few unmatched messages that look like they concern the search. Use this before reading mail through a connector: it costs no message bodies.", []string{"email", "sync"}, []mcpProp{
+	{"email_sync", "Read the inbox on this machine (Gmail API after gmail setup, or IMAP; when the user chose the AI agent on the Inbox page this fails, so read the mail through your connector and log replies with email_log), log replies matched to applications (rejections and interview invitations move the status), and return under review the few unmatched messages that look like they concern the search. Use this before reading mail through a connector: it costs no message bodies.", []string{"email", "sync"}, []mcpProp{
 		p("since", "string", "14d, 3w, or YYYY-MM-DD", "since"), p("limit", "integer", "", "limit"), p("dry_run", "boolean", "show matches, change nothing", "dry-run"),
 		p("via", "string", "gmail | imap | auto", "via")}, true},
 	{"email_log", "Record a message matched to a job through a Gmail connector, so the dashboard shows it on the job and in the inbox. Repeat runs with the same message_id are ignored.", []string{"email", "log"}, []mcpProp{jobRef,
@@ -353,9 +353,12 @@ func mcpCall(name string, in map[string]any) (string, error) {
 		if mcpDenied(args) {
 			return "", fmt.Errorf("%s is not available over MCP; ask the user to run it in a terminal", strings.Join(args, " "))
 		}
-		var buf bytes.Buffer
+		var buf mcpOutput
 		err = Run(args, &buf)
 		return strings.TrimSpace(buf.String()), err
 	}
 	return "", fmt.Errorf("%w: %s", errNoTool, name)
 }
+
+// mcpOutput collects a tool's output and tells commands that an AI client called them.
+type mcpOutput struct{ bytes.Buffer }

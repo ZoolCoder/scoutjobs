@@ -56,10 +56,12 @@ type Config struct {
 
 // MailHooks reach the mail code in cli without an import cycle.
 type MailHooks struct {
-	Status func() (source, account string) // source: gmail | imap | ""
+	Status func() (source, account string) // source: agent | gmail | imap | ""; account is the agent's name for agent
 	Sync   func() (int, error)
 	Draft  func(jobID int64, kind string) (openURL string, err error) // kind "" is the application e-mail
-	Gmail  func() *gmail.Client                                       // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
+	// Compose builds the e-mail the AI agent files as a draft when it reads the mail
+	Compose func(jobID int64, kind string) (runner.MailTask, error)
+	Gmail   func() *gmail.Client // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
 }
 
 func day(s string) string {
@@ -133,6 +135,7 @@ var funcs = template.FuncMap{
 	"pct":   func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
 	"f1":    func(f float64) string { return fmt.Sprintf("%.1f", f) },
 	"title": func(s string) string { return strings.ReplaceAll(s, "_", " ") },
+	"lower": strings.ToLower,
 	"split": func(s string) []string {
 		if strings.TrimSpace(s) == "" {
 			return nil
@@ -273,6 +276,11 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /gmail/disconnect", srv.gmailDisconnect)
 	mux.HandleFunc("GET /inbox", srv.inbox)
 	mux.HandleFunc("POST /inbox/sync", srv.syncInbox)
+	mux.HandleFunc("POST /mail/agent", srv.useAgent)
+	mux.HandleFunc("POST /mail/agent/off", srv.stopAgent)
+	mux.HandleFunc("GET /mail/agent/check", srv.agentCheck)
+	mux.HandleFunc("GET /mail/agent/run", srv.agentRun)
+	mux.HandleFunc("POST /mail/agent/cancel", srv.cancelAgent)
 	mux.HandleFunc("GET /interviews", srv.interviews)
 	mux.HandleFunc("POST /interviews", srv.createInterview)
 	mux.HandleFunc("POST /interviews/{id}", srv.setInterview)
@@ -609,8 +617,8 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
 		"Docs": docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf"), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
-		"CanGmail": v.cfg.Mail.Draft != nil && v.mailSource() == "gmail",
-		"Msg":      r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
+		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(),
+		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
 }
 
 // gmailLink keeps the "open your draft" link pointing at Gmail, whatever the query string says.

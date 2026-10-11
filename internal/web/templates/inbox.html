@@ -1,16 +1,37 @@
 {{template "head" .}}
 {{with .Data}}{{$kind := .Kind}}
 <div class="inbox-top">
-  <div class="src">{{if eq .Source "gmail"}}<span class="badge done">Google</span> {{.Account}}{{with .Google}}<span class="grants">{{if .Mail}}<span>mail</span>{{end}}{{if .Drafts}}<span>drafts</span>{{end}}{{if .CalendarWrite}}<span>calendar</span>{{end}}</span>{{end}} <form class="inline" method="post" action="/gmail/disconnect"><button class="mini">Disconnect</button></form>{{else if eq .Source "imap"}}<span class="badge done">IMAP</span> {{.Account}}{{else}}<span class="badge todo">no inbox connected</span>{{end}}</div>
+  <div class="src">{{if eq .Source "agent"}}<span class="badge done agentname">{{.Account}}</span> reads your mail <a class="btn mini" href="/inbox?connect=1#connect">Change</a>{{else if eq .Source "gmail"}}<span class="badge done">Google</span> {{.Account}}{{with .Google}}<span class="grants">{{if .Mail}}<span>mail</span>{{end}}{{if .Drafts}}<span>drafts</span>{{end}}{{if .CalendarWrite}}<span>calendar</span>{{end}}</span>{{end}} <form class="inline" method="post" action="/gmail/disconnect"><button class="mini">Disconnect</button></form>{{else if eq .Source "imap"}}<span class="badge done">IMAP</span> {{.Account}}{{else}}<span class="badge todo">no inbox connected</span>{{end}}</div>
   <span class="chips"><a {{if not $kind}}class="on" {{end}}href="/inbox">All</a>{{range .Kinds}}<a {{if eq . $kind}}class="on" {{end}}href="/inbox?kind={{.}}">{{.}}</a>{{end}}</span>
-  {{if .CanSync}}<form method="post" action="/inbox/sync"><input type="hidden" name="back" value="/inbox"><button class="primary">Sync now</button></form>{{end}}
+  {{if .CanSync}}<form method="post" action="/inbox/sync"><input type="hidden" name="back" value="/inbox"><button class="primary"{{with .AI}}{{if .Active}} disabled{{end}}{{end}}>Sync now</button></form>{{end}}
 </div>
 {{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
-{{with .Google}}{{if .Offered}}{{if or (not .Connected) .Problem}}<section class="panel gmail-setup" id="google">
-<div class="panel-h"><h2>Connect Google</h2><span class="muted">one connection for mail and calendar: reads replies, creates drafts, adds your interviews; never sends, deletes or changes other events</span></div>
-{{if .Problem}}<p class="callout bad">{{.Problem}}.</p>
-<form method="post" action="/gmail/connect"><button class="primary">Connect Google again</button></form>
-{{else if .Client}}<p>Your Google client is saved. Press Connect Google, pick your account, and <b>tick every box</b> Google offers; Google sends you back here.</p>
+{{with .AI}}{{with .Run}}<section class="panel" id="agent"{{if eq .State "running"}} data-run="/mail/agent/run"{{end}}>
+<div class="panel-h"><h2>Inbox agent</h2><span class="badge {{.State}}">{{.State}}</span><span class="n">{{.Agent}}</span>{{if eq .State "running"}}<form class="inline act" method="post" action="/mail/agent/cancel"><button class="mini">Cancel</button></form>{{end}}</div>
+{{template "runprog" .}}
+{{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
+{{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
+{{end}}</pre></details>{{end}}
+</section>{{end}}{{end}}
+{{with .Google}}{{if and .Offered .Connected}}{{if .Problem}}<div class="callout bad">{{.Problem}}. <form class="inline" method="post" action="/gmail/connect"><button class="mini primary">Connect Google again</button></form></div>{{end}}
+{{with .Missing}}<div class="callout bad">Google was not allowed {{join . ", "}}. <form class="inline" method="post" action="/gmail/connect"><button class="mini primary">Connect Google again</button></form> and tick every box.</div>{{end}}
+{{if .Testing}}<p class="callout">Your Google Cloud app is in Testing mode, so Google disconnects ScoutJobs on {{.Ends.Format "Jan 2"}}. <a href="https://console.cloud.google.com/auth/audience" rel="noopener noreferrer" target="_blank">Publish it</a> (Audience &rsaquo; Publish app), then connect Google again.</p>{{end}}
+{{end}}{{end}}
+{{if .Choose}}<section class="panel connect" id="connect">
+<div class="panel-h"><h2>Connect mail &amp; calendar</h2><span class="muted">ScoutJobs reads replies to your applications, files drafts and adds interviews to your calendar. It never sends, deletes or changes anything else.</span></div>
+{{with .AI}}<div class="option rec" id="ai"><h3>Your AI agent <span class="badge done">recommended</span></h3>
+<p>Claude or Codex reads your mail through the connectors you sign in to once: Gmail and Google Calendar, Microsoft 365 for Outlook and its calendar, and others. No Google Cloud project and no passwords in ScoutJobs.</p>
+{{if .Agents}}<ol class="setup">
+  <li><b>Claude</b>: open <a href="https://claude.ai/settings/connectors" rel="noopener noreferrer" target="_blank">claude.ai &rsaquo; Settings &rsaquo; Connectors</a> and connect Gmail and Google Calendar, or Microsoft 365. <b>Codex</b>: <code>codex mcp add</code> your mail server, then <code>codex mcp login &lt;name&gt;</code>.</li>
+  <li>Pick your agent. ScoutJobs shows what it can reach.</li>
+</ol>
+<ul class="agents">{{$cur := .Agent}}{{range .Agents}}<li data-mail-check="/mail/agent/check?agent={{.}}"><b class="agentname">{{.}}</b> <span class="conns muted"><span class="spin" aria-hidden="true"></span>looking for mail connectors…</span>
+  {{if eq . $cur}}<span class="badge done">in use</span> <form class="inline" method="post" action="/mail/agent/off"><button class="mini">Stop using it</button></form>{{else}}<form class="inline" method="post" action="/mail/agent"><input type="hidden" name="agent" value="{{.}}"><button class="mini primary">Use {{.}}</button></form>{{end}}
+  <button class="mini" type="button" data-recheck>Check again</button></li>{{end}}</ul>
+<p class="muted small">Trade-offs: your agent's provider reads the messages it opens; a sync takes a minute or two and costs agent tokens; mail comes in when you press Sync now, not in the background. On a Team or Enterprise plan an admin has to allow the connectors. Claude gets only reading, draft and new-event tools; Codex keeps to the same rule through its instructions.</p>
+{{else}}<p class="callout">Install <a href="https://claude.com/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or Codex to use this.</p>{{end}}</div>{{end}}
+{{with .Google}}{{if and .Offered (not .Connected)}}<details class="option" id="google"{{if .Client}} open{{end}}><summary><b>Your own Google client</b> (advanced): replies are matched on this machine, no AI reads your mail, and it syncs in the background</summary>
+{{if .Client}}<p>Your Google client is saved. Press Connect Google, pick your account, and <b>tick every box</b> Google offers; Google sends you back here.</p>
 <form method="post" action="/gmail/connect"><button class="primary">Connect Google</button></form>
 <p class="muted small">Google says it has not verified the app: it is your own, so choose Advanced &rsaquo; Go to ScoutJobs.</p>
 {{else}}<p>Once, about 3 minutes, in your own Google Cloud project, so your mail goes to no one else. Each link opens the right page.</p>
@@ -32,10 +53,12 @@
   <button class="primary">Save client</button>
 </form></details>
 <p class="muted small">Saved to <code>{{.Home}}/gmail-client.json</code> (0600). In a terminal, <code>scoutjobs gmail setup</code> does the same.</p>
-{{end}}</section>
-{{else}}{{with .Missing}}<div class="callout bad">Google was not allowed {{join . ", "}}. <form class="inline" method="post" action="/gmail/connect"><button class="mini primary">Connect Google again</button></form> and tick every box.</div>{{end}}
-{{if .Testing}}<p class="callout">Your Google Cloud app is in Testing mode, so Google disconnects ScoutJobs on {{.Ends.Format "Jan 2"}}. <a href="https://console.cloud.google.com/auth/audience" rel="noopener noreferrer" target="_blank">Publish it</a> (Audience &rsaquo; Publish app), then connect Google again.</p>{{end}}
-{{end}}{{end}}{{end}}
+{{end}}</details>{{end}}{{end}}
+<details class="option" id="imap"><summary><b>IMAP</b>: iCloud Mail, Fastmail, Yahoo and other mailboxes, with an app password</summary>
+<p>Add <code>imap_host: imap.mail.me.com:993</code> (iCloud) and <code>imap_user: you@icloud.com</code> to <code>config.yaml</code>, set <code>SCOUTJOBS_IMAP_PASSWORD</code> to an app-specific password (Apple: account.apple.com &rsaquo; Sign-In and Security), and restart <code>scoutjobs serve</code>. It reads only: no drafts, no calendar.</p></details>
+<details class="option" id="mcp"><summary><b>Another AI app</b>: Claude Desktop, ChatGPT, Cursor or any MCP client with a mail connector</summary>
+<p>Add the ScoutJobs MCP server (<code>scoutjobs mcp</code>) next to the app's mail connector and ask it to “check my inbox for replies to my job applications”. It logs each match with <code>email_log</code>, and the messages show up here.</p></details>
+</section>{{end}}
 {{if .Days}}
 {{range .Days}}<section class="panel"><div class="panel-h"><h2>{{if .Day}}{{when .Day}}{{else}}Undated{{end}}</h2><span class="n">{{len .Rows}}</span></div>
 <ul class="mails wide">{{range .Rows}}<li class="{{.Dir}}">
@@ -48,12 +71,7 @@
 <section class="panel"><p class="empty">No {{$kind}} messages. <a href="/inbox">Show all</a></p></section>
 {{else}}
 <section class="panel"><div class="panel-h"><h2>No replies logged yet</h2></div>
-<p>Pick one way to fill this page:</p>
-<ol class="setup">
-  <li><b>Gmail API</b> (recommended). Connect Google above, or run <code>scoutjobs gmail setup</code>. Replies are matched on this machine, so no agent has to read your mail.</li>
-  <li><b>IMAP</b>. Set <code>imap_host: imap.gmail.com:993</code> and <code>SCOUTJOBS_IMAP_PASSWORD</code> (a Google app password), then run <code>scoutjobs email sync</code>.</li>
-  <li><b>Agent connector</b>. In Claude with the Gmail connector, say “check my inbox”. The <code>inbox-triage</code> skill records matched threads with <code>scoutjobs email log</code>.</li>
-</ol></section>
+<p class="empty">{{if .Source}}Press Sync now to bring in the replies to your applications.{{else}}Connect your mail above, then press Sync now.{{end}}</p></section>
 {{end}}
 {{end}}
 {{template "foot" .}}
