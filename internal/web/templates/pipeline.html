@@ -13,7 +13,7 @@
     <a class="cover" href="/jobs/{{.ID}}" aria-label="Open {{.Company}} · {{.Title}}"></a>
     <div class="row"><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
     <div class="ttl">{{.Title}}</div>
-    <div class="meta">{{if or .Remote .Location}}<span class="chip">{{template "ico-pin"}}{{.Remote}}{{if and .Remote .Location}} · {{end}}{{.Location}}</span>{{end}}<span class="chip">{{template "ico-clock"}}{{if .Deadline}}due {{.Deadline}}{{else}}updated {{day .UpdatedAt}}{{end}}</span>{{if .Source}}<span class="chip acc">{{.Source}}</span>{{end}}</div>
+    <div class="meta">{{if or (knownRemote .Remote) .Location}}<span class="chip">{{template "ico-pin"}}{{if knownRemote .Remote}}{{.Remote}}{{if .Location}} · {{end}}{{end}}{{.Location}}</span>{{end}}<span class="chip">{{template "ico-clock"}}{{if .Deadline}}due {{.Deadline}}{{else}}updated {{day .UpdatedAt}}{{end}}</span>{{if .Tags}}<span class="chip dim">{{.Tags}}</span>{{end}}{{if .Source}}{{if isURL .Source}}<a class="chip acc source-chip" href="{{.Source}}" target="_blank" rel="noreferrer" title="{{.Source}}">{{sourceLabel .Source}}</a>{{else}}<span class="chip acc source-chip" title="{{.Source}}">{{sourceLabel .Source}}</span>{{end}}{{end}}</div>
     {{template "move" (dict_status .ID .Status "/pipeline")}}
   </article>
   {{else}}<p class="empty">{{if or $.Data.Query $.Data.Due}}No match here{{else}}No jobs in this stage<small>{{title .Status}} jobs appear here</small>{{end}}</p>{{end}}

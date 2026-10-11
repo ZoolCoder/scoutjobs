@@ -225,6 +225,7 @@ form.search .muted{font-size:12.5px;white-space:nowrap}
 .jobcard .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .jobcard .co{font-weight:600;color:var(--fg)}.jobcard .ttl{font-size:12.5px;color:var(--muted);margin:2px 0 8px}
 .jobcard .meta{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:10px}
+.jobcard .meta>*{position:relative;z-index:1;max-width:100%}.jobcard .source-chip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jobcard form.inline{display:flex}.jobcard form.inline select{flex:1}
 .col .empty{padding:28px 8px}.empty small{display:block;font-size:12px;color:var(--dim);margin-top:4px;text-transform:capitalize}
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -49,6 +50,36 @@ func day(s string) string {
 	return s
 }
 
+func knownRemote(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "remote", "hybrid", "onsite":
+		return true
+	default:
+		return false
+	}
+}
+
+func sourceLabel(s string) string {
+	s = strings.TrimSpace(s)
+	if u, err := url.Parse(s); err == nil && u.Host != "" && (u.Scheme == "http" || u.Scheme == "https") {
+		host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+		switch {
+		case strings.Contains(host, "linkedin.com"):
+			return "LinkedIn"
+		case strings.Contains(host, "greenhouse.io"):
+			return "Greenhouse"
+		case strings.Contains(host, "lever.co"):
+			return "Lever"
+		default:
+			return host
+		}
+	}
+	if len([]rune(s)) > 28 {
+		return string([]rune(s)[:25]) + "…"
+	}
+	return s
+}
+
 var funcs = template.FuncMap{
 	"kb": func(n int64) string {
 		switch {
@@ -68,6 +99,12 @@ var funcs = template.FuncMap{
 	"kindcls": func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
 	"mailto":  func(m *mail.Message) string { return mail.Mailto(*m) },
 	"day":     day,
+	"knownRemote": knownRemote,
+	"isURL": func(s string) bool {
+		u, err := url.Parse(strings.TrimSpace(s))
+		return err == nil && u.Host != "" && (u.Scheme == "http" || u.Scheme == "https")
+	},
+	"sourceLabel": sourceLabel,
 	// mon and dom feed the calendar tile: "2026-10-14" -> "Oct", "14".
 	"mon": func(s string) string {
 		if t, err := time.Parse("2006-01-02", day(s)); err == nil {
