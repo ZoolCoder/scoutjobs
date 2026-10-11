@@ -9,7 +9,7 @@ ScoutJobs skills are installed under `~/.cursor/skills/` (Agent Skills standard;
 - find postings: `job-search` (`scoutjobs search --add`)
 - score: `job-fit`; apply: `resume-tailor`, `cover-letter-generator`; status: `application-tracker`
 - interviews: `interview-prep`, `mock-interview` (embody the persona in `agents/`), `interview-debrief`
-- improve: `learn-preferences`, `upskill`; routine: `daily-briefing`, `weekly-review`
+- improve: `learn-preferences`, `upskill`; routine: `daily-briefing`, `weekly-review`; connectors: `inbox-triage`, `calendar-sync`, `google-drive`
 
 State is the `scoutjobs` CLI (`~/.scoutjobs`). Use `--json` to read and the `set`/`log` commands to write. Start with `scoutjobs brief`.
 

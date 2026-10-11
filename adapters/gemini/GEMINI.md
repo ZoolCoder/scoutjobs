@@ -15,6 +15,7 @@ Skills are in `~/.gemini/skills/` after `install.sh` (Agent Skills standard). Lo
 | offers | `salary-negotiation-prep`, `offer-comparison-analyzer` |
 | get better | `learn-preferences`, `upskill` |
 | routine | `daily-briefing`, `weekly-review` |
+| connectors | `inbox-triage`, `calendar-sync`, `google-drive` |
 
 Rules:
 - State is the `scoutjobs` CLI; data in `~/.scoutjobs`. Read with `--json`. Start sessions with `scoutjobs brief`.

@@ -23,8 +23,9 @@ scoutjobs path || echo "MISSING"
 Read `$(scoutjobs path)/profile.md`. If it still has empty fields, collect the facts. Ask for the easiest source first:
 
 1. A CV file (PDF, DOCX, MD). Ask the user to copy it into `$(scoutjobs path)/cv/` (that folder is where every skill looks for the master CV, portfolio links and certificates; it has a README). Read it and extract.
-2. LinkedIn "About" and experience text pasted in.
-3. A short interview: five questions max per turn. Roles held, strongest skills with years, three results they are proud of (with numbers), target role and seniority, location and remote stance, salary floor, deal-breakers, work authorization.
+2. The LinkedIn data export (LinkedIn: Settings > Data privacy > Get a copy of your data; the "larger archive" includes connections). Run `scoutjobs linkedin import <export.zip>`, then read `$(scoutjobs path)/linkedin/profile.md`: headline, summary, positions, education, skills, certifications. It also loads connections, so `scoutjobs contacts <job>` later finds people at a company. A CV in Google Drive works too, through the `google-drive` skill.
+3. LinkedIn "About" and experience text pasted in.
+4. A short interview: five questions max per turn. Roles held, strongest skills with years, three results they are proud of (with numbers), target role and seniority, location and remote stance, salary floor, deal-breakers, work authorization.
 
 Write the profile in the template's sections. Rules:
 - Only facts the user gave. Never invent employers, dates, numbers or certifications. If a bullet has no number, ask for one once, then leave it qualitative.
