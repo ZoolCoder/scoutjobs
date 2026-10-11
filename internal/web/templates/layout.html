@@ -40,7 +40,7 @@
 </aside>
 <div class="body">
 {{if not .Bare}}<header class="top">
-  <div><h1 class="pg">{{title .Title}}</h1><p class="sub">{{.Sub}}</p></div>
+  <div><h1 class="pg{{if eq .Active "overview"}} greet{{end}}">{{if eq .Active "overview"}}{{greet}}{{else}}{{title .Title}}{{end}}</h1><p class="sub">{{.Sub}}</p></div>
   <span class="now">{{.Now}}</span>
 </header>{{end}}
 <main>

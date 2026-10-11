@@ -14,7 +14,7 @@
 </section>
 {{else if .Upcoming}}{{$i := index .Upcoming 0}}
 <section class="next">
-  <span class="gauge lg g0"><b>{{title $i.Stage}}</b></span>
+  <span class="av lg h0">{{slice $i.Company 0 1}}</span>
   <div><span class="next-k">Next best move</span><h2>Prepare for {{$i.Company}}</h2><p>{{title $i.Stage}} interview · {{when $i.At}} · prep {{title $i.PrepStatus}}</p></div>
   <a class="btn primary" href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">Open prep</a>
 </section>
@@ -32,14 +32,7 @@
 </section>
 {{end}}
 
-{{if .Today}}<section class="panel today">
-  <div class="panel-h"><h2>Today</h2><span class="n">{{len .Today}}</span><a class="act" href="/inbox">Inbox</a></div>
-  <ul class="todo">{{range .Today}}<li class="t-{{.Kind}}">
-    <span class="tk">{{.Kind}}</span>
-    <div><a href="{{.Href}}"><b>{{.Title}}</b></a><small class="muted">{{.Detail}}</small></div>
-    <div class="tact">{{range .Links}}<a class="btn mini" href="{{.Href}}"{{if .External}} rel="noopener noreferrer" target="_blank"{{end}}>{{.Label}}</a>{{end}}{{if .Status}}<form method="post" action="/jobs/{{.JobID}}/status"><input type="hidden" name="back" value="/"><button class="mini go" name="status" value="{{.Status}}">{{.StatusL}}</button></form>{{end}}</div>
-  </li>{{end}}</ul>
-</section>{{end}}
+
 
 <section class="kpis">
   <a class="kpi" href="/pipeline"><span class="ic">{{template "ico-doc"}}</span><span class="lbl">Open jobs</span><b>{{.Stats.Open}}</b><span class="hint">in your pipeline</span></a>
@@ -48,12 +41,35 @@
   <a class="kpi" href="/activity"><span class="ic">{{template "ico-bars"}}</span><span class="lbl">Response rate</span><b>{{pct .Stats.ResponseRate}}</b><span class="hint">of {{.Stats.AppliedTotal}} applications</span><meter min="0" max="1" value="{{.Stats.ResponseRate}}"></meter></a>
 </section>
 
-<div class="grid-2">
+<div class="ov">
+<div class="stack">
+{{if .Today}}<section class="panel today">
+  <div class="panel-h"><h2>Today</h2><span class="n">{{len .Today}}</span><a class="act" href="/inbox">Inbox</a></div>
+  <ul class="todo">{{range .Today}}<li class="t-{{.Kind}}">
+    <span class="tk">{{.Kind}}</span>
+    <div><a href="{{.Href}}"><b>{{.Title}}</b></a><small class="muted">{{.Detail}}</small></div>
+    <div class="tact">{{range .Links}}<a class="btn mini" href="{{.Href}}"{{if .External}} rel="noopener noreferrer" target="_blank"{{end}}>{{.Label}}</a>{{end}}{{if .Status}}<form method="post" action="/jobs/{{.JobID}}/status"><input type="hidden" name="back" value="/"><button class="mini go" name="status" value="{{.Status}}">{{.StatusL}}</button></form>{{end}}</div>
+  </li>{{end}}</ul>
+</section>{{end}}
+<section class="panel">
+  <div class="panel-h"><h2>Coming up</h2><span class="n">{{len .Upcoming}}</span><a class="act" href="/interviews">All interviews</a></div>
+  {{if .Upcoming}}
+  <ul class="rows">
+  {{range .Upcoming}}<li>{{template "cal" .At}}<span><a href="/jobs/{{.JobID}}">{{.Company}}</a><small>{{title .Stage}}{{if .Format}} · {{.Format}}{{end}}{{with hm .At}} · {{.}}{{end}}</small></span><span class="badge {{.PrepStatus}}">{{title .PrepStatus}}</span></li>{{end}}
+  </ul>
+  {{else}}<p class="empty">No interviews scheduled. They appear here once you add one to a job.</p>{{end}}
+
+  <h3>Drafts waiting <span class="n">{{len .TodoJobs}}</span></h3>
+  {{if .TodoJobs}}<ul class="rows">{{range .TodoJobs}}<li><span></span><span><a href="/jobs/{{.ID}}">{{.Company}}</a> · {{.Title}}<small>edited {{day .UpdatedAt}}</small></span>{{template "gauge" .FitScore}}</li>{{end}}</ul>
+  {{else}}<p class="muted">Nothing drafted. Try <code>/scoutjobs:apply</code>.</p>{{end}}
+</section>
+</div>
+<div class="stack">
 <section class="panel">
   <div class="panel-h"><h2>Pipeline health</h2><span class="n">{{.Stats.Open}} active</span><a class="act" href="/pipeline">Open pipeline</a></div>
   <div class="split">
   <ul class="funnel">
-  {{range .Funnel}}<li><span class="lbl">{{title .Status}}</span><meter min="0" max="{{.Max}}" value="{{.Count}}"></meter><span class="n">{{.Count}}</span></li>{{end}}
+  {{range .Funnel}}<li class="f-{{.Status}}"><span class="lbl">{{title .Status}}</span><meter min="0" max="{{.Max}}" value="{{.Count}}"></meter><span class="n">{{.Count}}</span></li>{{end}}
   </ul>
   <div><h3 class="first">Applications <span class="muted">· last 8 weeks · target {{.Target}}</span></h3>
   <ul class="weeks">{{range $i, $w := .Weekly}}<li><i class="h{{$w.Pct}}" title="{{$w.Count}}"></i><span>W{{$i}}</span></li>{{end}}</ul></div>
@@ -68,19 +84,15 @@
     <form method="post" action="/jobs/{{.ID}}/status" class="inline"><input type="hidden" name="status" value="no_response"><input type="hidden" name="back" value="/"><button class="mini">Mark no response</button></form></li>{{end}}</ul>
   {{end}}
 </section>
-
 <section class="panel">
-  <div class="panel-h"><h2>Coming up</h2><span class="n">{{len .Upcoming}}</span><a class="act" href="/interviews">All interviews</a></div>
-  {{if .Upcoming}}
-  <ul class="rows">
-  {{range .Upcoming}}<li>{{template "cal" .At}}<span><a href="/jobs/{{.JobID}}">{{.Company}}</a><small>{{title .Stage}}{{if .Format}} · {{.Format}}{{end}}{{with hm .At}} · {{.}}{{end}}</small></span><span class="badge {{.PrepStatus}}">{{title .PrepStatus}}</span></li>{{end}}
-  </ul>
-  {{else}}<p class="empty">No interviews scheduled. They appear here once you add one to a job.</p>{{end}}
-
-  <h3>Drafts waiting <span class="n">{{len .TodoJobs}}</span></h3>
-  {{if .TodoJobs}}<ul class="rows">{{range .TodoJobs}}<li><span></span><span><a href="/jobs/{{.ID}}">{{.Company}}</a> · {{.Title}}<small>edited {{day .UpdatedAt}}</small></span>{{template "gauge" .FitScore}}</li>{{end}}</ul>
-  {{else}}<p class="muted">Nothing drafted. Try <code>/scoutjobs:apply</code>.</p>{{end}}
+  <div class="panel-h"><h2>Recent activity</h2><a class="act" href="/activity">Full log</a></div>
+  <ul class="timeline">{{range .Recent}}<li><span class="mono">{{when .At}}</span><span><span class="badge {{.Kind}}">{{title .Kind}}</span> {{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a> · {{end}}{{.Note}}</span></li>{{else}}<li><span class="mono">—</span><span class="muted">Empty. Add a job: <code>scoutjobs job add --company X --title Y</code> or <code>scoutjobs search --remote --add</code></span></li>{{end}}</ul>
 </section>
+</div>
+</div>
+
+<div class="grid-2">
+
 
 <section class="panel">
   <div class="panel-h"><h2>Learning progress</h2><span class="n">{{f1 .Stats.LearningHours}}h</span><a class="act" href="/learning">Practice and gaps</a></div>
@@ -118,9 +130,5 @@
   {{end}}
 </section>
 
-<section class="panel">
-  <div class="panel-h"><h2>Recent activity</h2><a class="act" href="/activity">Full log</a></div>
-  <ul class="timeline">{{range .Recent}}<li><span class="mono">{{when .At}}</span><span><span class="badge {{.Kind}}">{{title .Kind}}</span> {{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a> · {{end}}{{.Note}}</span></li>{{else}}<li><span class="mono">—</span><span class="muted">Empty. Add a job: <code>scoutjobs job add --company X --title Y</code> or <code>scoutjobs search --remote --add</code></span></li>{{end}}</ul>
-</section>
 {{end}}
 {{template "foot" .}}

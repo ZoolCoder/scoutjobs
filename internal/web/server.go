@@ -114,6 +114,15 @@ var funcs = template.FuncMap{
 		}
 		return s
 	},
+	"greet": func() string {
+		switch h := time.Now().Hour(); {
+		case h < 12:
+			return "Good morning"
+		case h < 18:
+			return "Good afternoon"
+		}
+		return "Good evening"
+	},
 	"hm": func(s string) string {
 		if len(s) >= 16 && s[10] == 'T' {
 			return s[11:16]
@@ -424,7 +433,7 @@ func hue(s string) int {
 
 var subtitles = map[string]string{
 	"inbox":       "Replies from companies, matched to your applications.",
-	"overview":    "Your job search, at a glance.",
+	"overview":    "Your job search, at a glance. Here's what to do next.",
 	"pipeline":    "Every opportunity, from discovery to outcome.",
 	"interviews":  "Prepare for what is coming, record how it went.",
 	"calendar":    "Interviews, deadlines and follow-ups. Subscribe from Google Calendar or add one event at a time.",
