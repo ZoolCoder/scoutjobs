@@ -259,13 +259,38 @@ func mailSource(s *store.Store, cfg Config, via string) (string, error) {
 	return "", fmt.Errorf("--via %q: use gmail, imap or auto", via)
 }
 
+// fetchMail never reads mail from before the first tracked job: an older message cannot be a reply to
+// an application, and skipping it keeps the inbox, and the agent that triages it, small.
 func fetchMail(s *store.Store, cfg Config, source string, since time.Time, limit int) ([]mail.Mail, error) {
+	start, ok := s.Started()
+	if !ok {
+		return nil, nil
+	}
+	if since.Before(start) {
+		since = start
+	}
+	var mails []mail.Mail
+	var err error
 	if source == "gmail" {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
-		return gmailClient(s, cfg).Fetch(ctx, since, limit)
+		mails, err = gmailClient(s, cfg).Fetch(ctx, since, limit)
+	} else {
+		mails, err = imapAccount(cfg).Fetch(since, limit)
 	}
-	return imapAccount(cfg).Fetch(since, limit)
+	return sentSince(mails, start), err
+}
+
+// sentSince drops messages dated before start; IMAP searches by whole day, so the morning before the first job slips in.
+func sentSince(mails []mail.Mail, start time.Time) []mail.Mail {
+	out := mails[:0]
+	for _, m := range mails {
+		if t, err := time.Parse(time.RFC3339, mailDate(m.Date)); err == nil && t.Before(start) {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // mailHooks lets the dashboard read the inbox and make Gmail drafts without importing cli.

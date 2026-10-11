@@ -95,7 +95,7 @@ type Reply struct {
 // status interview or rejected when the wording is clear. Never deletes or flags anything.
 func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	fs := flag.NewFlagSet("email sync", flag.ContinueOnError)
-	since := fs.String("since", "14d", "how far back to look: 14d, 3w, 2026-09-01")
+	since := fs.String("since", "14d", "how far back to look: 14d, 3w, 2026-09-01; never before your first tracked job")
 	limit := fs.Int("limit", 500, "newest messages to inspect at most")
 	dry := fs.Bool("dry-run", false, "show matches, change nothing")
 	via := fs.String("via", "auto", "gmail (API, after gmail connect), imap (imap_host), or auto")

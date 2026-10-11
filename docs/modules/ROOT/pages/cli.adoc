@@ -70,7 +70,7 @@ $ scoutjobs email draft 3 [--to hr@...] [--subject "..."] [--body file.md] [--at
 $ scoutjobs email show 3 [--json]         # the draft, and a mailto: link
 $ scoutjobs email send 3 --yes [--skip-checks]   # refuses without --yes, and while a quality gate fails
 $ scoutjobs email test [--to addr]        # probe: sends one line to yourself, checks IMAP login when imap_host is set
-$ scoutjobs email sync [--since 14d] [--via gmail|imap] [--dry-run] [--json]   # log replies to applications; --json adds "review": unmatched mail that may concern the search
+$ scoutjobs email sync [--since 14d] [--via gmail|imap] [--dry-run] [--json]   # log replies to applications; never reads mail older than your first tracked job; --json adds "review": unmatched mail that may concern the search
 $ scoutjobs gmail setup [--file client_secret_….json] [--no-connect]   # links the Google Cloud steps, imports the client JSON from ~/Downloads, connects
 $ scoutjobs gmail connect | status | disconnect
 $ scoutjobs gmail test                     # reads a few inbox headers and the next 14 days of your calendar; reports each

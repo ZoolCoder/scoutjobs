@@ -169,3 +169,41 @@ func TestGmailSetupImportsDownload(t *testing.T) {
 		t.Errorf("second setup: %s", out)
 	}
 }
+
+func TestSentSinceDropsMailFromBeforeTheFirstJob(t *testing.T) {
+	start := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	got := sentSince([]mail.Mail{
+		{Subject: "old", Date: "Thu, 1 Oct 2026 09:00:00 +0000"},
+		{Subject: "new", Date: "Thu, 1 Oct 2026 13:00:00 +0000"},
+		{Subject: "api", Date: "2026-10-02T08:00:00Z"},
+		{Subject: "undated", Date: "someday"},
+	}, start)
+	var subjects []string
+	for _, m := range got {
+		subjects = append(subjects, m.Subject)
+	}
+	if strings.Join(subjects, ",") != "new,api,undated" {
+		t.Fatalf("kept %v", subjects)
+	}
+}
+
+func TestFetchMailReadsNothingBeforeAnyJob(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	s, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, ok := s.Started(); ok {
+		t.Fatal("no job yet, so no start")
+	}
+	// imap_host is unset: reaching the server would fail, so a nil error proves nothing was fetched
+	if mails, err := fetchMail(s, Config{}, "imap", time.Now().AddDate(-1, 0, 0), 10); err != nil || mails != nil {
+		t.Fatalf("got %v, %v", mails, err)
+	}
+	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev")
+	if st, ok := s.Started(); !ok || time.Since(st) > time.Minute {
+		t.Fatalf("started %v %v", st, ok)
+	}
+}
