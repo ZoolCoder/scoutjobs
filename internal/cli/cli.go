@@ -44,6 +44,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   brief [--compact]          everything the daily briefing needs (json)
   export                     full json dump
   serve [--addr 127.0.0.1:7070]   dashboard, calendar feed, JSON API, MCP over HTTP on /mcp (needs api_token)
+                             restarts itself when the binary is upgraded (--no-restart to opt out; kill -HUP <pid> to force)
   mcp                        MCP server on stdio for Claude Desktop, Codex, Cursor (every tool is a CLI command)
   doctor [--online]          check PATH, data dir, config keys, mail secrets, linked skills, dashboard; --online compares with the latest release
 
@@ -121,7 +122,6 @@ func Run(args []string, out io.Writer) error {
 		if err := fs.Parse(rest); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "ScoutJobs %s dashboard on http://%s  (data: %s)\n", Version, *addr, s.Home)
 		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg)})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)

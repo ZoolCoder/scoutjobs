@@ -6,13 +6,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
 )
 
 // Status vocabulary for jobs. Order matters for the pipeline board.
@@ -76,21 +77,71 @@ func Home() string {
 
 func Open() (*Store, error) {
 	home := Home()
+	path := filepath.Join(home, "scoutjobs.db")
 	if err := os.MkdirAll(home, 0o700); err != nil {
-		return nil, err
+		return nil, openError(home, path, err)
 	}
-	dsn := "file:" + filepath.Join(home, "scoutjobs.db") + "?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
+	dsn := "file:" + path + "?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, err
+		return nil, openError(home, path, err)
 	}
 	db.SetMaxOpenConns(1)
 	s := &Store{DB: db, Home: home}
 	if err := s.migrate(); err != nil {
 		db.Close()
-		return nil, err
+		return nil, openError(home, path, err)
 	}
 	return s, nil
+}
+
+// openError names the database and the data dir it came from, with a hint for the SQLite codes
+// people actually hit: a path that cannot be opened (14), a read-only file (8), a lock (5, 6).
+func openError(home, path string, err error) error {
+	src := "default"
+	if os.Getenv("SCOUTJOBS_HOME") != "" {
+		src = "SCOUTJOBS_HOME"
+	}
+	msg := fmt.Sprintf("open database %s (data dir %s, from %s): %v", path, home, src, err)
+	if h := openHint(home, path, err); h != "" {
+		msg += "\nhint: " + h
+	}
+	return errors.New(msg)
+}
+
+func openHint(home, path string, err error) string {
+	var se *sqlite.Error
+	code := 0
+	if errors.As(err, &se) {
+		code = se.Code() & 0xff
+	}
+	switch {
+	case code == 5 || code == 6:
+		return "another process holds a lock on the database; stop other scoutjobs commands or dashboards using " + home + " and retry"
+	case code == 8:
+		return path + " is read-only; check its owner and permissions (ls -l " + home + ")"
+	case code != 14 && !errors.Is(err, fs.ErrPermission):
+		return ""
+	}
+	if st, e := os.Stat(home); e != nil || !st.IsDir() {
+		return home + " is not a directory; set SCOUTJOBS_HOME to a folder or run scoutjobs init"
+	}
+	if f, e := os.CreateTemp(home, ".probe-*"); e != nil {
+		return "no write permission on " + home + "; SQLite needs it for the journal. Check its owner (ls -ld " + home + ")"
+	} else {
+		f.Close()
+		_ = os.Remove(f.Name())
+	}
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		if f, e := os.OpenFile(p, os.O_RDWR, 0); e != nil {
+			if errors.Is(e, fs.ErrPermission) {
+				return "no write permission on " + p + "; check its owner (ls -l " + home + "), e.g. files created by sudo"
+			}
+		} else {
+			f.Close()
+		}
+	}
+	return "SQLite cannot open " + path + "; check the path exists, is writable, and is not on a network or synced drive"
 }
 
 func (s *Store) Close() error { return s.DB.Close() }

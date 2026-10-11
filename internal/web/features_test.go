@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -256,5 +257,17 @@ func TestVersionBadgeAndEndpoint(t *testing.T) {
 	}
 	if rec := get(h, "/app.js"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "/version") {
 		t.Errorf("/app.js: %d", rec.Code)
+	}
+}
+
+func TestHealthz(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{Version: "0.3.2"})
+	var got Health
+	if err := json.Unmarshal(get(h, "/healthz").Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.App != "scoutjobs" || got.Version != "0.3.2" || got.Home != s.Home || got.PID != os.Getpid() {
+		t.Errorf("%+v", got)
 	}
 }

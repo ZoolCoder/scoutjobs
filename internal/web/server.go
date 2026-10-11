@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -164,15 +165,35 @@ func Serve(s *store.Store, addr string, cfg Config) error {
 	return ServeContext(context.Background(), s, addr, cfg)
 }
 
+// Health is what GET /healthz answers, so scoutjobs doctor, update and serve can tell which
+// dashboard owns a port: its version, process, binary and data dir.
+type Health struct {
+	App     string `json:"app"`
+	Version string `json:"version"`
+	PID     int    `json:"pid"`
+	Exe     string `json:"exe"`
+	Home    string `json:"home"`
+}
+
 // ServeContext serves until ctx ends, then lets requests in flight finish and returns nil.
 func ServeContext(ctx context.Context, s *store.Store, addr string, cfg Config) error {
-	h, err := Handler(s, cfg)
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	hs := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
+	return ServeListener(ctx, l, s, cfg)
+}
+
+// ServeListener is ServeContext on a listener the caller opened, so it can report a busy port first.
+func ServeListener(ctx context.Context, l net.Listener, s *store.Store, cfg Config) error {
+	h, err := Handler(s, cfg)
+	if err != nil {
+		l.Close()
+		return err
+	}
+	hs := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
-	go func() { errc <- hs.ListenAndServe() }()
+	go func() { errc <- hs.Serve(l) }()
 	select {
 	case err := <-errc:
 		return err
@@ -226,6 +247,11 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
 	mux.HandleFunc("GET /board.js", static("templates/board.js", "text/javascript; charset=utf-8", false))
 	mux.HandleFunc("GET /app.js", static("templates/app.js", "text/javascript; charset=utf-8", false))
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		exe, _ := os.Executable()
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusOK, Health{App: "scoutjobs", Version: cfg.Version, PID: os.Getpid(), Exe: exe, Home: s.Home})
+	})
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")

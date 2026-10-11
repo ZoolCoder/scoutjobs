@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -77,12 +76,7 @@ func runDoctor(rest []string, out io.Writer) error {
 	cs = append(cs, mailChecks(cfg)...)
 	cs = append(cs, agentChecks(home)...)
 
-	if c, err := net.DialTimeout("tcp", cfg.DashboardAddr, 300*time.Millisecond); err == nil {
-		c.Close()
-		add("ok", "dashboard", "listening on "+cfg.DashboardAddr, "")
-	} else {
-		add("warn", "dashboard", "nothing on "+cfg.DashboardAddr, "scoutjobs serve (only needed for the browser UI, API and n8n)")
-	}
+	cs = append(cs, dashboardCheck(cfg.DashboardAddr, home))
 	return finishDoctor(out, *asJSON, cs)
 }
 
