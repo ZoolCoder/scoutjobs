@@ -122,10 +122,10 @@
   <p class="small muted">{{index .Counts "interview"}} interviews ahead.</p>
 </section>
 
-<section class="panel">
-  <div class="panel-h"><h2>{{if eq .GoogleCal "on"}}Calendar feed{{else}}Google Calendar{{end}}</h2></div>
+<details class="panel calfold">
+  <summary class="panel-h"><h2>{{if eq .GoogleCal "on"}}Calendar feed{{else}}Add to Google Calendar{{end}}</h2></summary>
   {{if eq .GoogleCal "on"}}<p class="small muted">Apple Calendar and Outlook can subscribe to this feed of interviews, deadlines and follow-ups.</p>{{else}}
-  <ol class="steps">
+  <ol class="calsteps">
     <li><b>One event</b><small>Open it here and press <em>Add to Google Calendar</em>. Google shows the event filled in; nothing is saved until you click Save there.</small></li>
     <li><b>Everything at once</b><small><a href="{{.FeedDownload}}">Download scoutjobs.ics</a>, then in Google Calendar: Settings › Import &amp; export › Import.</small></li>
     <li><b>Stay in sync</b><small>Subscribe to the feed below with Settings › Add calendar › From URL. Google fetches it from its own servers, so the address must be public: run <code>serve</code> behind a tunnel. Apple Calendar and Outlook on this machine can subscribe to it as it is.</small></li>
@@ -133,7 +133,7 @@
   </ol>{{end}}
   <label class="feed">Feed<input readonly value="{{.FeedURL}}" aria-label="calendar feed URL"></label>
   <p class="small muted">{{.FeedNote}}</p>
-</section>
+</details>
 </aside>
 </div>
 {{end}}
