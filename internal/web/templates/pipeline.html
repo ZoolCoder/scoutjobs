@@ -4,6 +4,12 @@
 <form class="toolbar" method="get" action="/pipeline">
   <label class="tsearch">{{template "ico-search"}}<input name="q" value="{{$f.Q}}" placeholder="Search jobs  ( / )" aria-label="Search company, title, tags"></label>
   {{if $f.Due}}<input type="hidden" name="due" value="1">{{end}}{{if $f.Remote}}<input type="hidden" name="remote" value="1">{{end}}{{if $f.Fit}}<input type="hidden" name="fit" value="{{$f.Fit}}">{{end}}{{if eq $f.View "list"}}<input type="hidden" name="view" value="list">{{end}}{{if $f.Full}}<input type="hidden" name="full" value="1">{{end}}{{if $f.Dense}}<input type="hidden" name="dense" value="1">{{end}}{{if $f.Closed}}<input type="hidden" name="closed" value="1">{{end}}
+  <span class="muted tcount">{{.Count}} jobs{{if $f.Active}} · <a href="/pipeline">clear</a>{{end}}</span>
+  <span class="seg"><a {{if eq $f.View "board"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "board"}}">Board</a><a {{if eq $f.View "list"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "list"}}">List</a></span>
+  <a class="btn icon{{if $f.Dense}} on{{end}}" href="{{$f.DenseURL}}" title="{{if $f.Dense}}Comfortable cards{{else}}Compact cards{{end}}" aria-label="Compact cards" aria-pressed="{{if $f.Dense}}true{{else}}false{{end}}">{{template "ico-rows"}}</a>
+  <a class="btn icon{{if $f.Full}} on{{end}}" href="{{$f.FullURL}}" data-full title="{{if $f.Full}}Exit full screen{{else}}Full screen{{end}} ( f )" aria-label="Full screen" aria-pressed="{{if $f.Full}}true{{else}}false{{end}}">{{if $f.Full}}{{template "ico-shrink"}}{{else}}{{template "ico-expand"}}{{end}}</a>
+  <a class="btn primary" href="/jobs/new">Add job</a>
+  <span class="tbreak"></span>
   <label class="tloc">{{template "ico-pin"}}<input name="loc" value="{{$f.Loc}}" placeholder="Location" aria-label="Location: city, country or region"></label>
   <span class="chips">
     {{if $f.Due}}<a class="on" href="{{$f.DueURL}}">Due this week ×</a>{{else}}<a href="{{$f.DueURL}}">Due this week</a>{{end}}
@@ -15,11 +21,6 @@
   {{if or .Tags $f.Tag}}<select name="tag" aria-label="tag" class="auto"><option value="">All tags</option>{{if $f.Tag}}<option value="{{$f.Tag}}" selected>{{$f.Tag}}</option>{{end}}{{range .Tags}}{{if ne . $f.Tag}}<option value="{{.}}">{{.}}</option>{{end}}{{end}}</select>{{end}}
   <select name="sort" aria-label="sort" class="auto">{{range .Sorts}}<option value="{{.}}" {{if eq . $f.Sort}}selected{{end}}>Sort: {{.}}</option>{{end}}</select>
   <button class="mini apply">Apply</button>
-  <span class="muted">{{.Count}} jobs{{if $f.Active}} · <a href="/pipeline">clear</a>{{end}}</span>
-  <span class="seg"><a {{if eq $f.View "board"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "board"}}">Board</a><a {{if eq $f.View "list"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "list"}}">List</a></span>
-  <a class="btn icon{{if $f.Dense}} on{{end}}" href="{{$f.DenseURL}}" title="{{if $f.Dense}}Comfortable cards{{else}}Compact cards{{end}}" aria-label="Compact cards" aria-pressed="{{if $f.Dense}}true{{else}}false{{end}}">{{template "ico-rows"}}</a>
-  <a class="btn icon{{if $f.Full}} on{{end}}" href="{{$f.FullURL}}" data-full title="{{if $f.Full}}Exit full screen{{else}}Full screen{{end}} ( f )" aria-label="Full screen" aria-pressed="{{if $f.Full}}true{{else}}false{{end}}">{{if $f.Full}}{{template "ico-shrink"}}{{else}}{{template "ico-expand"}}{{end}}</a>
-  <a class="btn primary" href="/jobs/new">Add job</a>
 </form>
 <div class="pipe-body">
 <div class="pipe-main">
@@ -42,7 +43,7 @@
 <div class="board">
 {{range .Columns}}
 {{if .Collapsed}}<a class="col strip s-{{.Status}}" data-drop="{{.Status}}" href="{{$f.ClosedURL}}" title="Show closed stages"><span class="n">{{.Total}}</span><b>{{title .Status}}</b></a>
-{{else}}<section class="col s-{{.Status}}" data-drop="{{.Status}}">
+{{else}}<section class="col s-{{.Status}}{{if not .Total}} empty{{end}}" data-drop="{{.Status}}">
   <div class="col-h"><h2>{{title .Status}}</h2><span class="n">{{.Total}}</span></div>
   <div class="col-cards">
   {{range .Jobs}}
@@ -56,7 +57,7 @@
       {{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}
       <span class="age muted" title="updated {{day .UpdatedAt}}">{{day .UpdatedAt}}</span></div>
   </article>
-  {{else}}<p class="empty">{{if $f.Active}}No match here{{else}}No jobs in this stage<small>{{title .Status}} jobs appear here</small>{{end}}</p>{{end}}
+  {{else}}<p class="empty">{{if $f.Active}}No match here{{else}}None yet{{end}}</p>{{end}}
   {{if .Expanded}}<a class="more" href="{{$f.MoreURL .Status}}">Show first {{colcap}}</a>{{else if gt .Total (len .Jobs)}}<a class="more" href="{{$f.MoreURL .Status}}">Show all {{.Total}}</a>{{end}}
   </div>
 </section>{{end}}

@@ -220,8 +220,6 @@ form.search .muted{font-size:12.5px;white-space:nowrap}
 /* kanban */
 .board{display:flex;gap:16px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
 .col{min-width:256px;max-width:300px;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;border-top:5px solid var(--line2);box-shadow:var(--shadow)}
-.col.s-ranked{border-top-color:var(--acc)}.col.s-drafted{border-top-color:var(--warn)}.col.s-applied,.col.s-interview{border-top-color:var(--info)}
-.col.s-offer,.col.s-hired{border-top-color:var(--ok)}.col.s-rejected,.col.s-no_response{border-top-color:var(--bad)}
 .col-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .col-h h2{font-size:13px;font-weight:600;text-transform:capitalize}
 .jobcard{background:var(--subtle);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
@@ -813,3 +811,14 @@ ul.feed small{display:block;font-size:11.5px;color:var(--muted)}
 }
 @media (max-width:1280px){.c3,.c4,.c6{grid-column:span 6}.c5,.c7,.c8{grid-column:span 12}}
 @media (max-width:720px){.dash>*{grid-column:1/-1}.dash .kpis{grid-template-columns:1fr 1fr}}
+
+/* pipeline: every stage fits the width, empty stages shrink */
+.toolbar .tcount{margin-left:auto}
+.toolbar .tbreak{flex-basis:100%;height:0}
+.toolbar .tsearch{max-width:420px}.toolbar .tloc{flex:0 1 180px}
+.board{overflow-x:auto;gap:12px}
+.board .col{flex:1 1 0;min-width:150px;max-width:none;border-top-width:1px;border-radius:12px}
+.board .col.empty{flex:0 0 120px;min-width:120px}
+.board .col.empty .empty{padding:16px 6px;font-size:12px}
+.col .jobcard{padding:10px}
+.jobcard .gauge{width:36px;height:36px}.jobcard .gauge b{width:28px;height:28px;font-size:10.5px}
