@@ -34,8 +34,8 @@ func (v *server) today(st store.Stats, upcoming []store.Interview) []todo {
 		if i.At > soon || i.Outcome != "" {
 			continue
 		}
-		out = append(out, todo{Kind: "interview", Title: fmt.Sprintf("Prepare for %s · %s", i.Company, i.Stage),
-			Detail: fmt.Sprintf("%s · prep %d/%d", i.At, i.PrepCount(), len(store.PrepItems)),
+		out = append(out, todo{Kind: "interview", Title: fmt.Sprintf("Prepare for %s · %s", i.Company, strings.ReplaceAll(i.Stage, "_", " ")),
+			Detail: fmt.Sprintf("%s · prep %d/%d", strings.Replace(i.At, "T", " ", 1), i.PrepCount(), len(store.PrepItems)),
 			Href:   fmt.Sprintf("/calendar?view=week&d=%s&ev=i%d", day(i.At), i.ID),
 			Links:  []todoLink{{"Open prep checklist", fmt.Sprintf("/calendar?view=week&d=%s&ev=i%d", day(i.At), i.ID), false}}})
 	}

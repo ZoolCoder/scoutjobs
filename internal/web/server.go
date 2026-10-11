@@ -551,7 +551,7 @@ func (v *server) overview(w http.ResponseWriter, r *http.Request) {
 	}
 	d := overviewData{Stats: st, Funnel: funnel, Weekly: weekly, Target: v.cfg.WeeklyApplyTarget}
 	d.Upcoming, _ = v.s.Interviews(0, true)
-	d.Recent, _ = v.s.Events(0, 12)
+	d.Recent, _ = v.s.Events(0, 8)
 	d.Prefs, _ = v.s.Preferences()
 	if len(d.Prefs) > 6 {
 		d.Prefs = d.Prefs[:6]
