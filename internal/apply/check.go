@@ -85,6 +85,7 @@ func Check(s *store.Store, j store.Job, events []store.Event, o CheckOptions) Re
 	if !o.Export {
 		add(gateDocuments(dir, drafts))
 	}
+	add(gateFormat(s.Home, drafts["resume.md"]))
 	add(gateFitReview(j, review, reviewErr))
 	add(gateCoverage(review, reviewErr, drafts))
 	add(gateGrounding(dir, events, drafts))
@@ -114,6 +115,52 @@ func gateDocuments(dir string, drafts map[string]string) Gate {
 		return Gate{"documents", Fail, "required documents missing: " + strings.Join(missing, ", "), missing}
 	}
 	return Gate{"documents", Pass, "tailored resume and cover letter present", nil}
+}
+
+// gateFormat keeps every tailored resume in the layout of the main CV: same sections, same order,
+// same heading levels. Tailoring changes the content, not the shape.
+func gateFormat(home, resume string) Gate {
+	main, err := os.ReadFile(filepath.Join(home, "cv", "resume.md"))
+	if err != nil || resume == "" {
+		return Gate{"format", Pass, "no main CV to compare with", nil}
+	}
+	want, got := Outline(string(main)), Outline(resume)
+	var diff []string
+	have := map[string]bool{}
+	for _, h := range got {
+		have[h] = true
+	}
+	for _, h := range want {
+		if !have[h] {
+			diff = append(diff, "missing section "+h)
+		}
+		delete(have, h)
+	}
+	for _, h := range got {
+		if have[h] {
+			diff = append(diff, "section not in the main CV "+h)
+		}
+	}
+	if len(diff) == 0 && strings.Join(want, "|") != strings.Join(got, "|") {
+		diff = append(diff, "sections are in a different order than the main CV")
+	}
+	if len(diff) > 0 {
+		return Gate{"format", Warn, "resume.md does not follow the layout of cv/resume.md", diff}
+	}
+	return Gate{"format", Pass, "same sections and order as the main CV", nil}
+}
+
+// Outline is the section headings of a Markdown CV below the name, with their level: "## Experience".
+func Outline(md string) []string {
+	var out []string
+	for _, l := range strings.Split(md, "\n") {
+		l = strings.TrimSpace(l)
+		if strings.HasPrefix(l, "##") {
+			level, text, _ := strings.Cut(l, " ")
+			out = append(out, level+" "+strings.ToLower(strings.TrimSpace(text)))
+		}
+	}
+	return out
 }
 
 func gateFitReview(j store.Job, review FitReview, err error) Gate {

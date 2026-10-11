@@ -311,7 +311,23 @@ CREATE TABLE IF NOT EXISTS saved_searches (
   filters TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT ''
+);
 `
+
+// Setting returns a dashboard switch stored in the database; "" when never set.
+func (s *Store) Setting(key string) string {
+	var v string
+	_ = s.DB.QueryRow(`SELECT value FROM settings WHERE key=?`, key).Scan(&v)
+	return v
+}
+
+func (s *Store) SetSetting(key, value string) error {
+	_, err := s.DB.Exec(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
+	return err
+}
 
 func (s *Store) migrate() error {
 	if _, err := s.DB.Exec(schema); err != nil {

@@ -7,7 +7,28 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Added
+- Job checklist: one list on the job page from fit to sent, with what is
+  done, what needs a look, what blocks sending and the one next step.
+- Grouped navigation (Apply, Interview, You) with live counts of jobs being
+  prepared and upcoming interviews.
+- `job run --keep-going` and a "Keep going if the review asks for fixes"
+  checkbox: a fix verdict is recorded as a warning and the PDF, gates and
+  e-mail draft are still prepared. Sending stays blocked.
+- Main CV from your own CV: a "Profile from your CV" step reads the PDF or
+  DOCX in `cv/`, adds what profile.md lacks (the old one is kept as
+  `profile.prev.md`), and the main CV keeps that file's sections, order and
+  style. Tailored resumes keep the main CV's layout; a new `format` gate warns
+  when they do not.
+
 ### Fixed
+- Prepare application no longer stalls (#29). Files left in a differently
+  spelled application folder are merged (conflicts kept and reported, never
+  overwritten), the agent's draft review and ATS score are read from
+  `review-result.json` and `ats-result.json` instead of relying on it to call
+  the CLI, quality gates block sending only and no longer stop the PDF or the
+  e-mail draft, and a failure that a later run fixed is shown as history
+  with the next step, not as the current error.
 - Gmail sync no longer fails with Google's raw 403 quota error (#27). Rate
   limits and transient errors are retried with backoff, message reads are
   paced under the per-user quota, and each message is read once: its metadata

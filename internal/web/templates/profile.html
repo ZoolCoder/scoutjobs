@@ -7,10 +7,32 @@
   <p class="muted small">Source of truth for every CV and cover-letter claim. Edit the file or run <code>/scoutjobs:setup</code> and paste your CV.</p>
 </section>
 <div class="stack">
+{{with .Main}}<section class="panel" id="main"{{if .Active}} data-run="/profile/prepare"{{end}}>
+  <div class="panel-h"><h2>Main CV &amp; cover letter</h2>{{with .Run}}<span class="badge {{.State}}">{{.State}}</span>{{if .Agent}}<span class="n">{{.Agent}}</span>{{end}}{{end}}<span class="act muted">every job starts from these</span></div>
+  {{with $.Data.Err}}<p class="callout bad">{{.}}</p>{{end}}{{with $.Data.Msg}}<p class="callout">{{.}}</p>{{end}}
+  <table><tbody>{{range .Docs}}<tr><td><span class="file">{{template "ico-doc"}}{{if .Exists}}<a href="/profile/files/{{.Name}}"><b>{{.Label}}</b></a>{{else}}<b>{{.Label}}</b>{{end}}</span> <code class="small">cv/{{.Name}}</code></td>
+  {{if .Exists}}<td class="mono">{{.Mod}}</td><td class="acts"><a class="btn mini" href="/profile/files/{{.Name}}">Preview</a> <a class="btn mini" href="/profile/files/{{.Name}}?edit=1">Edit</a> <a class="btn mini" href="/cv/{{.Name}}">Download</a></td>{{else}}<td class="muted">not written yet</td><td></td>{{end}}</tr>{{end}}</tbody></table>
+  {{with .Run}}{{template "runprog" .}}<ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}</div></li>{{end}}</ol>
+  {{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
+  {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
+{{end}}</pre></details>{{end}}{{end}}
+  {{if .Disabled}}<p class="muted small">The AI writer runs in <code>scoutjobs serve</code>.</p>
+  {{else if .Active}}<form class="inline" method="post" action="/profile/prepare/cancel"><button class="mini" type="submit">Cancel</button></form>
+  {{else if .Agents}}<form class="runform" method="post" action="/profile/prepare">
+    <div class="runpick">{{range .Steps}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}</label>{{end}}</div>
+    <div class="runbar"><label>Agent <select name="agent">{{range .Agents}}<option value="{{.}}">{{.}}</option>{{end}}</select></label><label class="check"><input type="checkbox" name="force" value="1"> Rewrite existing</label><button class="primary" type="submit" data-busy="Starting your agent…">Prepare with AI</button></div>
+    <small class="muted">Your agent writes them from profile.md, your stories and the CV files below. The previous version is kept as <code>*.prev.md</code>. Edit the files any time; tailored resumes and cover letters start from them.</small>
+  </form>
+  {{else}}<p class="callout">No agent CLI found. Install Claude Code or Codex, or set <code>agent_command</code> in config.yaml.</p>{{end}}
+  {{if not .Disabled}}<h3>Every job</h3>
+  <div class="runbar"><form class="inline" method="post" action="/jobs/prepare-all" data-busy="Queuing…"><input type="hidden" name="back" value="/profile"><button class="mini go" type="submit"{{if not .Ready}} disabled{{end}}>Prepare all ({{.Ready}})</button></form>
+  <form class="inline" method="post" action="/settings/auto-prepare">{{if .Auto}}<button class="mini" type="submit">Turn auto-prepare off</button>{{else}}<input type="hidden" name="on" value="1"><button class="mini" type="submit">Turn auto-prepare on</button>{{end}}</form></div>
+  <small class="muted">Open jobs scoring {{.Floor}} or more without a tailored resume and cover letter{{with .Waiting}}; {{len .}} waiting in the queue{{end}}. Auto-prepare {{if .Auto}}is <b>on</b>: new matching jobs are prepared within 10 minutes{{else}}is off{{end}}. Each job costs agent tokens. Nothing is sent.</small>{{end}}
+</section>{{end}}
 <section class="panel">
   <div class="panel-h"><h2>CV &amp; assets</h2><span class="n">{{len .Files}}</span><span class="act"><code class="path">{{tilde .CVDir}}</code></span></div>
   {{if .Files}}<table><thead><tr><th>File</th><th>Size</th><th>Modified</th><th>Location</th></tr></thead><tbody>
-  {{range .Files}}<tr><td><span class="file">{{template "ico-doc"}}<a>{{.Name}}</a></span></td><td class="mono">{{kb .Size}}</td><td class="mono">{{.Mod}}</td><td><span class="chip dim">{{template "ico-folder"}}cv/</span></td></tr>{{end}}</tbody></table>
+  {{range .Files}}<tr><td><span class="file">{{template "ico-doc"}}{{if .Preview}}<a href="/profile/files/{{.Name}}">{{.Name}}</a>{{else}}<a href="/cv/{{.Name}}" title="download">{{.Name}}</a>{{end}}</span></td><td class="mono">{{kb .Size}}</td><td class="mono">{{.Mod}}</td><td><span class="chip dim">{{template "ico-folder"}}cv/</span></td></tr>{{end}}</tbody></table>
   {{else}}<p class="empty">Folder is empty. Add <code>resume.pdf</code> or <code>resume.md</code>, then say “check my CV”.</p>{{end}}
   <p class="muted small">Drop your resume (PDF, DOCX, MD), portfolio links and certificates here. Skills read from this folder, nothing is uploaded.</p>
 </section>

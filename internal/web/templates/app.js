@@ -35,25 +35,67 @@
   document.addEventListener('visibilitychange', check);
 })();
 
-// Job page: while a run prepares the application, follow its steps and log, and reload when it ends.
+// Job and Profile pages: while an agent run is going, show its progress, how long it has run and
+// when it last did something, so the user sees it is alive; reload when it ends.
 (function () {
   var panel = document.querySelector('[data-run]');
   if (!panel || !window.fetch) return;
   var url = panel.dataset.run;
+  var prog = panel.querySelector('.runprog');
+  var last = prog && prog.dataset.last ? Date.parse(prog.dataset.last) : 0;
+
+  function span(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return s + 's';
+    var m = Math.floor(s / 60);
+    return m < 60 ? m + 'm ' + (s % 60) + 's' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+  }
+
+  function set(sel, text) {
+    var el = prog && prog.querySelector(sel);
+    if (el) el.textContent = text;
+  }
+
+  // every second: the clock keeps moving even between polls
+  function clock() {
+    if (!prog) return;
+    var started = Date.parse(prog.dataset.started);
+    var ended = prog.dataset.ended ? Date.parse(prog.dataset.ended) : Date.now();
+    if (started) set('[data-elapsed]', span(ended - started) + (prog.dataset.ended ? '' : ' elapsed'));
+    if (last && !prog.dataset.ended) {
+      var quiet = Date.now() - last;
+      prog.classList.toggle('quiet', quiet > 120000);
+      set('[data-ago]', quiet < 5000 ? 'working now' : quiet > 120000
+        ? 'no output for ' + span(quiet) + ', the agent may be thinking; cancel if it stays stuck'
+        : 'last output ' + span(quiet) + ' ago');
+    }
+  }
 
   function tick() {
     fetch(url, { cache: 'no-store', credentials: 'same-origin' }).then(function (res) {
       return res.ok ? res.json() : null;
     }).then(function (run) {
       if (!run) return;
+      if (panel.dataset.queued) { if (run.state !== 'queued') location.reload(); return; }
       if (run.state !== 'running') { location.reload(); return; }
+      var done = 0, now = [];
       (run.steps || []).forEach(function (s) {
+        if (s.state !== 'pending' && s.state !== 'running') done++;
+        if (s.state === 'running') now.push(s.label);
         var li = panel.querySelector('[data-step="' + s.name + '"]');
         if (!li) return;
         var badge = li.querySelector('.badge');
         badge.className = 'badge ' + s.state;
         badge.textContent = s.state;
       });
+      if (prog) {
+        var bar = prog.querySelector('progress');
+        if (bar) bar.value = done;
+        set('[data-count]', done + '/' + (run.steps || []).length);
+        set('[data-now]', now.length ? now.join(' + ') : 'Starting');
+      }
+      if (run.last) last = Date.parse(run.last);
+      clock();
       var pre = panel.querySelector('details.runlog pre');
       if (pre && run.log) {
         pre.textContent = run.log.slice(-60).join('\n') + '\n';
@@ -62,5 +104,20 @@
     }).catch(function () { /* next tick */ });
   }
 
+  clock();
+  setInterval(clock, 1000);
   setInterval(tick, 2000);
+})();
+
+// Run and prepare buttons: answer the click at once, so a slow start does not look like nothing happened.
+(function () {
+  document.querySelectorAll('form.runform, form[data-busy]').forEach(function (f) {
+    f.addEventListener('submit', function (e) {
+      var btn = e.submitter || f.querySelector('button[type=submit], button:not([type])');
+      if (!btn) return;
+      setTimeout(function () { btn.disabled = true; }, 0);
+      btn.classList.add('busy');
+      btn.textContent = btn.dataset.busy || f.dataset.busy || 'Starting…';
+    });
+  });
 })();

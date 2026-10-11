@@ -186,8 +186,9 @@ func TestEmailDraftAndSend(t *testing.T) {
 	if !strings.Contains(out, `"status": "new"`) || !strings.Contains(out, "email:draft") || strings.Contains(out, "email:sent") || !strings.Contains(out, "check:skipped") {
 		t.Errorf("job after failed send: %s", out)
 	}
-	if err := Run([]string{"cv", "export", "1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "not exported") {
-		t.Errorf("export must stop before a reviewer verdict: %v", err)
+	// a local PDF is preparation: it is written with a warning, and sending stays blocked
+	if out := run(t, "cv", "export", "1"); !strings.Contains(out, "sending stays blocked") || !strings.Contains(out, "reviewer") {
+		t.Errorf("export before a reviewer verdict: %s", out)
 	}
 	run(t, "job", "review", "1", "--verdict", "send", "--notes", "all claims in profile")
 	out = run(t, "cv", "export", "1", "--json")

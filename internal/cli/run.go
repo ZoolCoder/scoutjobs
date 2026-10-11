@@ -29,6 +29,7 @@ func runJobRun(s *store.Store, rest []string, out io.Writer) error {
 	fs.Bool("safe", true, "every step, skipping those already done (default)")
 	agent := fs.String("agent", "", "claude | codex | custom (agent_command in config.yaml); default: agent in config.yaml, else the first found")
 	force := fs.Bool("force", false, "redo steps whose output already exists")
+	keep := fs.Bool("keep-going", false, "go on when the draft review asks for fixes; quality gates never stop preparation, only sending")
 	dry := fs.Bool("dry-run", false, "show the plan without running anything")
 	asJSON := fs.Bool("json", false, "")
 	pos, err := parse(fs, rest)
@@ -36,7 +37,7 @@ func runJobRun(s *store.Store, rest []string, out io.Writer) error {
 		return err
 	}
 	if len(pos) == 0 {
-		return fmt.Errorf("usage: scoutjobs job run <id> [--steps %s] [--agent claude|codex|custom] [--force] [--dry-run]", "fit,tailor,...")
+		return fmt.Errorf("usage: scoutjobs job run <id> [--steps %s] [--agent claude|codex|custom] [--force] [--keep-going] [--dry-run]", "fit,tailor,...")
 	}
 	j, err := s.ResolveJob(pos[0])
 	if err != nil {
@@ -47,7 +48,7 @@ func runJobRun(s *store.Store, rest []string, out io.Writer) error {
 		return err
 	}
 	rn := newRunner(s, LoadConfig(s.Home))
-	run, ag, err := rn.Plan(j, runner.Request{Steps: list, Agent: *agent, Force: *force, DryRun: *dry})
+	run, ag, err := rn.Plan(j, runner.Request{Steps: list, Agent: *agent, Force: *force, KeepGoing: *keep, DryRun: *dry})
 	if err != nil {
 		return err
 	}

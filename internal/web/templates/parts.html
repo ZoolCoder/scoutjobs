@@ -67,3 +67,8 @@
 {{define "prep-check"}}{{$i := .I}}<form class="prepcheck" method="post" action="/interviews/{{$i.ID}}"><input type="hidden" name="back" value="{{.Back}}"><input type="hidden" name="prep_form" value="1">
   {{range prepItems}}<label class="check"><input type="checkbox" name="prep" value="{{.Key}}" {{if $i.PrepDone .Key}}checked{{end}}> {{.Label}}</label>{{end}}
   <button class="mini primary">Save prep</button></form>{{end}}
+{{define "runprog"}}<div class="runprog{{if eq .State "running"}} live{{end}}" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="{{.Ended}}">
+  <progress max="{{len .Steps}}" value="{{.Finished}}" aria-label="steps finished">{{.Finished}} of {{len .Steps}}</progress>
+  <p class="runnow" role="status">{{if eq .State "running"}}<span class="spin" aria-hidden="true"></span><b data-now>{{with .Current}}{{.}}{{else}}Starting{{end}}</b>{{else}}<b>{{title .State}}</b>{{end}}
+  <span class="muted"> · <span data-count>{{.Finished}}/{{len .Steps}}</span> steps · <span data-elapsed></span>{{if eq .State "running"}} · <span data-ago>working</span>{{end}}</span></p>
+</div>{{end}}

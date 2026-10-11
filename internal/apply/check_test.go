@@ -179,3 +179,20 @@ func TestCheckATSAndFilenames(t *testing.T) {
 		t.Errorf("bad names: %+v", g)
 	}
 }
+
+func TestFormatGateFollowsTheMainCV(t *testing.T) {
+	home := t.TempDir()
+	_ = os.MkdirAll(filepath.Join(home, "cv"), 0o755)
+	main := "# Ada\nada@x.io\n\n## Summary\nGo.\n\n## Experience\n- a\n\n## Skills\nGo\n"
+	_ = os.WriteFile(filepath.Join(home, "cv", "resume.md"), []byte(main), 0o600)
+	if g := gateFormat(home, strings.Replace(main, "- a", "- reworded for Acme", 1)); g.State != Pass {
+		t.Errorf("same layout: %+v", g)
+	}
+	g := gateFormat(home, "# Ada\n\n## Experience\n- a\n\n## Summary\nGo.\n\n## Projects\nx\n")
+	if g.State != Warn || strings.Join(g.Items, "; ") != "missing section ## skills; section not in the main CV ## projects" {
+		t.Errorf("changed layout: %+v", g)
+	}
+	if g := gateFormat(home, "# Ada\n\n## Experience\n- a\n\n## Summary\nGo.\n\n## Skills\nGo\n"); g.State != Warn || !strings.Contains(g.Items[0], "different order") {
+		t.Errorf("reordered: %+v", g)
+	}
+}

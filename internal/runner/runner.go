@@ -39,11 +39,11 @@ func (s Step) AI() bool { return s.Skill != "" }
 // Steps in dependency order.
 var Steps = []Step{
 	{"fit", "Fit review", "fit-review", "Write the evidence-backed fit review and store it with `scoutjobs job fit {id}`."},
-	{"tailor", "Tailored resume", "resume-tailor", "Write resume.md in the application folder, grounded in profile.md and the fit review."},
-	{"cover", "Cover letter", "cover-letter-generator", "Write cover-letter.md in the application folder, from scratch for this posting."},
-	{"review", "Draft review", "draft-review", "Review resume.md and cover-letter.md as the draft reviewer and log the verdict with `scoutjobs job review {id} --verdict send|fix`. Do not edit the drafts in this step."},
+	{"tailor", "Tailored resume", "resume-tailor", "Write resume.md in the application folder as a copy of the main CV cv/resume.md tailored to this posting. Keep its exact style and format: the same name line and contact line, the same sections with the same headings, heading levels and order, the same bullet style, date format and length. Change only the content: reorder and reword bullets, sharpen the summary and skills for this role, all grounded in profile.md and the fit review. Do not add or drop sections. When cv/resume.md does not exist, follow the layout of the CV file in cv/ instead."},
+	{"cover", "Cover letter", "cover-letter-generator", "Write cover-letter.md in the application folder for this posting: when cv/cover-letter.md exists, keep its format (greeting, paragraph count, sign-off) and voice, keep its strongest paragraphs and rewrite the rest for this company and role."},
+	{"review", "Draft review", "draft-review", "Review resume.md and cover-letter.md as the draft reviewer, then write the verdict to review-result.json in the application folder: {\"verdict\":\"send\" or \"fix\",\"notes\":\"what you checked, or what must change\"}. ScoutJobs records it. Do not edit the drafts in this step."},
 	{"export", "Resume PDF", "", ""},
-	{"ats", "ATS check", "cv-check", "Score resume.pdf in the application folder against this job and log it with `scoutjobs cv log --file <path to resume.pdf> --job {id} ...`."},
+	{"ats", "ATS check", "cv-check", "Score resume.pdf in the application folder against this job, then write ats-result.json in the application folder: {\"score\":0-100 content quality,\"ats\":0-100 ATS readiness,\"summary\":\"one line\",\"gaps\":[\"fix to make\"]}. ScoutJobs records it."},
 	{"check", "Quality gates", "", ""},
 	{"draft", "E-mail draft", "", ""},
 }
@@ -93,6 +93,7 @@ const (
 	Done    = "done"
 	Skipped = "skipped"
 	Failed  = "failed"
+	Warned  = "warn" // the step finished but found something to fix; preparation goes on, sending stays blocked
 )
 
 // StepState is a step of one run.
@@ -112,8 +113,32 @@ type Status struct {
 	Steps   []StepState `json:"steps"`
 	Log     []string    `json:"log"`
 	Started string      `json:"started"`
+	Last    string      `json:"last"` // when the run last logged or changed a step: proof the agent is alive
 	Ended   string      `json:"ended,omitempty"`
 	DryRun  bool        `json:"dry_run,omitempty"`
+	Keep    bool        `json:"keep_going,omitempty"` // a "fix" review verdict warns instead of stopping
+}
+
+// Finished counts the steps that are over, whatever their outcome.
+func (s Status) Finished() int {
+	n := 0
+	for _, st := range s.Steps {
+		if st.State != Pending && st.State != Running {
+			n++
+		}
+	}
+	return n
+}
+
+// Current names the steps in progress, for the progress bar.
+func (s Status) Current() string {
+	var out []string
+	for _, st := range s.Steps {
+		if st.State == Running {
+			out = append(out, st.Label)
+		}
+	}
+	return strings.Join(out, " + ")
 }
 
 // Run is one preparation of one job. Its status changes while it runs; read it through Snapshot.
@@ -121,7 +146,15 @@ type Run struct {
 	Status
 	mu   sync.Mutex
 	echo io.Writer
+	done chan struct{}
 }
+
+func newRun(id string, jobID int64, dry bool) *Run {
+	return &Run{Status: Status{ID: id, JobID: jobID, State: Running, Started: time.Now().Format(time.RFC3339), DryRun: dry}, done: make(chan struct{})}
+}
+
+// Wait blocks until the run ends.
+func (r *Run) Wait() { <-r.done }
 
 // Snapshot copies the status for JSON or a template.
 func (r *Run) Snapshot() Status {
@@ -138,6 +171,7 @@ func (r *Run) logf(format string, a ...any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.Log = append(r.Log, line)
+	r.Last = time.Now().Format(time.RFC3339)
 	if len(r.Log) > 500 {
 		r.Log = r.Log[len(r.Log)-500:]
 	}
@@ -149,6 +183,7 @@ func (r *Run) logf(format string, a ...any) {
 func (r *Run) set(i int, state, detail string) {
 	r.mu.Lock()
 	r.Steps[i].State, r.Steps[i].Detail = state, detail
+	r.Last = time.Now().Format(time.RFC3339)
 	r.mu.Unlock()
 }
 
@@ -158,6 +193,9 @@ type Request struct {
 	Agent  string   `json:"agent"`
 	Force  bool     `json:"force"` // redo steps whose output exists
 	DryRun bool     `json:"dry_run"`
+	// KeepGoing goes on past a "fix" review verdict. Quality gates never stop preparation:
+	// they block sending only, and `email send --skip-checks` stays the one way past them.
+	KeepGoing bool `json:"keep_going"`
 }
 
 // Runner holds what every run needs.
@@ -177,7 +215,13 @@ func (rn *Runner) Plan(j store.Job, req Request) (*Run, Agent, error) {
 	if len(req.Steps) == 0 {
 		req.Steps, _ = Parse("")
 	}
-	run := &Run{Status: Status{ID: fmt.Sprintf("%d-%d", j.ID, time.Now().UnixMilli()), JobID: j.ID, State: Running, Started: time.Now().Format(time.RFC3339), DryRun: req.DryRun}}
+	run := newRun(fmt.Sprintf("%d-%d", j.ID, time.Now().UnixMilli()), j.ID, req.DryRun)
+	run.Keep = req.KeepGoing
+	if !req.DryRun {
+		for _, note := range rn.Reconcile(j) {
+			run.logf("%s", note)
+		}
+	}
 	needAI := false
 	want := map[string]bool{}
 	for _, n := range req.Steps {
@@ -200,30 +244,47 @@ func (rn *Runner) Plan(j store.Job, req Request) (*Run, Agent, error) {
 	}
 	var ag Agent
 	if needAI {
-		name := req.Agent
-		if name == "" {
-			name = rn.Agent
-		}
-		var ok bool
-		if ag, ok = Pick(rn.Agents(), name); !ok {
-			if name == "" || name == "auto" {
-				return nil, ag, errors.New("no agent CLI found: install Claude Code (claude) or Codex (codex), or set agent_command in config.yaml")
-			}
-			return nil, ag, fmt.Errorf("agent %q not found on this machine", name)
+		var err error
+		if ag, err = rn.pick(req.Agent); err != nil {
+			return nil, ag, err
 		}
 		run.Agent = ag.Name
 	}
 	return run, ag, nil
 }
 
+// pick resolves the agent asked for, else the one config.yaml prefers, else the first installed.
+func (rn *Runner) pick(name string) (Agent, error) {
+	if name == "" {
+		name = rn.Agent
+	}
+	ag, ok := Pick(rn.Agents(), name)
+	if ok {
+		return ag, nil
+	}
+	if name == "" || name == "auto" {
+		return ag, errors.New("no agent CLI found: install Claude Code (claude) or Codex (codex), or set agent_command in config.yaml")
+	}
+	return ag, fmt.Errorf("agent %q not found on this machine", name)
+}
+
 // Exec carries out a planned run. echo, when set, gets every log line as it happens.
 func (rn *Runner) Exec(ctx context.Context, run *Run, ag Agent, j store.Job, echo io.Writer) {
+	state, msg := finish(ctx, run, echo, func(ctx context.Context) error { return rn.exec(ctx, run, ag, j) })
+	if !run.DryRun {
+		_ = rn.Store.AddEvent(j.ID, "run:"+state, strings.TrimSpace(run.Agent+" "+msg))
+	}
+}
+
+// finish runs do under the run timeout, then settles the run's state and the steps it did not reach.
+func finish(ctx context.Context, run *Run, echo io.Writer, do func(context.Context) error) (string, string) {
+	defer close(run.done)
 	run.mu.Lock()
 	run.echo = echo
 	run.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, Timeout)
 	defer cancel()
-	err := rn.exec(ctx, run, ag, j)
+	err := do(ctx)
 	run.mu.Lock()
 	run.Ended = time.Now().Format(time.RFC3339)
 	switch {
@@ -248,10 +309,8 @@ func (rn *Runner) Exec(ctx context.Context, run *Run, ag Agent, j store.Job, ech
 	}
 	state, msg := run.State, run.Error
 	run.mu.Unlock()
-	if !run.DryRun {
-		_ = rn.Store.AddEvent(j.ID, "run:"+state, strings.TrimSpace(run.Agent+" "+msg))
-	}
 	run.logf("run %s %s", state, msg)
+	return state, msg
 }
 
 func (rn *Runner) exec(ctx context.Context, run *Run, ag Agent, j store.Job) error {
@@ -268,7 +327,13 @@ func (rn *Runner) exec(ctx context.Context, run *Run, ag Agent, j store.Job) err
 		if !s.AI() {
 			run.set(i, Running, "")
 			run.logf("%s…", s.Label)
-			detail, err := rn.local(j, s.Name)
+			detail, warn, err := rn.local(j, s.Name)
+			if err == nil && warn {
+				run.set(i, Warned, detail)
+				_ = rn.Store.AddEvent(j.ID, "run:"+s.Name, detail)
+				run.logf("%s: %s", s.Name, detail)
+				continue
+			}
 			if err != nil {
 				run.set(i, Failed, err.Error())
 				_ = rn.Store.AddEvent(j.ID, "run:"+s.Name, "failed: "+err.Error())
@@ -305,31 +370,9 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 	}
 	run.logf("%s: %s", ag.Name, labels(steps))
 	since := time.Now()
-	argv := ag.command(rn.Exe, rn.Store.Home, dir)
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "SCOUTJOBS_HOME="+rn.Store.Home, "SCOUTJOBS_RUNNER=1")
-	cmd.Stdin = strings.NewReader(Prompt(j, dir, rn.Exe, steps))
-	cmd.WaitDelay = 5 * time.Second
-	out, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	var stderr tail
-	cmd.Stderr = &stderr
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start %s: %w", ag.Name, err)
-	}
 	stop := make(chan struct{})
 	go rn.watch(run, j, group, since, stop)
-	sc := bufio.NewScanner(out)
-	sc.Buffer(make([]byte, 1<<20), 8<<20)
-	for sc.Scan() {
-		if line := summarize(sc.Text()); line != "" {
-			run.logf("  %s", line)
-		}
-	}
-	err = cmd.Wait()
+	err := rn.agent(ctx, run, ag, dir, Prompt(j, dir, rn.Exe, steps))
 	close(stop)
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -338,14 +381,22 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 		for _, i := range group {
 			run.set(i, Failed, ag.Name+" stopped")
 		}
-		return fmt.Errorf("%s exited: %v %s", ag.Name, err, stderr.String())
+		return err
+	}
+	if err := rn.record(j); err != nil {
+		run.logf("%v", err)
 	}
 	for _, i := range group {
 		s := run.Steps[i]
 		if fail := rn.failed(j, s.Name, since); fail != "" {
+			if run.Keep {
+				run.set(i, Warned, fail)
+				_ = rn.Store.AddEvent(j.ID, "run:"+s.Name, "kept going: "+fail)
+				continue
+			}
 			run.set(i, Failed, fail)
 			_ = rn.Store.AddEvent(j.ID, "run:"+s.Name, "failed: "+fail)
-			return fmt.Errorf("%s: %s", s.Name, fail)
+			return fmt.Errorf("%s: %s (fix the drafts, or tick \"keep going\" to prepare the rest)", s.Name, fail)
 		}
 		done, why := rn.done(j, s.Name)
 		if !done {
@@ -360,6 +411,36 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 	return nil
 }
 
+// agent runs the agent CLI once in dir, which is the only folder it may write, and logs what it does.
+func (rn *Runner) agent(ctx context.Context, run *Run, ag Agent, dir, prompt string) error {
+	argv := ag.command(rn.Exe, rn.Store.Home, dir)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "SCOUTJOBS_HOME="+rn.Store.Home, "SCOUTJOBS_RUNNER=1")
+	cmd.Stdin = strings.NewReader(prompt)
+	cmd.WaitDelay = 5 * time.Second
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	var stderr tail
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start %s: %w", ag.Name, err)
+	}
+	sc := bufio.NewScanner(out)
+	sc.Buffer(make([]byte, 1<<20), 8<<20)
+	for sc.Scan() {
+		if line := summarize(sc.Text()); line != "" {
+			run.logf("  %s", line)
+		}
+	}
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("%s exited: %v %s", ag.Name, err, stderr.String())
+	}
+	return nil
+}
+
 // watch marks steps done as their outputs appear, so progress moves during a long session.
 func (rn *Runner) watch(run *Run, j store.Job, group []int, since time.Time, stop chan struct{}) {
 	t := time.NewTicker(2 * time.Second)
@@ -369,6 +450,7 @@ func (rn *Runner) watch(run *Run, j store.Job, group []int, since time.Time, sto
 		case <-stop:
 			return
 		case <-t.C:
+			_ = rn.record(j)
 			for _, i := range group {
 				if done, why := rn.done(j, run.Steps[i].Name); done && rn.fresh(j, run.Steps[i].Name, since) {
 					run.mu.Lock()

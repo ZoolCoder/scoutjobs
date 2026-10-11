@@ -28,7 +28,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   version                    print the version
   update [--check] [--yes] [--version vX.Y.Z]   install the latest release over this binary (brew/deb/rpm installs are handed to their manager)
   job add [--from url]|list [--compact]|show|set|skip|rm|import
-  job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--dry-run]
+  job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--keep-going] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
   email draft|show|send   application e-mail from the cover letter; send needs --yes
@@ -129,7 +129,11 @@ func Run(args []string, out io.Writer) error {
 		if err := fs.Parse(rest); err != nil {
 			return err
 		}
-		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
+		// older versions and some agents spelled application folders differently: merge them once at start
+		if n, err := apply.ReconcileAll(s); n > 0 || err != nil {
+			fmt.Fprintf(out, "merged %d file(s) from older application folders %v\n", n, errOrNil(err))
+		}
+		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, FitApplyFloor: cfg.FitApplyFloor, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -1075,4 +1079,11 @@ func runExport(s *store.Store, out io.Writer) error {
 	sess, _ := s.Sessions(0)
 	learn, _ := s.LearningItems()
 	return emit(out, true, map[string]any{"jobs": jobs, "events": events, "decisions": decs, "preferences": prefs, "interviews": ivs, "sessions": sess, "learning": learn}, nil)
+}
+
+func errOrNil(err error) string {
+	if err == nil {
+		return ""
+	}
+	return "(" + err.Error() + ")"
 }

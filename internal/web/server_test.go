@@ -114,7 +114,10 @@ func TestDraftEditDueAndReviews(t *testing.T) {
 	if b, err := os.ReadFile(filepath.Join(s.Home, "applications", "acme_go-engineer", "cover-letter.md")); err != nil || string(b) != "Dear Acme,\nhire me." {
 		t.Errorf("draft on disk: %q %v", b, err)
 	}
-	if rec := get("/jobs/1/files/cover-letter.md?saved=1"); !strings.Contains(rec.Body.String(), "<textarea") || !strings.Contains(rec.Body.String(), "hire me.") {
+	if rec := get("/jobs/1/files/cover-letter.md?saved=1"); !strings.Contains(rec.Body.String(), "hire me.") || !strings.Contains(rec.Body.String(), "saved") {
+		t.Errorf("file page after save: %s", rec.Body.String())
+	}
+	if rec := get("/jobs/1/files/cover-letter.md?edit=1"); !strings.Contains(rec.Body.String(), "<textarea") {
 		t.Errorf("file page not editable: %s", rec.Body.String())
 	}
 	if rec := form("/jobs/1/files/email.eml", "body=x"); rec.Code != 400 {

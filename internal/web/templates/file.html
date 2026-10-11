@@ -1,21 +1,26 @@
 {{template "head" .}}
-{{with .Data}}{{$j := .Job}}
+{{with .Data}}{{with .F}}
 <header class="top job">
-<div><a class="crumb" href="/jobs/{{$j.ID}}">← {{$j.Company}} · {{$j.Title}}</a>
-<div class="jobhead"><h1>{{.Name}}<small>{{tilde .Path}}</small></h1></div></div>
+<div><a class="crumb" href="{{.Back}}">← {{.BackLabel}}</a>
+<div class="jobhead"><h1>{{.Name}}<small>{{tilde .Path}}</small></h1></div>
+<div class="issue-acts">
+  {{if and .Editable (eq .Kind "md")}}{{if .Edit}}<a class="btn mini" href="{{.SaveURL}}">Preview</a>{{else}}<a class="btn mini" href="{{.SaveURL}}?edit=1">Edit</a>{{end}}{{end}}
+  {{if eq .Kind "pdf"}}<a class="btn mini" href="{{.ViewURL}}" rel="noopener" target="_blank">Open full size</a>{{end}}
+  {{with .Download}}<a class="btn mini" href="{{.}}">{{template "ico-doc"}}Download</a>{{end}}
+</div></div>
 <span class="now">{{$.Now}}</span>
 </header>
 <section class="panel">
-  {{if .Editable}}
-  <div class="panel-h"><h2>Draft</h2><span class="n">{{kb .Size}}</span>{{if .Saved}}<span class="badge filled">saved</span>{{end}}<span class="act muted">edit here, in your editor, or ask the agent to rewrite it</span></div>
-  <form class="edit" method="post" action="/jobs/{{$j.ID}}/files/{{.Name}}">
+  <div class="panel-h"><h2>{{if .Edit}}Edit{{else}}Preview{{end}}</h2><span class="n">{{kb .Size}} · {{.Mod}}</span>{{if .Saved}}<span class="badge filled">saved</span>{{end}}{{if .Edit}}<span class="act muted">edit here, in your editor, or ask the agent to rewrite it</span>{{end}}</div>
+  {{if .Edit}}
+  <form class="edit" method="post" action="{{.SaveURL}}" data-busy="Saving…">
     <textarea name="body" rows="24" spellcheck="true">{{.Body}}</textarea>
-    <div class="row"><button type="submit">Save {{.Name}}</button><a class="btn" href="/jobs/{{$j.ID}}/files/{{.Name}}">Discard changes</a></div>
+    <div class="row"><button type="submit">Save {{.Name}}</button><a class="btn" href="{{.SaveURL}}">Discard changes</a></div>
   </form>
-  {{else}}
-  <div class="panel-h"><h2>File</h2><span class="n">{{kb .Size}}</span><span class="act muted">read-only</span></div>
-  <pre class="doc">{{.Body}}</pre>
-  {{end}}
+  {{else if eq .Kind "md"}}<article class="paper">{{.HTML}}</article>
+  {{else if eq .Kind "pdf"}}<iframe class="pdfview" src="{{.ViewURL}}" title="{{.Name}}"></iframe>
+  {{else if eq .Kind "text"}}<pre class="doc tall">{{.Body}}</pre>
+  {{else}}<p class="empty">No preview for this file type. Download it to open it in its app.</p>{{end}}
 </section>
-{{end}}
+{{end}}{{end}}
 {{template "foot" .}}

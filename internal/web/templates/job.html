@@ -23,32 +23,54 @@
 </nav>
 <div class="grid-3">
 <div class="stack span-2">
+{{with .Err}}<p class="callout bad">{{.}}</p>{{end}}{{with .Msg}}<p class="callout">{{.}}</p>{{end}}
+{{with .Drafted}}<p class="callout">Draft saved in Gmail. <a href="{{.}}" rel="noopener noreferrer" target="_blank">Open it</a>, review, and send it from there.</p>{{end}}
 {{if eq $tab "overview"}}
-{{with .RunP}}<section class="panel" id="run"{{if .Active}} data-run="/jobs/{{$j.ID}}/run"{{end}}>
+{{with .Checklist}}<section class="panel" id="checklist">
+  <div class="panel-h"><h2>Checklist</h2><span class="n">{{.Done}}/{{len .Items}}</span><span class="act muted">nothing is sent without you</span></div>
+  <ol class="checklist">{{range .Items}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Label}}</b>{{if .Detail}}<small title="{{.Detail}}">{{.Detail}}</small>{{end}}</div><span class="state">{{if eq .State "next"}}next{{else if eq .State "blocked"}}blocked{{else if eq .State "warn"}}check{{else if eq .State "done"}}done{{end}}</span>{{if .Href}}<a class="btn mini" href="{{.Href}}">{{.Act}}</a>{{end}}</li>{{end}}</ol>
+</section>{{end}}
+{{with .RunP}}<section class="panel" id="run"{{if .Active}} data-run="/jobs/{{$j.ID}}/run"{{else if .Queued}} data-run="/jobs/{{$j.ID}}/run" data-queued="1"{{end}}>
   <div class="panel-h"><h2>Prepare application</h2>{{with .Run}}<span class="badge {{.State}}">{{.State}}</span>{{if .Agent}}<span class="n">{{.Agent}}</span>{{end}}{{end}}<span class="act muted">nothing is sent</span></div>
   {{with $.Data.RunErr}}<p class="callout bad">{{.}}</p>{{end}}
-  {{with .Run}}<ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}</div></li>{{end}}</ol>
+  {{with $.Data.RunP.Queued}}<p class="callout"><span class="spin" aria-hidden="true"></span> Waiting in the Prepare all queue, position {{.}}. It starts when the job before it finishes.</p>{{end}}
+  {{if .Recovered}}<p class="callout">The last run stopped at <b>{{.Recovered}}</b>; that step is done now.{{with .Todo}} Next: {{(index . 0).Label}}.{{end}}</p>
+  {{with .Run}}<details class="runlog"><summary>Last run</summary><ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}</div></li>{{end}}</ol>{{if .Error}}<p class="small muted">{{.Error}}</p>{{end}}</details>{{end}}
+  {{else}}  {{with .Run}}{{template "runprog" .}}<ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}</div></li>{{end}}</ol>
   {{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
   {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
-{{end}}</pre></details>{{end}}{{end}}
+{{end}}</pre></details>{{end}}{{end}}{{end}}
   {{if .Active}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run/cancel"><button class="mini" type="submit">Cancel run</button></form>
   {{else if .Agents}}<form class="runform" method="post" action="/jobs/{{$j.ID}}/run">
-    <div class="runpick">{{$fin := .Finished}}{{range .Steps}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}{{with index $fin .Name}} <span class="muted">· done</span>{{end}}</label>{{end}}</div>
-    <div class="runbar"><label>Agent <select name="agent">{{range .Agents}}<option value="{{.}}">{{.}}</option>{{end}}</select></label><label class="check"><input type="checkbox" name="force" value="1"> Redo finished steps</label><button class="primary" type="submit">Prepare application</button></div>
-    <small class="muted">Your agent writes the fit review, resume and cover letter from profile.md, reviews them, then ScoutJobs exports the PDF, runs the quality gates and saves an e-mail draft. Finished steps are skipped; a failed step stops the run with the reason. Nothing is sent: you review and send.</small>
+    {{if .Todo}}<div class="runpick">{{range .Todo}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}</label>{{end}}</div>
+    {{else}}<p class="callout">Every step is done. Review the documents below, or redo a step.</p>{{end}}
+    {{if .Done}}<p class="muted small">Already done: {{range $i, $d := .Done}}{{if $i}}, {{end}}{{$d.Label}}{{end}}.</p>
+    <details class="redo"{{if not .Todo}} open{{end}}><summary>Redo a finished step</summary><div class="runpick">{{range .Done}}<label class="check"><input type="checkbox" name="redo" value="{{.Name}}"> {{.Label}}</label>{{end}}</div><small class="muted">Picked steps are written again; the previous file is replaced.</small></details>{{end}}
+    <div class="runbar"><label>Agent <select name="agent">{{range .Agents}}<option value="{{.}}">{{.}}</option>{{end}}</select></label><label class="check" title="A fix verdict from the draft review is recorded as a warning and the PDF, gates and e-mail draft are still prepared. Sending stays blocked."><input type="checkbox" name="keep" value="1"> Keep going if the review asks for fixes</label><button class="primary" type="submit" data-busy="Starting your agent…">{{if .Todo}}Prepare application{{else}}Redo picked steps{{end}}</button></div>
+    <small class="muted">Your agent writes the fit review, resume and cover letter from profile.md, reviews them, then ScoutJobs exports the PDF, runs the quality gates and saves an e-mail draft. Quality gates never stop preparation; they only block sending. Nothing is sent: you review and send.</small>
   </form>
   {{else}}<p class="callout">No agent CLI found on this machine. Install <a href="https://docs.anthropic.com/en/docs/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or <a href="https://github.com/openai/codex" rel="noopener noreferrer" target="_blank">Codex</a>, or set <code>agent_command</code> in config.yaml to any agent that reads a prompt on stdin, then reload.</p>{{end}}
 </section>{{end}}
-<section class="panel">
-  <div class="panel-h"><h2>Get selected</h2><span class="n">{{.KitDone}}/4</span><span class="act muted">or step by step in your agent</span></div>
-  <ol class="kit">
-    <li><span class="badge {{if .Resume}}done{{else}}todo{{end}}">{{if .Resume}}done{{else}}todo{{end}}</span><div><b>Tailor CV to this job</b><small>Rewrites <code>resume.md</code> against the posting. Every claim stays traceable to <code>profile.md</code>.</small></div><code class="cmd">/scoutjobs:apply {{$j.ID}}</code></li>
-    <li><span class="badge {{if .Cover}}done{{else}}todo{{end}}">{{if .Cover}}done{{else}}todo{{end}}</span><div><b>Cover letter for this role</b><small>Written to the posting and your stories, reviewed by <code>draft-reviewer</code>. Rewrite any time.</small></div><code class="cmd">/scoutjobs:cover {{$j.ID}}</code></li>
-    <li>{{with .Check}}<span class="badge {{if ge .ATSScore 70}}done{{else}}todo{{end}}">ATS {{fit .ATSScore}}</span><div><b>ATS check against this posting</b><small>{{.Summary}}{{if .Gaps}}<br>{{range split .Gaps}}<span class="chip warn">{{.}}</span> {{end}}{{end}}</small></div>{{else}}<span class="badge todo">todo</span><div><b>ATS check against this posting</b><small>Keyword coverage, parseable layout, missing skills for this job.</small></div>{{end}}<code class="cmd">/scoutjobs:cv --job {{$j.ID}}</code></li>
-    <li><span class="badge {{if .Sent}}done{{else if .Draft}}drafted{{else}}todo{{end}}">{{if .Sent}}sent{{else if .Draft}}draft{{else}}todo{{end}}</span><div><b>Send the application</b><small>{{if .Sent}}Sent{{with .Draft}} to {{.To}}{{end}}. Follow-up timer runs from the applied date.{{else if .Draft}}Draft ready for {{.Draft.To}}: {{.Draft.Subject}}. The agent sends only after you say yes, or <a href="{{mailto .Draft}}">open it in your mail app</a>.{{else}}Cover letter as body, tailored resume attached, to {{if $j.Contact}}{{$j.Contact}}{{else}}the contact you set with <code>scoutjobs job set {{$j.ID}} --contact hr@…</code>{{end}}. You confirm before anything is sent.{{end}}</small></div><code class="cmd">/scoutjobs:send {{$j.ID}}</code></li>
-  </ol>
+<section class="panel" id="docs">
+  <div class="panel-h"><h2>Documents</h2><span class="act muted">starts from your main CV on the Profile page</span></div>
+  <table><thead><tr><th>Document</th><th>Updated</th><th></th></tr></thead><tbody>
+  {{range .Docs}}<tr{{if not .Exists}} class="missing"{{end}}><td><span class="file">{{template "ico-doc"}}{{if and .Exists (ne .Name "resume.docx")}}<a href="/jobs/{{$j.ID}}/files/{{.Name}}"><b>{{.Label}}</b></a>{{else}}<b>{{.Label}}</b>{{end}}</span> <code class="small">{{.Name}}</code></td>
+  {{if .Exists}}<td class="mono">{{.Mod}} · {{kb .Size}}</td><td class="acts">{{if ne .Name "resume.docx"}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}">Preview</a> {{end}}{{if .Editable}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}?edit=1">Edit</a> {{end}}<a class="btn mini" href="/jobs/{{$j.ID}}/download/{{.Name}}">Download</a></td>
+  {{else}}<td class="muted">not written yet</td><td class="acts">{{if eq .Name "resume.pdf"}}{{if $.Data.HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export" data-busy="Exporting…"><button class="mini" type="submit">Export PDF</button></form>{{end}}{{else if $.Data.RunP}}{{if not $.Data.RunP.Active}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run" data-busy="Starting…"><input type="hidden" name="step" value="{{if eq .Name "resume.md"}}tailor{{else}}cover{{end}}"><button class="mini go" type="submit">Write with AI</button></form>{{end}}{{end}}</td>{{end}}</tr>{{end}}
+  </tbody></table>
+  {{if .Draft}}<p class="small">Application e-mail ready for {{.Draft.To}}: <b>{{.Draft.Subject}}</b>. <a href="{{mailto .Draft}}">Open in your mail app</a>{{if .CanGmail}} or{{end}}</p>{{if .CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="/jobs/{{$j.ID}}"><button class="mini go">Draft in Gmail</button></form>{{end}}{{end}}
 </section>
-<section class="panel">
+{{if .Emails}}<section class="panel" id="emails">
+  <div class="panel-h"><h2>Proposed e-mails</h2><span class="n">{{len .Emails}}</span><span class="act muted">edit, save, draft; you send</span></div>
+  {{range .Emails}}<details class="proposal"{{if eq (len $.Data.Emails) 1}} open{{end}}><summary><b>{{.Label}}</b> <span class="muted small">{{.Why}}</span>{{if .Saved}} <span class="badge drafted">edited</span>{{end}}</summary>
+  <form class="mailform" method="post" data-busy="Saving…" action="/jobs/{{$j.ID}}/emails/{{.Kind}}">
+    <label>To <input name="to" value="{{.Msg.To}}" autocomplete="off"></label>
+    <label>Subject <input name="subject" value="{{.Msg.Subject}}" autocomplete="off"></label>
+    <label>Message <textarea name="body" rows="10">{{.Msg.Body}}</textarea></label>
+    <div class="runbar"><button class="mini" name="action" value="save">Save</button>{{if $.Data.CanGmail}}<button class="mini go" name="action" value="gmail">Save &amp; draft in Gmail</button>{{end}}<a class="btn mini" href="{{mailto .Msg}}">Open in mail app</a></div>
+  </form></details>{{end}}
+</section>{{end}}
+<section class="panel" id="gates">
   <div class="panel-h"><h2>Ready to send?</h2><span class="n">{{if .Gates.OK}}clear{{else}}{{.Gates.Failed}} blocking{{end}}</span><span class="act muted">scoutjobs job check {{$j.ID}}</span></div>
   <ul class="gates">{{range .Gates.Gates}}<li><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Name}}</b><small>{{.Detail}}</small>{{if .Items}}<ul>{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{end}}</div></li>{{end}}</ul>
   {{if not .Gates.OK}}<p class="callout">Sending is blocked until every failed gate passes. <code>scoutjobs email send {{$j.ID}} --yes --skip-checks</code> overrides it and logs the skip on the job.</p>{{end}}
@@ -77,7 +99,7 @@
 {{else if eq $tab "files"}}
 <section class="panel">
   <div class="panel-h"><h2>Files</h2><span class="n">{{len .Files}}</span></div>
-  {{if .Files}}{{$id := $j.ID}}{{range .Files}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}">{{template "ico-doc"}}{{.}}</a> {{end}}{{else}}<p class="muted">None yet. Drafts land here when you run <code>/scoutjobs:apply</code>.</p>{{end}}
+  {{if .Files}}{{$id := $j.ID}}{{range .Files}}{{if hasSuffix . ".docx"}}<a class="chip dim" href="/jobs/{{$id}}/download/{{.}}" title="download">{{template "ico-doc"}}{{.}}</a>{{else}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}" title="preview">{{template "ico-doc"}}{{.}}</a>{{end}} {{end}}{{else}}<p class="muted">None yet. Drafts land here when you run <code>/scoutjobs:apply</code>.</p>{{end}}
   <p class="mono small">{{tilde .Dir}}</p>
   {{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export"><button class="mini" type="submit">Export resume.md as PDF</button></form>{{end}}
 </section>
