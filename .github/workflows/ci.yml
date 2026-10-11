@@ -1,9 +1,14 @@
 name: ci
 
+# Actions minutes are rationed: the full matrix runs only for main (pushes, and the
+# develop -> main pull request). A pull request into develop gets one quick test job;
+# a push to develop runs nothing. Run the full set by hand with workflow_dispatch.
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,7 +18,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quick:
+    # pull requests into develop: vet and the short tests, nothing else
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -short ./...
+
   test:
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -26,6 +44,7 @@ jobs:
         run: go tool cover -func=coverage.out | tail -1
 
   lint:
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -37,6 +56,7 @@ jobs:
           version: v2.14.0
 
   plugin:
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     # The plugin manifest, skills and commands must stay loadable by Claude Code.
     runs-on: ubuntu-latest
     steps:
@@ -47,6 +67,7 @@ jobs:
       - run: npx --yes @anthropic-ai/claude-code plugin validate .
 
   release-config:
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
