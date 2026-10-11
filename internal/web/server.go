@@ -267,6 +267,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/emails/{kind}", srv.saveEmail)
 	mux.HandleFunc("POST /jobs/prepare-all", srv.prepareAll)
 	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
+	mux.HandleFunc("GET /gmail/detect", srv.gmailDetect)
 	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
 	mux.HandleFunc("GET /gmail/callback", srv.gmailCallback)
 	mux.HandleFunc("POST /gmail/disconnect", srv.gmailDisconnect)

@@ -287,6 +287,11 @@ func matchReply(s *store.Store, m mail.Mail) (store.Job, string, bool) {
 			}
 		}
 	}
+	if id, ok := s.ThreadJob(m.Thread); ok { // a reply in the Gmail thread of a draft or an earlier reply
+		if j, err := s.JobByID(id); err == nil {
+			return j, "thread", true
+		}
+	}
 	if m.From == "" {
 		return store.Job{}, "", false
 	}
@@ -313,8 +318,54 @@ func matchReply(s *store.Store, m mail.Mail) (store.Job, string, bool) {
 	if len(hit) == 1 {
 		return hit[0], "domain", true
 	}
+	if j, ok := companyNamed(jobs, m); ok {
+		return j, "company", true
+	}
 	return store.Job{}, "", false
 }
+
+// companyNamed matches the mail an applicant tracking system sends ("Your application to Acme", from
+// no-reply@greenhouse.io): the message must come from an ATS or speak of an application, and name the
+// company of exactly one job applied to.
+func companyNamed(jobs []store.Job, m mail.Mail) (store.Job, bool) {
+	text := strings.ToLower(m.Subject + "\n" + m.Text)
+	if !atsSender(m.From) && !containsAny(text, applicationWords) {
+		return store.Job{}, false
+	}
+	var hit []store.Job
+	for _, j := range jobs {
+		name := strings.ToLower(strings.TrimSpace(j.Company))
+		if len(name) >= 3 && appliedStatus[j.Status] && hasWord(text, name) {
+			hit = append(hit, j)
+		}
+	}
+	if len(hit) == 1 {
+		return hit[0], true
+	}
+	return store.Job{}, false
+}
+
+// appliedStatus are the open statuses a company writes back to: before applying, mail naming it is not a reply.
+var appliedStatus = map[string]bool{"applied": true, "interview": true, "offer": true}
+
+// hasWord finds w in s with no letter or digit right around it, so "Meta" does not match "metadata".
+func hasWord(s, w string) bool {
+	for i := 0; ; {
+		k := strings.Index(s[i:], w)
+		if k < 0 {
+			return false
+		}
+		k += i
+		end := k + len(w)
+		before, after := k == 0 || !wordByte(s[k-1]), end == len(s) || !wordByte(s[end])
+		if before && after {
+			return true
+		}
+		i = k + 1
+	}
+}
+
+func wordByte(b byte) bool { return b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || b >= 0x80 }
 
 var freeMail = map[string]bool{"gmail.com": true, "googlemail.com": true, "outlook.com": true, "hotmail.com": true, "yahoo.com": true, "icloud.com": true, "gmx.de": true, "web.de": true, "proton.me": true, "protonmail.com": true}
 

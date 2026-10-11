@@ -2,9 +2,12 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -60,7 +63,62 @@ func (v *server) gmailClient() *gmail.Client {
 	return v.cfg.Mail.Gmail()
 }
 
-// gmailSetClient imports the OAuth client JSON pasted or uploaded on the Inbox page.
+// downloadsDir is where the browser saves the client JSON Google offers; a variable so tests can move it.
+var downloadsDir = func() string {
+	h, _ := os.UserHomeDir()
+	return filepath.Join(h, "Downloads")
+}
+
+// googleView is the Connect Google panel: how far setup got and what the grant allows.
+type googleView struct {
+	Offered bool // the dashboard can connect Google at all
+	gmail.State
+	Download string // a client_secret_….json waiting in Downloads, by name
+	Home     string
+}
+
+func (v *server) googleView() googleView {
+	c := v.gmailClient()
+	if c == nil {
+		return googleView{}
+	}
+	g := googleView{Offered: true, State: c.Status(), Home: v.s.Home}
+	if !g.Client {
+		g.Download = filepath.Base(gmail.FindDownload(downloadsDir(), time.Time{}))
+		if g.Download == "." {
+			g.Download = ""
+		}
+	}
+	return g
+}
+
+// Missing names what the user unticked on Google's consent screen.
+func (g googleView) Missing() []string {
+	if !g.Connected {
+		return nil
+	}
+	var out []string
+	if !g.Mail {
+		out = append(out, "reading mail")
+	}
+	if !g.Drafts {
+		out = append(out, "creating drafts")
+	}
+	if !g.CalendarWrite {
+		out = append(out, "your calendar")
+	}
+	return out
+}
+
+// gmailDetect tells the setup page when Google's client download has landed, so it can offer to import it.
+func (v *server) gmailDetect(w http.ResponseWriter, r *http.Request) {
+	g := v.googleView()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"file": g.Download, "client": g.Client})
+}
+
+// gmailSetClient imports the OAuth client JSON pasted or uploaded on the Inbox page, or the one
+// found in Downloads when the form asks for it.
 func (v *server) gmailSetClient(w http.ResponseWriter, r *http.Request) {
 	if err := sameOrigin(r); err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
@@ -71,6 +129,12 @@ func (v *server) gmailSetClient(w http.ResponseWriter, r *http.Request) {
 		b, _ = io.ReadAll(io.LimitReader(f, 64<<10))
 		f.Close()
 	}
+	var found string
+	if r.FormValue("detected") != "" {
+		if found = gmail.FindDownload(downloadsDir(), time.Time{}); found != "" {
+			b, _ = readSmall(found)
+		}
+	}
 	c, err := gmail.ParseCredentials(b)
 	if err == nil {
 		err = gmail.SaveCredentials(v.s.Home, c)
@@ -79,7 +143,20 @@ func (v *server) gmailSetClient(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, withParam("/inbox", "err", err.Error()), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, withParam("/inbox", "msg", "Google client saved. Connect Gmail to finish."), http.StatusSeeOther)
+	msg := "Google client saved. Press Connect Google to finish."
+	if found != "" {
+		msg = "Google client imported from " + filepath.Base(found) + "; you can delete that download. Press Connect Google to finish."
+	}
+	http.Redirect(w, r, withParam("/inbox", "msg", msg), http.StatusSeeOther)
+}
+
+func readSmall(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(io.LimitReader(f, 64<<10))
 }
 
 // gmailConnect sends the browser to Google's consent page; Google returns it to gmailCallback.
@@ -128,15 +205,24 @@ func (v *server) gmailCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, withParam(feature.page, "err", feature.name+" was not connected: "+err.Error()), http.StatusSeeOther)
 		return
 	}
-	if feature.key == "calendar" {
-		msg := "Google Calendar connected as " + t.Email + "."
-		if !gmail.HasScope(t.Scope, gmail.CalendarScope) && !gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
-			msg = "Google connected as " + t.Email + ", but Calendar was not allowed; reconnect and tick it."
-		}
-		http.Redirect(w, r, withParam("/calendar", "msg", msg), http.StatusSeeOther)
+	g := googleView{Offered: true, State: c.Status()}
+	if missing := g.Missing(); len(missing) > 0 {
+		http.Redirect(w, r, withParam(feature.page, "err", connectedAs(t)+", but Google was not allowed "+strings.Join(missing, ", ")+
+			". Press Connect Google again and tick every box on Google's screen."), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, withParam("/inbox", "msg", "Gmail connected as "+t.Email+". Sync now reads replies to your applications"+calendarNote(t)+"."), http.StatusSeeOther)
+	msg := connectedAs(t) + ": replies to your applications sync into the Inbox, drafts go to Gmail, and interviews to your Google Calendar."
+	if g.Testing {
+		msg += " Your Google Cloud app is still in Testing mode, so Google will disconnect it on " + g.Ends.Format("Jan 2") + ": publish it to stay connected."
+	}
+	http.Redirect(w, r, withParam(feature.page, "msg", msg), http.StatusSeeOther)
+}
+
+func connectedAs(t gmail.Token) string {
+	if t.Email == "" {
+		return "Google connected"
+	}
+	return "Google connected as " + t.Email
 }
 
 func (v *server) gmailDisconnect(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +236,7 @@ func (v *server) gmailDisconnect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	http.Redirect(w, r, withParam("/inbox", "msg", "Gmail disconnected: access revoked at Google, token deleted"), http.StatusSeeOther)
+	http.Redirect(w, r, withParam("/inbox", "msg", "Google disconnected: access revoked at Google, token deleted"), http.StatusSeeOther)
 }
 
 // oauthTarget is the feature a Google sign-in was started for: its name in messages and its page.
@@ -158,14 +244,7 @@ type oauthTarget struct{ key, name, page string }
 
 func oauthFeature(key string) oauthTarget {
 	if key == "calendar" {
-		return oauthTarget{"calendar", "Google Calendar", "/calendar"}
+		return oauthTarget{"calendar", "Google", "/calendar"}
 	}
-	return oauthTarget{"gmail", "Gmail", "/inbox"}
-}
-
-func calendarNote(t gmail.Token) string {
-	if gmail.HasScope(t.Scope, gmail.CalendarScope) || gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
-		return "; your Google Calendar shows on the Calendar page"
-	}
-	return "; Calendar was not allowed, so connect again and tick it to see your events here"
+	return oauthTarget{"gmail", "Google", "/inbox"}
 }

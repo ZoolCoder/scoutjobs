@@ -118,7 +118,7 @@
   <form method="post" action="/gmail/connect"><input type="hidden" name="for" value="calendar"><button class="mini primary">Reconnect Google</button></form></div>
   {{else if eq .GoogleCal "reconnect"}}<div class="small"><p>Sync your interviews with your Google Calendar. Enable the <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">Calendar API</a> in your Google Cloud project, then reconnect and allow Calendar.</p>
   <form method="post" action="/gmail/connect"><input type="hidden" name="for" value="calendar"><button class="mini primary">Reconnect Google</button></form></div>
-  {{else if eq .GoogleCal "setup"}}<p class="small muted">Connect Google on the <a href="/inbox">Inbox</a> page to sync your interviews with your Google Calendar.</p>{{end}}
+  {{else if eq .GoogleCal "setup"}}<p class="small muted"><a href="/inbox#google">Connect Google</a> once for mail and calendar: your interviews then sync with your Google Calendar.</p>{{end}}
   <p class="small muted">{{index .Counts "interview"}} interviews ahead.</p>
 </section>
 

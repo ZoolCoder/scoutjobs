@@ -26,7 +26,14 @@ import (
 
 // Scopes: read for reply matching, compose for drafts, calendar events to read the user's calendar and
 // keep the interviews ScoutJobs tracks in it. Compose cannot send without the user pressing Send.
-const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose " + CalendarEventsScope
+const Scopes = MailScope + " " + ComposeScope + " " + CalendarEventsScope
+
+// MailScope reads inbox metadata; ComposeScope creates drafts. Google's consent screen lets the user
+// untick either, so each is checked before use.
+const (
+	MailScope    = "https://www.googleapis.com/auth/gmail.readonly"
+	ComposeScope = "https://www.googleapis.com/auth/gmail.compose"
+)
 
 const TokenFile = "gmail-token.json"
 
@@ -49,6 +56,10 @@ type Token struct {
 	Expiry       time.Time `json:"expiry"`
 	Email        string    `json:"email"`
 	Scope        string    `json:"scope,omitempty"` // granted scopes; tokens from before Calendar have none
+	// RefreshExpiry is when Google ends the grant: set only for an app still in Testing mode (7 days)
+	RefreshExpiry time.Time `json:"refresh_expiry,omitempty"`
+	// Problem is why the last refresh failed for good (expired or revoked); cleared on a new connect
+	Problem string `json:"problem,omitempty"`
 }
 
 func (c *Client) defaults() {
@@ -99,9 +110,19 @@ func (c *Client) load() (Token, error) {
 	return t, err
 }
 
+// save writes atomically: the dashboard's calendar sync and a mail sync may refresh at the same time,
+// and neither may read a half-written token.
 func (c *Client) save(t Token) error {
 	b, _ := json.MarshalIndent(t, "", "  ")
-	return os.WriteFile(c.tokenPath(), b, 0o600)
+	tmp := c.tokenPath() + "." + randomString(6) + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, c.tokenPath()); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func randomString(n int) string {
@@ -138,7 +159,7 @@ func (c *Client) Connect(ctx context.Context, show func(authURL string)) (Token,
 		if err != nil {
 			http.Error(w, "Gmail was not connected: "+err.Error(), http.StatusBadRequest)
 		} else {
-			fmt.Fprintln(w, "Gmail connected to ScoutJobs. You can close this tab.")
+			fmt.Fprintln(w, "Google connected to ScoutJobs. You can close this tab.")
 		}
 		done <- result{code, err}
 	})}
@@ -174,6 +195,7 @@ func (c *Client) grant(ctx context.Context, form url.Values) (Token, error) {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int    `json:"expires_in"`
+		RefreshIn    int    `json:"refresh_token_expires_in"` // only for apps in Testing mode
 		Scope        string `json:"scope"`
 		Error        string `json:"error"`
 		Desc         string `json:"error_description"`
@@ -184,7 +206,11 @@ func (c *Client) grant(ctx context.Context, form url.Values) (Token, error) {
 	if out.Error != "" || out.AccessToken == "" {
 		return Token{}, fmt.Errorf("token endpoint: %s %s", out.Error, out.Desc)
 	}
-	return Token{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, Scope: out.Scope, Expiry: time.Now().Add(time.Duration(out.ExpiresIn) * time.Second)}, nil
+	t := Token{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, Scope: out.Scope, Expiry: time.Now().Add(time.Duration(out.ExpiresIn) * time.Second)}
+	if out.RefreshIn > 0 {
+		t.RefreshExpiry = time.Now().Add(time.Duration(out.RefreshIn) * time.Second)
+	}
+	return t, nil
 }
 
 // access returns a valid access token, refreshing and saving it when it is about to expire.
@@ -202,16 +228,33 @@ func (c *Client) access(ctx context.Context) (string, error) {
 	}
 	n, err := c.grant(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {t.RefreshToken}})
 	if err != nil {
-		return "", fmt.Errorf("gmail refresh: %w (run scoutjobs gmail connect again if access was revoked)", err)
+		if strings.Contains(err.Error(), "invalid_grant") { // for good: only a new connect helps
+			t.Problem = expiredProblem(t)
+			_ = c.save(t)
+			return "", errors.New(t.Problem)
+		}
+		return "", fmt.Errorf("google refresh: %w", err)
 	}
-	t.AccessToken, t.Expiry = n.AccessToken, n.Expiry
+	t.AccessToken, t.Expiry, t.Problem = n.AccessToken, n.Expiry, ""
 	if n.RefreshToken != "" {
 		t.RefreshToken = n.RefreshToken
+	}
+	if !n.RefreshExpiry.IsZero() {
+		t.RefreshExpiry = n.RefreshExpiry
 	}
 	if n.Scope != "" {
 		t.Scope = n.Scope
 	}
 	return t.AccessToken, c.save(t)
+}
+
+// expiredProblem explains a refresh Google refused for good; a Testing-mode app is the usual cause.
+func expiredProblem(t Token) string {
+	if !t.RefreshExpiry.IsZero() {
+		return "Google ended the connection after 7 days because your Google Cloud app is in Testing mode: " +
+			"publish it (Google Cloud > Audience > Publish app), then connect Google again"
+	}
+	return "Google ended the connection (access was revoked or the password changed): connect Google again"
 }
 
 func (c *Client) call(ctx context.Context, tok, method, path string, body, out any) error {
@@ -271,6 +314,9 @@ func (c *Client) once(ctx context.Context, tok, method, u string, body []byte, o
 // Fetch lists inbox messages since the day, newest first, at most limit, as the reply matcher wants them.
 // Only metadata and Gmail's snippet are read; bodies stay in Gmail.
 func (c *Client) Fetch(ctx context.Context, since time.Time, limit int) ([]mail.Mail, error) {
+	if c.Connected() && !c.HasMail() {
+		return nil, errors.New("reading Gmail was not allowed when you connected Google: connect again and tick every box Google offers")
+	}
 	tok, err := c.access(ctx)
 	if err != nil {
 		return nil, err
@@ -278,7 +324,8 @@ func (c *Client) Fetch(ctx context.Context, since time.Time, limit int) ([]mail.
 	if limit <= 0 {
 		limit = 200
 	}
-	query := "in:inbox -category:promotions -category:social after:" + strconv.FormatInt(since.Unix(), 10)
+	// not only the inbox: a reply the user archived, or a filter moved under a label, still counts
+	query := "-in:sent -in:drafts -in:chats -category:promotions -category:social after:" + strconv.FormatInt(since.Unix(), 10)
 	var ids []string
 	page := ""
 	for len(ids) < limit {
@@ -385,6 +432,9 @@ type Draft struct {
 
 // CreateDraft uploads a complete RFC 822 message as a draft. Nothing is sent.
 func (c *Client) CreateDraft(ctx context.Context, raw []byte, thread string) (Draft, error) {
+	if c.Connected() && !c.granted(ComposeScope) && !c.oldGrant() {
+		return Draft{}, errors.New("creating Gmail drafts was not allowed when you connected Google: connect again and tick every box Google offers")
+	}
 	tok, err := c.access(ctx)
 	if err != nil {
 		return Draft{}, err
@@ -427,4 +477,46 @@ func (c *Client) Disconnect(ctx context.Context) error {
 // ThreadURL opens a thread in Gmail's web app; account is the address, so the right inbox opens.
 func ThreadURL(account, thread string) string {
 	return "https://mail.google.com/mail/?authuser=" + url.QueryEscape(account) + "#all/" + url.PathEscape(thread)
+}
+
+// DraftURL opens a draft in the account it was made in, whichever Google account the browser lists first.
+func DraftURL(account, messageID string) string {
+	return "https://mail.google.com/mail/?authuser=" + url.QueryEscape(account) + "#drafts?compose=" + url.QueryEscape(messageID)
+}
+
+// HasMail reports whether the grant lets ScoutJobs read inbox metadata.
+func (c *Client) HasMail() bool { return c.granted(MailScope) || c.oldGrant() }
+
+// oldGrant is a token saved before scopes were recorded: it was granted every scope asked then, mail included.
+func (c *Client) oldGrant() bool {
+	t, err := c.load()
+	return err == nil && t.Scope == ""
+}
+
+// State is the Google connection as the dashboard and `gmail status` show it.
+type State struct {
+	Client        bool      `json:"client"` // an OAuth client is set up
+	Connected     bool      `json:"connected"`
+	Account       string    `json:"account"`
+	Mail          bool      `json:"mail"`   // inbox metadata can be read
+	Drafts        bool      `json:"drafts"` // drafts can be created
+	Calendar      bool      `json:"calendar"`
+	CalendarWrite bool      `json:"calendar_write"`
+	Problem       string    `json:"problem,omitempty"`
+	Testing       bool      `json:"testing"`       // the app is in Testing mode: Google ends the grant after 7 days
+	Ends          time.Time `json:"ends,omitzero"` // when, for a Testing-mode app
+}
+
+// Status reads the saved token; it does not call Google.
+func (c *Client) Status() State {
+	st := State{Client: c.ID != ""}
+	t, err := c.load()
+	if err != nil {
+		return st
+	}
+	st.Connected, st.Account, st.Problem = true, t.Email, t.Problem
+	st.Mail, st.Drafts = c.HasMail(), c.granted(ComposeScope) || t.Scope == ""
+	st.Calendar, st.CalendarWrite = c.HasCalendar(), c.CanWriteCalendar()
+	st.Testing, st.Ends = !t.RefreshExpiry.IsZero(), t.RefreshExpiry
+	return st
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +36,7 @@ func fakeGoogle(t *testing.T) (*httptest.Server, *[]string) {
 		}
 		switch {
 		case r.Method == "GET" && r.URL.Path == "/api/messages":
-			if !strings.Contains(r.URL.Query().Get("q"), "in:inbox") {
+			if q := r.URL.Query().Get("q"); !strings.Contains(q, "-in:sent") || strings.Contains(q, "in:inbox") {
 				t.Errorf("query %q", r.URL.Query().Get("q"))
 			}
 			_, _ = w.Write([]byte(`{"messages":[{"id":"m1"}]}`))
@@ -132,5 +133,50 @@ func TestNotConnected(t *testing.T) {
 	}
 	if err := c.Disconnect(context.Background()); err != nil {
 		t.Errorf("disconnect without token: %v", err)
+	}
+}
+
+func TestExpiredGrantIsRecorded(t *testing.T) {
+	c, _ := testClient(t)
+	tok, _ := c.load()
+	tok.RefreshToken, tok.RefreshExpiry = "rt-gone", time.Now().Add(-time.Hour)
+	if err := c.save(tok); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Fetch(context.Background(), time.Now(), 1); err == nil || !strings.Contains(err.Error(), "Testing mode") {
+		t.Fatalf("want Testing-mode hint, got %v", err)
+	}
+	if st := c.Status(); !st.Connected || !strings.Contains(st.Problem, "Testing mode") || !st.Testing {
+		t.Errorf("status %+v", st)
+	}
+}
+
+func TestGrantKeepsTestingExpiry(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"access_token":"a","refresh_token":"r","expires_in":3600,"refresh_token_expires_in":604799,"scope":"` + CalendarEventsScope + `"}`))
+	}))
+	defer srv.Close()
+	c := &Client{ID: "cid", Home: t.TempDir(), HTTP: srv.Client(), TokenURL: srv.URL}
+	tok, err := c.grant(context.Background(), url.Values{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Until(tok.RefreshExpiry); d < 6*24*time.Hour || d > 7*24*time.Hour {
+		t.Errorf("refresh expiry in %v", d)
+	}
+	if err := c.save(tok); err != nil {
+		t.Fatal(err)
+	}
+	if st := c.Status(); st.Mail || st.Drafts || !st.CalendarWrite {
+		t.Errorf("calendar-only grant: %+v", st)
+	}
+	if _, err := c.Fetch(context.Background(), time.Now(), 1); err == nil || !strings.Contains(err.Error(), "tick every box") {
+		t.Errorf("fetch without mail scope: %v", err)
+	}
+}
+
+func TestDraftURLNamesAccount(t *testing.T) {
+	if u := DraftURL("me@x.test", "abc"); u != "https://mail.google.com/mail/?authuser=me%40x.test#drafts?compose=abc" {
+		t.Error(u)
 	}
 }

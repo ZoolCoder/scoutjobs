@@ -43,7 +43,7 @@ func (v *server) today(st store.Stats, upcoming []store.Interview) []todo {
 	n := 0
 	if ms, err := v.s.Mails(0, 30); err == nil {
 		for _, m := range ms {
-			row := toRow(m)
+			row := toRow(m, v.mailAccount())
 			if m.Dir != "in" || n >= 4 || row.When.Before(cutoff) || m.Kind == "ack" || m.Kind == "rejected" {
 				continue
 			}

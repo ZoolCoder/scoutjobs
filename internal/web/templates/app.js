@@ -157,3 +157,16 @@
     apply();
   });
 })();
+
+// The Connect Google wizard: reload when Google's client download lands, so the page offers to import it.
+(function () {
+  var box = document.querySelector('[data-gmail-detect]');
+  if (!box || box.querySelector('form')) return;
+  var tries = 0;
+  var timer = setInterval(function () {
+    if (++tries > 200) return clearInterval(timer); // ten minutes
+    fetch('/gmail/detect', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.file || d.client) { clearInterval(timer); location.reload(); }
+    }).catch(function () {});
+  }, 3000);
+})();

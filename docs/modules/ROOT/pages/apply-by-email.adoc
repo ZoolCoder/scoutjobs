@@ -53,10 +53,12 @@ Prefer your own mail app? `scoutjobs email show 3 --json` and the job page both 
 
 == Replies: `scoutjobs email sync`
 
-Every message `scoutjobs email send` puts out carries a `Message-ID` that is stored with the job. `scoutjobs email sync` reads your inbox over IMAP (read-only: messages are peeked, never flagged, moved or deleted) and matches each message to an application in two ways:
+Every message `scoutjobs email send` puts out carries a `Message-ID` that is stored with the job. `scoutjobs email sync` reads your inbox over IMAP (read-only: messages are peeked, never flagged, moved or deleted) and matches each message to an application in these ways, first match wins:
 
-* *thread*: the reply's `In-Reply-To` or `References` names one of our Message-IDs;
-* *contact*: the sender is the job's `contact` address and the job is still open.
+* *thread*: the reply's `In-Reply-To` or `References` names one of our Message-IDs, or, with Gmail, it is in the thread of a draft ScoutJobs made (Gmail gives a sent draft a new Message-ID, so the thread is what ties them);
+* *contact*: the sender is the job's `contact` address and the job is still open;
+* *domain*: the sender's domain is that of exactly one open job;
+* *company*: the mail comes from an applicant tracking system or speaks of an application, and names the company of exactly one job you applied to.
 
 A match logs `reply:received` on the job. When the wording is clear the status moves too: "unfortunately", "other candidates", "not moving forward" and the like give `rejected`; "interview", "schedule a call", "phone screen" give `interview`. Rejections win when both appear. Anything else stays where it is and you decide on the job page. Each reply is processed once; a second sync skips it.
 

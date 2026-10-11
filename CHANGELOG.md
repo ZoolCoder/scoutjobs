@@ -20,15 +20,34 @@ All notable changes to ScoutJobs. The format follows
 - More tags: every posting gets its skills, level, employment type, regions
   and visa stance from the title, tags and description, stored with the job on
   add. The search results have a tag bar to narrow the rows.
+- Connect Google: one button for mail and calendar. The Inbox page walks
+  through the Google Cloud setup with a link per step, watches Downloads for
+  the client JSON and offers to import it, and after the sign-in says which
+  boxes were left unticked on Google's screen.
 
 ### Changed
 - The boards of a search are queried in parallel.
+- Gmail sync reads every folder except Sent, Drafts and the promotions and
+  social tabs, so archived or filtered replies are found.
 
 ### Fixed
 - Jobs added from a search keep the posting: its text is saved to
   `posting.md`, and Prepare application fetches a missing one from the job's
   URL (Remotive links included) before the agent starts, so the fit and draft
   reviews check the drafts against the posting, not the board's tags.
+- Gmail replies to a draft sent from Gmail match the job again: Gmail gives
+  the sent message a new Message-ID, so the draft's thread is recorded and a
+  reply in it is matched. Mail from an applicant tracking system that names
+  the company of exactly one job you applied to is matched too.
+- Follow-up and thank-you drafts in Gmail answer the job's thread
+  (`In-Reply-To`), and draft and message links open the connected account,
+  not the first account signed in to the browser.
+- A connection Google ended (Testing-mode apps expire after 7 days, revoked
+  access) shows as such, with how to fix it, instead of a connected inbox
+  that fails every sync. A Testing-mode app is warned about before it ends.
+- Connecting with mail unticked on Google's consent screen no longer leaves
+  the account unnamed, and reading or drafting says which permission is
+  missing. The token is written atomically.
 
 ## [0.6.0] - 2026-10-11
 

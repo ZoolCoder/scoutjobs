@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -333,6 +334,9 @@ func TestGmailConnectFromInbox(t *testing.T) {
 		return &gmail.Client{ID: c.ID, Secret: c.Secret, Home: s.Home, AuthURL: "https://auth.test/o"}
 	}
 	h, _ := Handler(s, Config{Mail: MailHooks{Gmail: client}})
+	downloads := t.TempDir()
+	defer func(old func() string) { downloadsDir = old }(downloadsDir)
+	downloadsDir = func() string { return downloads }
 	send := func(method, path, body, origin string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, strings.NewReader(body))
 		req.Host = "127.0.0.1:7070"
@@ -344,8 +348,26 @@ func TestGmailConnectFromInbox(t *testing.T) {
 		h.ServeHTTP(rec, req)
 		return rec
 	}
-	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, "Connect Gmail") || !strings.Contains(b, `action="/gmail/client"`) {
-		t.Fatal("inbox lacks the Gmail setup panel")
+	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, "Connect Google") || !strings.Contains(b, `action="/gmail/client"`) || !strings.Contains(b, "Watching Downloads") {
+		t.Fatal("inbox lacks the Google setup wizard")
+	}
+	if b := get(h, "/gmail/detect").Body.String(); !strings.Contains(b, `"file":""`) {
+		t.Errorf("detect before download: %s", b)
+	}
+	if err := os.WriteFile(filepath.Join(downloads, "client_secret_9.json"), []byte(`{"installed":{"client_id":"9-z.apps.googleusercontent.com","client_secret":"s9"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if b := get(h, "/gmail/detect").Body.String(); !strings.Contains(b, "client_secret_9.json") || strings.Contains(b, "s9") {
+		t.Errorf("detect after download: %s", b)
+	}
+	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, `name="detected"`) {
+		t.Error("inbox does not offer the download")
+	}
+	if rec := send("POST", "/gmail/client", "detected=1", "http://127.0.0.1:7070"); !strings.Contains(rec.Header().Get("Location"), "client_secret_9.json") {
+		t.Fatalf("import download: %s", rec.Header().Get("Location"))
+	}
+	if gmail.LoadCredentials(s.Home).ID != "9-z.apps.googleusercontent.com" {
+		t.Fatal("download not imported")
 	}
 	clientForm := url.Values{"client": {`{"installed":{"client_id":"1-a.apps.googleusercontent.com","client_secret":"s"}}`}}.Encode()
 	if rec := send("POST", "/gmail/client", clientForm, "https://evil.test"); rec.Code != http.StatusForbidden {
@@ -372,18 +394,18 @@ func TestGmailConnectFromInbox(t *testing.T) {
 		t.Errorf("refusal: %s", rec.Header().Get("Location"))
 	}
 
-	// a Calendar reconnect reports on the Calendar page, under its own name
+	// a reconnect from the Calendar page reports there
 	rec = send("POST", "/gmail/connect", "for=calendar", "")
 	loc, _ = url.Parse(rec.Header().Get("Location"))
 	back, _ := url.Parse(send("GET", "/gmail/callback?state="+loc.Query().Get("state")+"&error=access_denied", "", "").Header().Get("Location"))
-	if back.Path != "/calendar" || !strings.HasPrefix(back.Query().Get("err"), "Google Calendar was not connected") {
+	if back.Path != "/calendar" || !strings.HasPrefix(back.Query().Get("err"), "Google was not connected") {
 		t.Errorf("calendar refusal: %s", back)
 	}
 
 	// without the secret nobody is sent to Google
 	_ = gmail.SaveCredentials(s.Home, gmail.Credentials{ID: "1-a.apps.googleusercontent.com"})
 	back, _ = url.Parse(send("POST", "/gmail/connect", "for=calendar", "").Header().Get("Location"))
-	if back.Path != "/calendar" || !strings.Contains(back.Query().Get("err"), "Google Calendar was not connected: the Google OAuth client secret is missing") {
+	if back.Path != "/calendar" || !strings.Contains(back.Query().Get("err"), "Google was not connected: the Google OAuth client secret is missing") {
 		t.Errorf("missing secret: %s", back)
 	}
 }

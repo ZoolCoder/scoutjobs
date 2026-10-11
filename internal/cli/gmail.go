@@ -42,12 +42,14 @@ const gmailSteps = `Google setup: a Desktop OAuth client in your own Google Clou
   2. Enable the Gmail and Calendar APIs in it:
      ` + gmail.EnableAPIs + `
   3. Configure the consent screen: Get started, app name ScoutJobs, audience External, your e-mail:
-     https://console.cloud.google.com/auth/overview
-     Then Audience > Publish app. In Testing mode Google drops the connection every 7 days.
-  4. Create the client: Application type Desktop app, Create, then Download JSON:
+     https://console.cloud.google.com/auth/overview/create
+  4. Publish the app (Publish app). Do not skip it: in Testing mode Google disconnects you every 7 days.
+     https://console.cloud.google.com/auth/audience
+  5. Create the client: Application type Desktop app, Create, then Download JSON:
      https://console.cloud.google.com/auth/clients/create
 
 Google will say it has not verified the app: it is your own app, so choose Advanced > Go to ScoutJobs.
+Tick every box on Google's screen: mail, drafts and calendar.
 ScoutJobs reads inbox metadata and your calendar, and creates drafts.
 It never sends, labels or deletes mail, and in your calendar it writes only the interviews it adds.
 `
@@ -106,11 +108,30 @@ func connectGmail(s *store.Store, cfg Config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "gmail connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
-	if !gmail.HasScope(t.Scope, gmail.CalendarScope) && !gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
-		fmt.Fprintln(out, "calendar was not allowed: the dashboard calendar shows only ScoutJobs events (connect again and tick Calendar to add yours)")
-	}
+	fmt.Fprintf(out, "google connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
+	printGrant(out, gmailClient(s, cfg).Status())
 	return nil
+}
+
+// printGrant warns about boxes left unticked on Google's screen and about a Testing-mode app.
+func printGrant(out io.Writer, st gmail.State) {
+	var missing []string
+	if !st.Mail {
+		missing = append(missing, "reading mail")
+	}
+	if !st.Drafts {
+		missing = append(missing, "creating drafts")
+	}
+	if !st.CalendarWrite {
+		missing = append(missing, "calendar")
+	}
+	if len(missing) > 0 {
+		fmt.Fprintf(out, "not allowed: %s. Run scoutjobs gmail connect again and tick every box.\n", strings.Join(missing, ", "))
+	}
+	if st.Testing {
+		fmt.Fprintf(out, "your Google Cloud app is in Testing mode: Google disconnects it on %s. Publish it at "+
+			"https://console.cloud.google.com/auth/audience, then run scoutjobs gmail connect again\n", st.Ends.Format("Jan 2"))
+	}
 }
 
 // testGoogle checks mail and calendar separately, so one failing does not hide the other.
@@ -169,12 +190,17 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		if _, err := parse(fs, rest); err != nil {
 			return err
 		}
+		st := c.Status()
 		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "calendar": c.HasCalendar(),
-			"calendar_sync": c.CanWriteCalendar(), "imap_host": cfg.IMAPHost}
+			"calendar_sync": c.CanWriteCalendar(), "imap_host": cfg.IMAPHost, "mail": st.Mail, "drafts": st.Drafts,
+			"testing": st.Testing, "problem": st.Problem}
 		return emit(out, *asJSON, res, func() {
 			switch {
+			case st.Problem != "":
+				fmt.Fprintf(out, "gmail: disconnected by Google: %s\n", st.Problem)
 			case c.Connected():
 				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), calendarState(c))
+				printGrant(out, st)
 			case c.ID == "":
 				fmt.Fprintln(out, "gmail: off (scoutjobs gmail setup connects it in a few minutes)")
 			default:
@@ -237,19 +263,25 @@ func gmailDraft(s *store.Store, cfg Config, j store.Job, kind string) (gmail.Dra
 	}
 	now := time.Now()
 	m.MessageID = mail.NewMessageID(m.From, now)
+	thread := ""
+	if kind != "" && kind != "application" { // a follow-up or thank-you answers the conversation so far
+		var ref string
+		thread, ref = s.JobThread(j.ID)
+		m.InReplyTo = ref
+	}
 	raw, err := mail.Build(m, now)
 	if err != nil {
 		return gmail.Draft{}, "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	d, err := c.CreateDraft(ctx, raw, "")
+	d, err := c.CreateDraft(ctx, raw, thread)
 	if err != nil {
 		return d, "", err
 	}
-	_ = s.RecordMail(m.MessageID, j.ID, "out", 0)
+	_ = s.RecordDraft(m.MessageID, j.ID, d.Thread)
 	_ = s.AddEvent(j.ID, "email:gmail_draft", "to "+m.To+": "+m.Subject)
-	return d, "https://mail.google.com/mail/#drafts?compose=" + d.MessageID, nil
+	return d, gmail.DraftURL(c.Account(), d.MessageID), nil
 }
 
 // proposal is the saved version of a proposed e-mail, else the one proposed now.

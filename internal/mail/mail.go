@@ -28,7 +28,8 @@ type Message struct {
 	Subject     string   `json:"subject"`
 	Body        string   `json:"body"`
 	Attachments []string `json:"attachments"`
-	MessageID   string   `json:"message_id,omitempty"` // set on send; replies carry it in In-Reply-To
+	MessageID   string   `json:"message_id,omitempty"`  // set on send; replies carry it in In-Reply-To
+	InReplyTo   string   `json:"in_reply_to,omitempty"` // the Message-ID this answers, so mail clients thread it
 }
 
 // NewMessageID makes a unique id in the sender's domain, the key `scoutjobs email sync` matches replies on.
@@ -72,6 +73,9 @@ func Build(m Message, now time.Time) ([]byte, error) {
 		m.From, m.To, mime.QEncoding.Encode("utf-8", m.Subject), now.Format(time.RFC1123Z))
 	if m.MessageID != "" {
 		fmt.Fprintf(&b, "Message-ID: %s\r\n", m.MessageID)
+	}
+	if ref := m.InReplyTo; strings.HasPrefix(ref, "<") && strings.HasSuffix(ref, ">") && !strings.ContainsAny(ref, " \r\n") {
+		fmt.Fprintf(&b, "In-Reply-To: %s\r\nReferences: %s\r\n", ref, ref)
 	}
 	fmt.Fprintf(&b, "Content-Type: multipart/mixed; boundary=%s\r\n\r\n", w.Boundary())
 	text, err := w.CreatePart(textproto.MIMEHeader{"Content-Type": {"text/plain; charset=utf-8"}, "Content-Transfer-Encoding": {"8bit"}})

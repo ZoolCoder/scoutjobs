@@ -270,7 +270,7 @@ smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
 
-# Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Gmail on the dashboard's Inbox page); it stores
+# Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Google on the dashboard's Inbox page); it stores
 # the client in gmail-client.json, so these two stay empty unless you prefer them here
 gmail_client_id:        # xxxx.apps.googleusercontent.com
 gmail_client_secret:    # the Desktop client's secret; or set $SCOUTJOBS_GMAIL_CLIENT_SECRET
