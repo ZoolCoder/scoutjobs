@@ -35,6 +35,7 @@ type Report struct {
 	Gates  []Gate `json:"gates"`
 	Failed int    `json:"failed"`
 	Warned int    `json:"warned"`
+	Acked  int    `json:"acknowledged,omitempty"`
 }
 
 // OK is true when nothing blocks.
@@ -55,6 +56,9 @@ func (r Report) Unresolved() []string {
 // `cv export` can produce the PDF the ATS gate later inspects.
 type CheckOptions struct {
 	Export bool
+	// AllowAcknowledged lets an acknowledged coverage gap stop counting as a failure (portal
+	// applications); email send never sets it.
+	AllowAcknowledged bool
 }
 
 var (
@@ -93,6 +97,9 @@ func Check(s *store.Store, j store.Job, events []store.Event, o CheckOptions) Re
 	if !o.Export {
 		add(gateATS(dir))
 		add(gateFilenames(dir))
+	}
+	if o.AllowAcknowledged {
+		r.allowAcknowledged(events, review, drafts)
 	}
 	return r
 }
@@ -189,6 +196,11 @@ func gateCoverage(review FitReview, err error, drafts map[string]string) Gate {
 	if gaps := review.Gaps(); len(gaps) > 0 {
 		return Gate{"coverage", Fail, fmt.Sprintf("%d must-have requirement(s) without evidence", len(gaps)), gaps}
 	}
+	return gateWording(review, drafts)
+}
+
+// gateWording wants the agreed wording of every evidenced must-have in the drafts.
+func gateWording(review FitReview, drafts map[string]string) Gate {
 	if len(drafts) == 0 {
 		return Gate{"coverage", Warn, "no markdown drafts to match the agreed wording against", nil}
 	}

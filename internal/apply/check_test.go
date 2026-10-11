@@ -196,3 +196,58 @@ func TestFormatGateFollowsTheMainCV(t *testing.T) {
 		t.Errorf("reordered: %+v", g)
 	}
 }
+
+func TestAcknowledgeGapsForAPortalApplication(t *testing.T) {
+	s, j := testJob(t)
+	dir := Dir(s, j)
+	write(t, dir, "resume.md", "# Me\n\nSix years of Go in production.\n\n"+filler)
+	write(t, dir, "cover-letter.md", "Dear team,\n\n"+filler)
+	r := goodReview()
+	r.Requirements = append(r.Requirements, Requirement{Requirement: "CISSP", Kind: "must", Strength: "gap"})
+	if _, err := SaveReview(dir, r); err != nil {
+		t.Fatal(err)
+	}
+	events, _ := s.Events(j.ID, 50)
+	rep := Check(s, j, events, CheckOptions{})
+	if got := rep.PendingGaps(events); len(got) != 1 || got[0] != "CISSP" {
+		t.Fatalf("pending %v", got)
+	}
+	if _, err := Acknowledge(s, j, "grounding", "", nil); err == nil {
+		t.Error("only coverage gaps can be acknowledged")
+	}
+	if _, err := Acknowledge(s, j, "coverage", "", nil); err == nil || !strings.Contains(err.Error(), "CISSP") {
+		t.Errorf("each gap must be acknowledged: %v", err)
+	}
+	if _, err := Acknowledge(s, j, "coverage", "adjacent experience", []string{"CISSP"}); err != nil {
+		t.Fatal(err)
+	}
+	events, _ = s.Events(j.ID, 50)
+	if events[1].Kind != AckEvent || events[1].Note != "coverage: CISSP | adjacent experience" || events[0].Note != "new -> drafted" {
+		t.Errorf("events %+v", events[:2])
+	}
+	if g := gate(Check(s, j, events, CheckOptions{}), "coverage"); g.State != Fail {
+		t.Errorf("sending still sees the gap: %+v", g)
+	}
+	allowed := Check(s, j, events, CheckOptions{AllowAcknowledged: true})
+	if g := gate(allowed, "coverage"); g.State != Acked || g.Items[0] != "CISSP" {
+		t.Errorf("acknowledged: %+v", g)
+	}
+	if back, _ := LoadReview(dir); len(back.Gaps()) != 1 {
+		t.Error("the review keeps its gap")
+	}
+	if got, _ := s.JobByID(j.ID); got.Status == "applied" {
+		t.Error("only the user marks a job applied")
+	}
+
+	r.Requirements = append(r.Requirements, Requirement{Requirement: "PMP", Kind: "must", Strength: "gap"})
+	SaveReview(dir, r)
+	if g := gate(Check(s, j, events, CheckOptions{AllowAcknowledged: true}), "coverage"); g.State != Fail {
+		t.Errorf("a new gap needs a new acknowledgement: %+v", g)
+	}
+
+	r.Vetoes = []Veto{{Rule: "work permit", Reason: "EU only"}}
+	SaveReview(dir, r)
+	if _, err := Acknowledge(s, j, "coverage", "", []string{"CISSP", "PMP"}); err == nil {
+		t.Error("a veto is never acknowledged away")
+	}
+}

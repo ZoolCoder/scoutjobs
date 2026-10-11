@@ -214,3 +214,66 @@ func TestJobChecklistAndGroupedNav(t *testing.T) {
 		t.Error("navigation is not grouped")
 	}
 }
+
+func TestProceedWithGapsFlow(t *testing.T) {
+	s := testStore(t)
+	h, err := Handler(s, Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	body := strings.Repeat("Shipped services in Go with Postgres behind them. ", 6)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Ada\n\n"+body), 0o600)
+	_ = os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team,\n\n"+body), 0o600)
+	review := apply.FitReview{Score: 60, Requirements: []apply.Requirement{{Requirement: "Commissioning and handover", Kind: "must", Strength: "gap"}}}
+	if _, err := apply.SaveReview(dir, review); err != nil {
+		t.Fatal(err)
+	}
+	get := func() string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
+		return rec.Body.String()
+	}
+	post := func(path, form string) int {
+		req := httptest.NewRequest("POST", path, strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	page := get()
+	if !strings.Contains(page, "1 must-have gap remains. Your documents do not claim this experience.") || !strings.Contains(page, `name="gap" value="Commissioning and handover" required`) {
+		t.Fatal("no acknowledgement form")
+	}
+	post("/jobs/1/acknowledge", "notes=adjacent")
+	if ev, _ := s.Events(1, 20); hasKind(ev, apply.AckEvent) {
+		t.Fatal("acknowledged without ticking the gap")
+	}
+	if code := post("/jobs/1/acknowledge", "gap="+url.QueryEscape("Commissioning and handover")+"&notes=adjacent"); code != 303 {
+		t.Fatalf("acknowledge %d", code)
+	}
+	page = get()
+	if !strings.Contains(page, "Finish the application first") || strings.Contains(page, "Proceed with gaps</button>") {
+		t.Error("other failing gates must hold the portal link back")
+	}
+	if !strings.Contains(page, "Sending is blocked") {
+		t.Error("e-mail sending stays blocked")
+	}
+	if code := post("/jobs/1/applied", "note=ref+42"); code != 303 {
+		t.Fatalf("applied %d", code)
+	}
+	if got, _ := s.JobByID(1); got.Status != "applied" {
+		t.Errorf("status %s", got.Status)
+	}
+}
+
+func hasKind(events []store.Event, kind string) bool {
+	for _, e := range events {
+		if e.Kind == kind {
+			return true
+		}
+	}
+	return false
+}

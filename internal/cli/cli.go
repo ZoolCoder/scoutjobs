@@ -530,6 +530,8 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		return runJobReview(s, rest, out)
 	case "check":
 		return runJobCheck(s, rest, out)
+	case "acknowledge":
+		return runJobAcknowledge(s, rest, out)
 	case "run":
 		return runJobRun(s, rest, out)
 	case "rm":
@@ -546,7 +548,7 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, "removed #%d\n", j.ID)
 		return nil
 	}
-	return errors.New("usage: job add|list|show|set|fit|check|review|skip|rm")
+	return errors.New("usage: job add|list|show|set|fit|check|acknowledge|review|skip|rm")
 }
 
 func appDir(s *store.Store, j store.Job) string { return apply.Dir(s, j) }

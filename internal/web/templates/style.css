@@ -698,3 +698,9 @@ ol.checklist .state{font-size:11.5px;font-weight:600;text-transform:uppercase;le
 ol.checklist li.next .state{color:var(--acc)}ol.checklist li.warn .state{color:var(--warn)}ol.checklist li.blocked .state{color:var(--bad)}ol.checklist li.done .state{color:var(--ok)}
 @media (max-width:640px){ol.checklist>li{grid-template-columns:22px 1fr auto}ol.checklist .btn{grid-column:2}}
 @media (forced-colors:active){ol.checklist li.done .tick{background:CanvasText}}
+/* apply with gaps */
+.badge.ack{background:var(--info-sub);color:var(--info);border-color:transparent}
+.ackform{display:grid;gap:10px;margin-top:8px}
+.ackform label:not(.check){display:grid;gap:4px;font-size:13px}
+.ackform .runpick{display:grid;gap:6px}
+.gates-left{margin:0 0 8px 18px;font-size:13px}

@@ -20,6 +20,11 @@ All notable changes to ScoutJobs. The format follows
   `profile.prev.md`), and the main CV keeps that file's sections, order and
   style. Tailored resumes keep the main CV's layout; a new `format` gate warns
   when they do not.
+- Apply with gaps (#30): for an employer portal, acknowledge each must-have
+  without evidence (`job acknowledge`, the job page, or
+  `POST /api/jobs/{id}/acknowledge`), open the official posting, then mark the
+  job applied. The decision is logged; the fit review, the drafts and the
+  e-mail send gate are unchanged, and a veto is never acknowledged.
 
 ### Fixed
 - Prepare application no longer stalls (#29). Files left in a differently

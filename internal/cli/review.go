@@ -111,23 +111,65 @@ func runJobReview(s *store.Store, rest []string, out io.Writer) error {
 func runJobCheck(s *store.Store, rest []string, out io.Writer) error {
 	fs := flag.NewFlagSet("job check", flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "")
+	allowAcked := fs.Bool("allow-acknowledged", false, "count acknowledged coverage gaps as decided, for a portal application")
 	pos, err := parse(fs, rest)
 	if err != nil {
 		return err
 	}
 	if len(pos) == 0 {
-		return errors.New("usage: job check <id> [--json]")
+		return errors.New("usage: job check <id> [--allow-acknowledged] [--json]")
 	}
 	j, err := s.ResolveJob(pos[0])
 	if err != nil {
 		return err
 	}
 	events, _ := s.Events(j.ID, 200)
-	rep := apply.Check(s, j, events, apply.CheckOptions{})
+	rep := apply.Check(s, j, events, apply.CheckOptions{AllowAcknowledged: *allowAcked})
 	if err := emit(out, *asJSON, map[string]any{"job": j.ID, "ok": rep.OK(), "report": rep}, func() { printReport(out, j, rep) }); err != nil {
 		return err
 	}
 	return unresolved(rep)
+}
+
+// runJobAcknowledge records an informed decision to apply with must-have gaps, for a portal
+// application. It changes no evidence and sends nothing; email send still needs every gate to pass.
+func runJobAcknowledge(s *store.Store, rest []string, out io.Writer) error {
+	fs := flag.NewFlagSet("job acknowledge", flag.ContinueOnError)
+	gate := fs.String("gate", "coverage", "the failed gate to acknowledge (only coverage)")
+	notes := fs.String("notes", "", "why you apply anyway")
+	yes := fs.Bool("yes", false, "acknowledge every gap listed")
+	pos, err := parse(fs, rest)
+	if err != nil {
+		return err
+	}
+	if len(pos) == 0 {
+		return errors.New("usage: job acknowledge <id> [--gate coverage] [--notes text] --yes")
+	}
+	j, err := s.ResolveJob(pos[0])
+	if err != nil {
+		return err
+	}
+	events, _ := s.Events(j.ID, 200)
+	gaps := apply.Check(s, j, events, apply.CheckOptions{}).PendingGaps(events)
+	if *gate == "coverage" && len(gaps) > 0 {
+		fmt.Fprintf(out, "#%d %s / %s: %d must-have gap(s). Your documents do not claim this experience.\n", j.ID, j.Company, j.Title, len(gaps))
+		for _, g := range gaps {
+			fmt.Fprintf(out, "  - %s\n", g)
+		}
+	}
+	if !*yes {
+		return errors.New("nothing recorded; add --yes to acknowledge every gap above")
+	}
+	g, err := apply.Acknowledge(s, j, *gate, *notes, gaps)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "acknowledged %s on #%d; e-mail sending stays blocked.\n", g.Name, j.ID)
+	if j.URL != "" {
+		fmt.Fprintf(out, "Apply on the official posting: %s\n", j.URL)
+	}
+	fmt.Fprintf(out, "Once you have submitted it: scoutjobs job set %d --status applied --note \"via the portal\"\n", j.ID)
+	return nil
 }
 
 func printReport(out io.Writer, j store.Job, rep apply.Report) {

@@ -75,6 +75,25 @@
   <ul class="gates">{{range .Gates.Gates}}<li><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Name}}</b><small>{{.Detail}}</small>{{if .Items}}<ul>{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{end}}</div></li>{{end}}</ul>
   {{if not .Gates.OK}}<p class="callout">Sending is blocked until every failed gate passes. <code>scoutjobs email send {{$j.ID}} --yes --skip-checks</code> overrides it and logs the skip on the job.</p>{{end}}
 </section>
+{{with .Portal}}<section class="panel" id="portal">
+  <div class="panel-h"><h2>Apply with gaps</h2>{{if .Acked}}<span class="badge ack">acknowledged {{day .Acked}}</span>{{end}}<span class="act muted">for an employer portal</span></div>
+  {{if .Gaps}}<p class="callout warn">{{len .Gaps}} must-have {{if gt (len .Gaps) 1}}gaps remain{{else}}gap remains{{end}}. Your documents do not claim this experience.</p>
+  <form method="post" action="/jobs/{{$j.ID}}/acknowledge" class="ackform">
+    <div class="runpick">{{range .Gaps}}<label class="check"><input type="checkbox" name="gap" value="{{.}}" required> I apply without evidence for: {{.}}</label>{{end}}</div>
+    <label>Why you apply anyway <input type="text" name="notes" maxlength="300" placeholder="Applying with adjacent experience; no unsupported claims added"></label>
+    <div class="runbar"><button class="primary" type="submit">Proceed with gaps</button></div>
+    <small class="muted">Recorded on the job as <code>check:acknowledged</code>. The fit review and its evidence stay as they are, and e-mail sending stays blocked. Hard requirements (veto, legal, certification, work authorisation) are never acknowledged away. CLI: <code>scoutjobs job acknowledge {{$j.ID}} --notes "…" --yes</code></small>
+  </form>
+  {{else}}{{with .Note}}<p class="muted">Your note: {{.}}</p>{{end}}
+  {{if .Blocked}}<p class="callout bad">Finish the application first; these still fail:</p><ul class="gates-left">{{range .Blocked}}<li>{{.}}</li>{{end}}</ul>
+  {{else if .Applied}}<p class="callout">Status is {{$j.Status}}.</p>
+  {{else}}<div class="runbar">{{if .URL}}<a class="btn primary" href="{{.URL}}" target="_blank" rel="noopener noreferrer">Proceed to official application</a>{{else}}<span class="muted">No posting URL on this job; apply where you found it.</span>{{end}}</div>
+  <form method="post" action="/jobs/{{$j.ID}}/applied" class="ackform">
+    <p><b>Did you submit the application?</b></p>
+    <label>Note <input type="text" name="note" maxlength="300" placeholder="optional, e.g. reference number"></label>
+    <div class="runbar"><button class="go" type="submit">Yes, mark applied</button><span class="muted small">No? Nothing to do; the job stays drafted. Nothing is submitted for you.</span></div>
+  </form>{{end}}{{end}}
+</section>{{end}}
 <section class="panel">
   <div class="panel-h"><h2>Why this job fits</h2><span class="n">fit {{fit $j.FitScore}}</span></div>
   {{if $j.Veto}}<p class="callout bad"><b>Veto:</b> {{$j.Veto}}. Hard failures stay outside the score; this job is not sendable until the veto is cleared with <code>scoutjobs job set {{$j.ID}} --veto ''</code>.</p>{{end}}

@@ -384,6 +384,33 @@ func TestJobFitReviewAndCheck(t *testing.T) {
 	}
 }
 
+func TestJobAcknowledgeGaps(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SCOUTJOBS_HOME", home)
+	run(t, "init")
+	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev", "--url", "https://acme.test/jobs/1")
+	run(t, "job", "fit", "1", "--review", `{"requirements":[{"requirement":"Commissioning","kind":"must","strength":"gap"}],"score":55}`)
+	var b bytes.Buffer
+	if err := Run([]string{"job", "acknowledge", "1"}, &b); err == nil || !strings.Contains(b.String(), "- Commissioning") {
+		t.Errorf("without --yes: %v %s", err, b.String())
+	}
+	dir := filepath.Join(home, "applications", "acme_go-dev")
+	body := strings.Repeat("Built Go services with Postgres and shipped them weekly. ", 5)
+	os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Me\n\n"+body), 0o600)
+	os.WriteFile(filepath.Join(dir, "cover-letter.md"), []byte("Dear team,\n\n"+body), 0o600)
+	out := run(t, "job", "acknowledge", "1", "--notes", "adjacent experience", "--yes")
+	if !strings.Contains(out, "https://acme.test/jobs/1") || !strings.Contains(out, "sending stays blocked") {
+		t.Errorf("acknowledge: %s", out)
+	}
+	b.Reset()
+	if err := Run([]string{"job", "check", "1", "--allow-acknowledged"}, &b); !strings.Contains(b.String(), "ACK   coverage") {
+		t.Errorf("check: %v %s", err, b.String())
+	}
+	if err := Run([]string{"job", "check", "1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "coverage") {
+		t.Errorf("plain check keeps the gap: %v", err)
+	}
+}
+
 func TestPrefReviewCommands(t *testing.T) {
 	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
 	run(t, "init")

@@ -253,6 +253,8 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /reviews", srv.reviews)
 	mux.HandleFunc("POST /jobs/{id}/status", srv.setStatus)
 	mux.HandleFunc("POST /jobs/{id}/note", srv.addNote)
+	mux.HandleFunc("POST /jobs/{id}/acknowledge", srv.acknowledgeGaps)
+	mux.HandleFunc("POST /jobs/{id}/applied", srv.markApplied)
 	mux.HandleFunc("POST /jobs/{id}/export", srv.exportPDF)
 	mux.HandleFunc("POST /jobs/{id}/run", srv.startRun)
 	mux.HandleFunc("POST /jobs/{id}/run/cancel", srv.cancelRun)
@@ -316,6 +318,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	api.HandleFunc("GET /api/brief", srv.apiBrief)
 	api.HandleFunc("GET /api/events", srv.apiEvents)
 	api.HandleFunc("GET /api/jobs/{id}/check", srv.apiCheck)
+	api.HandleFunc("POST /api/jobs/{id}/acknowledge", srv.apiAcknowledge)
 	api.HandleFunc("GET /api/jobs/{id}/contacts", srv.apiContacts)
 	api.HandleFunc("GET /api/jobs/{id}/files", srv.apiFiles)
 	api.HandleFunc("GET /api/jobs/{id}/files/{name}", srv.apiReadFile)
@@ -599,7 +602,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 	p := v.panel(j, self, "/pipeline")
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
-		"Gates": gates, "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
+		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
 		"Docs": docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx"), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
 		"CanGmail": v.cfg.Mail.Draft != nil && v.mailSource() == "gmail",
