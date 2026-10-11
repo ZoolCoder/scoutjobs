@@ -375,3 +375,11 @@ func TestCVGapsKeepsCommasInsideFindings(t *testing.T) {
 		t.Fatal("blank gaps should be nil")
 	}
 }
+
+func TestMarkdownNumberedList(t *testing.T) {
+	got := string(mdHTML("Next week\n1. Apply to 4 jobs\n2) Two mock sessions\n- a bullet"))
+	want := "<p>Next week</p>\n<ol>\n<li>Apply to 4 jobs</li>\n<li>Two mock sessions</li>\n</ol>\n<ul>\n<li>a bullet</li>\n</ul>\n"
+	if got != want {
+		t.Errorf("mdHTML = %q", got)
+	}
+}

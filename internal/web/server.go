@@ -695,11 +695,27 @@ func (v *server) saveFile(w http.ResponseWriter, r *http.Request) {
 // ---- reviews ----
 
 type review struct {
-	Name string
-	Mod  string
+	Name  string
+	Mod   string
+	Label string
 }
 
-// reviews lists reviews/*.md (written by the weekly-review skill), shows one, and draws the funnel next to it.
+// weekLabel turns a review file name like 2026-41.md into "Week 41 · 5–11 Oct 2026".
+func weekLabel(name string) string {
+	var y, wk int
+	if _, err := fmt.Sscanf(name, "%d-%d.md", &y, &wk); err != nil || wk < 1 || wk > 53 {
+		return strings.TrimSuffix(name, ".md")
+	}
+	jan4 := time.Date(y, 1, 4, 0, 0, 0, 0, time.UTC)
+	mon := jan4.AddDate(0, 0, -((int(jan4.Weekday())+6)%7)+(wk-1)*7)
+	sun := mon.AddDate(0, 0, 6)
+	span := fmt.Sprintf("%d–%d %s %d", mon.Day(), sun.Day(), sun.Format("Jan"), sun.Year())
+	if mon.Month() != sun.Month() {
+		span = mon.Format("2 Jan") + " – " + sun.Format("2 Jan 2006")
+	}
+	return fmt.Sprintf("Week %d · %s", wk, span)
+}
+
 func (v *server) reviews(w http.ResponseWriter, r *http.Request) {
 	dir := filepath.Join(v.s.Home, "reviews")
 	var list []review
@@ -712,21 +728,36 @@ func (v *server) reviews(w http.ResponseWriter, r *http.Request) {
 			if info, err := e.Info(); err == nil {
 				mod = info.ModTime().Format("2006-01-02")
 			}
-			list = append(list, review{e.Name(), mod})
+			list = append(list, review{e.Name(), mod, weekLabel(e.Name())})
 		}
 	}
 	sort.Slice(list, func(a, b int) bool { return list[a].Name > list[b].Name })
 	pick := filepath.Base(r.URL.Query().Get("f"))
-	var body, current string
-	for _, rv := range list {
+	var body, current, label, older, newer string
+	for n, rv := range list {
 		if pick == rv.Name || (pick == "." && current == "") {
 			if b, err := os.ReadFile(filepath.Join(dir, rv.Name)); err == nil {
-				body, current = string(b), rv.Name
+				body, current, label = string(b), rv.Name, rv.Label
+				if n+1 < len(list) {
+					older = list[n+1].Name
+				}
+				if n > 0 {
+					newer = list[n-1].Name
+				}
 			}
 		}
 	}
+	// the page shows the week as its title, so drop the file's own heading
+	if first, rest, ok := strings.Cut(body, "\n"); ok && strings.HasPrefix(first, "# ") {
+		body = rest
+	}
 	st, _ := v.s.Stats(v.cfg.FollowUpDays, v.cfg.StaleDays)
-	v.render(w, r, "reviews.html", "reviews", map[string]any{"Reviews": list, "Current": current, "Body": body, "Dir": dir,
+	up, _ := v.s.Interviews(0, true)
+	if len(up) > 3 {
+		up = up[:3]
+	}
+	v.render(w, r, "reviews.html", "reviews", map[string]any{"Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
+		"Older": older, "Newer": newer, "Upcoming": up,
 		"Funnel": funnelOf(st), "Stats": st, "Target": v.cfg.WeeklyApplyTarget, "ThisWeek": v.s.WeeklyCounts("status", "%applied%", 1)})
 }
 

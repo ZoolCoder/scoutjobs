@@ -2,12 +2,21 @@
 {{with .Data}}
 <div class="grid-3">
 <section class="panel span-2">
-  <div class="panel-h"><h2>{{if .Current}}{{.Current}}{{else}}Weekly reviews{{end}}</h2>
-    {{if .Reviews}}<div class="chips">{{$c := .Current}}{{range .Reviews}}<a href="/reviews?f={{.Name}}" {{if eq .Name $c}}class="on"{{end}}>{{.Name}}</a>{{end}}</div>{{end}}</div>
-  {{if .Body}}<pre class="doc tall">{{.Body}}</pre>
-  {{else}}<p class="empty">No review yet<small>Run <code>/scoutjobs:review</code> on Friday. The skill writes <code>reviews/&lt;YYYY-WW&gt;.md</code> and it shows up here.</small></p>{{end}}
-  <p class="mono small">{{tilde .Dir}}</p>
+{{if .Reviews}}
+  <div class="weekbar">
+    {{if .Older}}<a class="btn mini" href="/reviews?f={{.Older}}" title="Older week">‹</a>{{else}}<span class="btn mini off">‹</span>{{end}}
+    <details class="prep-pop weekpick"><summary class="btn">{{.Label}} ▾</summary>
+      <ul class="popform">{{$c := .Current}}{{range .Reviews}}<li><a href="/reviews?f={{.Name}}" {{if eq .Name $c}}class="on"{{end}}>{{.Label}}</a></li>{{end}}</ul>
+    </details>
+    {{if .Newer}}<a class="btn mini" href="/reviews?f={{.Newer}}" title="Newer week">›</a>{{else}}<span class="btn mini off">›</span>{{end}}
+  </div>
+  <article class="rdoc">{{.HTML}}</article>
+{{else}}
+  <div class="panel-h"><h2>Weekly review</h2></div>
+  <p class="empty">No review yet<small>Every Friday ScoutJobs looks back at your week: what you applied to, what moved, and three goals for next week. It shows up here.</small></p>
+{{end}}
 </section>
+<div class="stack">
 <section class="panel">
   <div class="panel-h"><h2>Funnel now</h2><span class="n">{{.Stats.Open}} active</span></div>
   <ul class="funnel">
@@ -16,9 +25,17 @@
   <dl class="facts">
     <dt>Applied this week</dt><dd>{{index .ThisWeek 0}} of {{.Target}}</dd>
     <dt>Follow-ups due</dt><dd>{{len .Stats.DueFollowUps}}</dd>
-    <dt>Stale</dt><dd>{{len .Stats.Stale}}</dd>
+    <dt>No reply yet</dt><dd>{{len .Stats.Stale}}</dd>
   </dl>
 </section>
+{{with .Upcoming}}<section class="panel">
+  <div class="panel-h"><h2>Coming up</h2><a class="act" href="/interviews">All interviews</a></div>
+  <ul class="irows">{{range .}}<li>
+    <span class="cal"><small>{{mon .At}}</small><b>{{dom .At}}</b></span>
+    <div class="who"><a href="/pipeline?job={{.JobID}}"><b>{{.Company}}</b></a><small>{{title .Stage}}{{with hm .At}} · {{.}}{{end}}</small></div>
+  </li>{{end}}</ul>
+</section>{{end}}
+</div>
 </div>
 {{end}}
 {{template "foot" .}}

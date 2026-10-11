@@ -142,10 +142,10 @@ func TestDraftEditDueAndReviews(t *testing.T) {
 	os.MkdirAll(filepath.Join(s.Home, "reviews"), 0o755)
 	os.WriteFile(filepath.Join(s.Home, "reviews", "2026-41.md"), []byte("# Week 41\n\nApplied 4 of 5."), 0o600)
 	os.WriteFile(filepath.Join(s.Home, "reviews", "2026-40.md"), []byte("# Week 40"), 0o600)
-	if rec := get("/reviews"); !strings.Contains(rec.Body.String(), "Applied 4 of 5") || !strings.Contains(rec.Body.String(), "2026-40.md") || !strings.Contains(rec.Body.String(), "<meter") {
+	if rec := get("/reviews"); !strings.Contains(rec.Body.String(), "Applied 4 of 5") || !strings.Contains(rec.Body.String(), "Week 40 · 28 Sep – 4 Oct 2026") || !strings.Contains(rec.Body.String(), "<meter") {
 		t.Errorf("reviews page: %s", rec.Body.String())
 	}
-	if rec := get("/reviews?f=2026-40.md"); !strings.Contains(rec.Body.String(), "# Week 40") {
+	if rec := get("/reviews?f=2026-40.md"); !strings.Contains(rec.Body.String(), `href="/reviews?f=2026-41.md" title="Newer week"`) {
 		t.Errorf("pick review: %s", rec.Body.String())
 	}
 	if rec := get("/reviews?f=..%2Fprofile.md"); strings.Contains(rec.Body.String(), "Name") && !strings.Contains(rec.Body.String(), "Applied 4 of 5") {

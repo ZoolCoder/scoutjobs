@@ -228,7 +228,7 @@ form.search .muted{font-size:12.5px;white-space:nowrap}
 .jobcard .co{font-weight:600;color:var(--fg)}.jobcard .ttl{font-size:12.5px;color:var(--muted);margin:2px 0 8px}
 .jobcard .meta{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-bottom:10px}
 .jobcard form.inline{display:flex}.jobcard form.inline select{flex:1}
-.col .empty{padding:28px 8px}.empty small{display:block;font-size:12px;color:var(--dim);margin-top:4px;text-transform:capitalize}
+.col .empty{padding:28px 8px}.empty small{display:block;font-size:12px;color:var(--dim);margin-top:4px}
 
 @media (max-width:1200px){.kpis{grid-template-columns:1fr 1fr}.grid-3{grid-template-columns:1fr 1fr}}
 .pg.greet{text-transform:none}.next .av.lg{width:48px;height:48px;border-radius:12px;font-size:20px}
@@ -925,3 +925,22 @@ ul.prows .conf meter{width:56px}
 .prows .popform input,.addpref .popform input{min-width:220px}
 .addpref{margin-left:auto}
 @media (max-width:900px){ul.prows>li{grid-template-columns:1fr auto}ul.prows>li.ph{display:none}}
+.weekbar{display:flex;align-items:center;gap:8px;margin-bottom:18px}
+.weekbar .btn.mini{width:32px;height:32px;padding:0;justify-content:center;font-size:16px}
+.weekbar .off{opacity:.35;pointer-events:none}
+.weekpick summary.btn{height:32px;font-weight:600}
+.weekpick .popform{position:absolute;left:0;top:38px;z-index:20;list-style:none;margin:0;padding:6px;min-width:100%;width:max-content;background:var(--surface);border:1px solid var(--line2);border-radius:12px;box-shadow:var(--shadow)}
+.weekpick .popform a{display:block;padding:7px 10px;border-radius:8px;color:var(--text);font-size:13px}
+.weekpick .popform a:hover,.weekpick .popform a.on{background:var(--subtle);color:var(--acc)}
+article.rdoc{font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+article.rdoc h1,article.rdoc h2{font-size:15px;font-weight:600;margin:22px 0 8px}
+article.rdoc>:first-child{margin-top:0}
+article.rdoc h3,article.rdoc h4{font-size:14px;margin:14px 0 4px}
+article.rdoc p{margin:0 0 10px;color:var(--muted)}
+article.rdoc ul{list-style:none;margin:0 0 10px;padding:0}
+article.rdoc ul li{position:relative;padding:3px 0 3px 18px;color:var(--muted)}
+article.rdoc ul li::before{content:"";position:absolute;left:3px;top:12px;width:6px;height:6px;border-radius:50%;background:var(--acc)}
+article.rdoc b{color:var(--text)}
+article.rdoc ol{list-style:none;counter-reset:c;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:8px}
+article.rdoc ol li{counter-increment:c;display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--subtle)}
+article.rdoc ol li::before{content:counter(c);flex:none;width:24px;height:24px;border-radius:50%;border:1px solid var(--acc);color:var(--acc);display:grid;place-items:center;font-size:12px;font-weight:600}
