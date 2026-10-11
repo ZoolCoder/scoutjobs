@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 	"github.com/zoolcoder/scoutjobs/internal/web"
 )
@@ -27,6 +28,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   version                    print the version
   update [--check] [--yes] [--version vX.Y.Z]   install the latest release over this binary (brew/deb/rpm installs are handed to their manager)
   job add [--from url]|list [--compact]|show|set|skip|rm|import
+  job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
   email draft|show|send   application e-mail from the cover letter; send needs --yes
@@ -124,7 +126,7 @@ func Run(args []string, out io.Writer) error {
 		if err := fs.Parse(rest); err != nil {
 			return err
 		}
-		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg)})
+		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -242,6 +244,10 @@ fit_apply_floor: 60     # the job-fit skill suggests skipping below this score
 currency: EUR           # salaries converted to yearly figures in this currency, original kept in notes
 dashboard_addr: 127.0.0.1:7070
 theme: light            # dashboard: light | dark | auto (follow system)
+
+# job run and the dashboard's Prepare application: which agent CLI writes the drafts
+agent: auto             # claude | codex | custom | auto (the first one found)
+agent_command:          # any other agent that reads the prompt on stdin, e.g. "gemini --yolo"; used as "custom"
 
 # job search defaults for ` + "`scoutjobs search`" + ` (flags override)
 search_queries: senior backend engineer, go developer
@@ -517,6 +523,8 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		return runJobReview(s, rest, out)
 	case "check":
 		return runJobCheck(s, rest, out)
+	case "run":
+		return runJobRun(s, rest, out)
 	case "rm":
 		if len(rest) == 0 {
 			return errors.New("usage: job rm <id>")

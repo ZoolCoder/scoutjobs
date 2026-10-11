@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
@@ -140,7 +141,10 @@ func mcpDenied(args []string) bool {
 	case "serve", "mcp", "update":
 		return true
 	case "gmail":
-		return len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
+		// an unattended job run gets no Google access at all
+		return os.Getenv("SCOUTJOBS_RUNNER") != "" || len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
+	case "job":
+		return len(args) > 1 && args[1] == "run"
 	case "email":
 		return len(args) > 1 && (args[1] == "send" || args[1] == "test")
 	}

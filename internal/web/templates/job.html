@@ -24,8 +24,23 @@
 <div class="grid-3">
 <div class="stack span-2">
 {{if eq $tab "overview"}}
+{{with .RunP}}<section class="panel" id="run"{{if .Active}} data-run="/jobs/{{$j.ID}}/run"{{end}}>
+  <div class="panel-h"><h2>Prepare application</h2>{{with .Run}}<span class="badge {{.State}}">{{.State}}</span>{{if .Agent}}<span class="n">{{.Agent}}</span>{{end}}{{end}}<span class="act muted">nothing is sent</span></div>
+  {{with $.Data.RunErr}}<p class="callout bad">{{.}}</p>{{end}}
+  {{with .Run}}<ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}</div></li>{{end}}</ol>
+  {{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
+  {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
+{{end}}</pre></details>{{end}}{{end}}
+  {{if .Active}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run/cancel"><button class="mini" type="submit">Cancel run</button></form>
+  {{else if .Agents}}<form class="runform" method="post" action="/jobs/{{$j.ID}}/run">
+    <div class="runpick">{{$fin := .Finished}}{{range .Steps}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}{{with index $fin .Name}} <span class="muted">· done</span>{{end}}</label>{{end}}</div>
+    <div class="runbar"><label>Agent <select name="agent">{{range .Agents}}<option value="{{.}}">{{.}}</option>{{end}}</select></label><label class="check"><input type="checkbox" name="force" value="1"> Redo finished steps</label><button class="primary" type="submit">Prepare application</button></div>
+    <small class="muted">Your agent writes the fit review, resume and cover letter from profile.md, reviews them, then ScoutJobs exports the PDF, runs the quality gates and saves an e-mail draft. Finished steps are skipped; a failed step stops the run with the reason. Nothing is sent: you review and send.</small>
+  </form>
+  {{else}}<p class="callout">No agent CLI found on this machine. Install <a href="https://docs.anthropic.com/en/docs/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or <a href="https://github.com/openai/codex" rel="noopener noreferrer" target="_blank">Codex</a>, or set <code>agent_command</code> in config.yaml to any agent that reads a prompt on stdin, then reload.</p>{{end}}
+</section>{{end}}
 <section class="panel">
-  <div class="panel-h"><h2>Get selected</h2><span class="n">{{.KitDone}}/4</span><span class="act muted">run in your agent</span></div>
+  <div class="panel-h"><h2>Get selected</h2><span class="n">{{.KitDone}}/4</span><span class="act muted">or step by step in your agent</span></div>
   <ol class="kit">
     <li><span class="badge {{if .Resume}}done{{else}}todo{{end}}">{{if .Resume}}done{{else}}todo{{end}}</span><div><b>Tailor CV to this job</b><small>Rewrites <code>resume.md</code> against the posting. Every claim stays traceable to <code>profile.md</code>.</small></div><code class="cmd">/scoutjobs:apply {{$j.ID}}</code></li>
     <li><span class="badge {{if .Cover}}done{{else}}todo{{end}}">{{if .Cover}}done{{else}}todo{{end}}</span><div><b>Cover letter for this role</b><small>Written to the posting and your stories, reviewed by <code>draft-reviewer</code>. Rewrite any time.</small></div><code class="cmd">/scoutjobs:cover {{$j.ID}}</code></li>

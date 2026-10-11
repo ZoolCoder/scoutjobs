@@ -295,6 +295,10 @@ table.log tr.sep td{padding:14px 0 6px;font-size:11px;font-weight:600;text-trans
 .move details[open] form.inline{position:absolute;left:0;top:34px;z-index:5;background:var(--surface);border:1px solid var(--line2);border-radius:10px;padding:8px;box-shadow:var(--pop-shadow)}
 .jobcard .move details[open] form.inline{left:auto;right:0}
 /* job detail: get-selected kit */
+ol.runsteps{list-style:none;margin:0 0 10px;padding:0}ol.runsteps>li{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:6px 0;border-top:1px solid var(--line)}ol.runsteps>li:first-child{border-top:0}ol.runsteps>li>.badge{min-width:58px;text-align:center}
+ol.runsteps b{font-weight:600;font-size:13px}ol.runsteps small{display:block;color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}.badge.running{background:var(--acc-sub);color:var(--acc);border-color:transparent}
+details.runlog{margin:0 0 10px}details.runlog summary{cursor:pointer;font-size:12.5px;color:var(--muted)}details.runlog pre{max-height:260px;overflow:auto;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0 0}
+form.runform{display:flex;flex-direction:column;gap:10px}.runpick{display:flex;flex-wrap:wrap;gap:6px 16px}.runbar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}.runbar label,.runpick label{display:flex;align-items:center;gap:6px;font-size:13px}.runform input[type=checkbox]{width:16px;height:16px;padding:0;accent-color:var(--acc)}
 ol.kit{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 ol.kit li{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;padding:12px 0;border-top:1px solid var(--line)}
 ol.kit li:first-child{border-top:0;padding-top:4px}
