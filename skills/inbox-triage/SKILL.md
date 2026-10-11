@@ -49,6 +49,16 @@ Times in mails are in the sender's timezone when they say so. Convert to the use
 
 Show the table: date, from, job, kind, the one-line evidence (quoted from the mail, under 20 words), and the exact command. Ask in a full sentence whether to apply all, some, or none. Run only the confirmed commands. Status changes the CLI refuses (an illegal transition) are reported, not forced.
 
+Record every confirmed thread on its job, so the dashboard shows it on the job's Mail tab, in the Inbox and on the Today list:
+
+```bash
+scoutjobs email log <id> --from <address> --subject "<subject>" --snippet "<one line>" \
+  --date <YYYY-MM-DD or RFC3339> --thread <gmail thread id> --message-id <connector message id> \
+  --kind rejected|interview|offer|request|ack [--status <new status>]
+```
+
+`--message-id` dedupes repeat runs; pass the connector's id. `--status` replaces a separate `job set --status` for that thread. The snippet is one or two lines, never the whole body.
+
 After applying, suggest the next skill: `interview-prep` for an invitation, `application-tracker` for a rejection streak, `calendar-sync` to put new interviews in Google Calendar.
 
 ## 5. Drafting replies
