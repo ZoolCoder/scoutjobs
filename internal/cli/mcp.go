@@ -94,10 +94,16 @@ var mcpTools = []mcpTool{
 	{"interview_list", "Interviews, upcoming unless all=true.", []string{"interview", "list"}, []mcpProp{p("all", "boolean", "include past", "all")}, true},
 	{"interview_add", "Schedule an interview; an earlier-stage job moves to interview.", []string{"interview", "add"}, []mcpProp{jobRef,
 		req("stage", "string", "screen|technical|system_design|behavioral|case|onsite|final|other", "stage"), p("at", "string", "YYYY-MM-DD or YYYY-MM-DDTHH:MM", "at"),
-		p("format", "string", "phone|video|onsite", "format"), p("interviewer", "string", "", "interviewer")}, false},
+		p("format", "string", "phone|video|onsite", "format"), p("interviewer", "string", "", "interviewer"),
+		p("duration", "integer", "minutes, default 60", "duration"), p("location", "string", "meeting link or address", "location")}, false},
 	{"interview_set", "Update an interview: outcome, feedback, prep status, time.", []string{"interview", "set"}, []mcpProp{req("id", "integer", "interview id", ""),
 		p("at", "string", "", "at"), p("format", "string", "", "format"), p("interviewer", "string", "", "interviewer"), p("prep_status", "string", "todo|in_progress|ready", "prep-status"),
-		p("outcome", "string", "passed|failed|pending|cancelled", "outcome"), p("feedback", "string", "", "feedback"), p("stage", "string", "", "stage")}, false},
+		p("outcome", "string", "passed|failed|pending|cancelled", "outcome"), p("feedback", "string", "", "feedback"), p("stage", "string", "", "stage"),
+		p("duration", "integer", "minutes", "duration"), p("location", "string", "meeting link or address", "location")}, false},
+	{"contacts", "Referral finder: people in the user's imported LinkedIn network who work at the job's company (or at company).", []string{"contacts"}, []mcpProp{
+		p("job", "string", "job id, or company/title", ""), p("company", "string", "company name instead of a job", "company")}, true},
+	{"linkedin_import", "Import a LinkedIn data export (zip or unpacked folder on this machine): profile to linkedin/profile.md, connections for the referral finder.", []string{"linkedin", "import"}, []mcpProp{
+		req("path", "string", "path to the export zip or folder", "")}, true},
 	{"session_log", "Log a practice session.", []string{"session", "log"}, []mcpProp{req("kind", "string", "mock_behavioral|mock_sysdesign|mock_coding|drill|study|review", "kind"),
 		p("topic", "string", "", "topic"), p("score", "integer", "0-100 if graded", "score"), p("notes", "string", "", "notes")}, false},
 	{"session_list", "Practice sessions, newest first.", []string{"session", "list"}, []mcpProp{p("limit", "integer", "", "limit")}, true},
@@ -107,7 +113,7 @@ var mcpTools = []mcpTool{
 	{"learn_set", "Update a learning item; hours are added.", []string{"learn", "set"}, []mcpProp{req("id", "integer", "learning item id", ""),
 		p("status", "string", "planned|in_progress|done", "status"), p("hours", "number", "hours to add", "hours"), p("resource", "string", "", "resource"),
 		p("notes", "string", "", "notes"), p("priority", "integer", "", "priority"), p("demand", "integer", "", "demand")}, false},
-	{"run", "Run any scoutjobs CLI command by its arguments, e.g. [\"job\",\"list\",\"--json\"]. Refused: email send, email test, serve, mcp.", []string{}, []mcpProp{
+	{"run", "Run any scoutjobs CLI command by its arguments, e.g. [\"job\",\"list\",\"--json\"]. Refused: email send, email test, serve, mcp, update.", []string{}, []mcpProp{
 		req("args", "array", "command line arguments without the program name", "")}, false},
 }
 
@@ -117,7 +123,7 @@ func mcpDenied(args []string) bool {
 		return false
 	}
 	switch args[0] {
-	case "serve", "mcp":
+	case "serve", "mcp", "update":
 		return true
 	case "email":
 		return len(args) > 1 && (args[1] == "send" || args[1] == "test")

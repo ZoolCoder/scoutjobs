@@ -1,0 +1,124 @@
+{{template "head" .}}
+{{with .Data}}{{$v := .}}
+<div class="calbar">
+  <a class="btn primary" href="/calendar?view={{.View}}&amp;d={{.D}}&amp;new={{.D}}"><span class="plus" aria-hidden="true">+</span>Create</a>
+  <a class="btn" href="/calendar?view={{.View}}&amp;d={{.Today}}">Today</a>
+  <span class="navs"><a class="btn icon" href="/calendar?view={{.View}}&amp;d={{.Prev}}" aria-label="previous">‹</a><a class="btn icon" href="/calendar?view={{.View}}&amp;d={{.Next}}" aria-label="next">›</a></span>
+  <h2>{{.Title}}</h2>
+  <div class="seg" role="group" aria-label="view">{{range $o := (split "day,week,month,schedule")}}<a href="/calendar?view={{$o}}&amp;d={{$v.D}}" {{if eq $o $v.View}}class="on" aria-current="true"{{end}}>{{title $o}}</a>{{end}}</div>
+</div>
+<div class="calwrap">
+<section class="panel calmain">
+{{if or (eq .View "week") (eq .View "day")}}
+<div class="tg cols-{{len .Days}}">
+  <div class="tg-head"><span></span>{{range .Days}}<a href="/calendar?view=day&amp;d={{.Date}}" class="dh{{if .Today}} today{{end}}"><small>{{.Label}}</small><b>{{.Dom}}</b></a>{{end}}</div>
+  <div class="tg-all"><span class="muted">all day</span>{{range .Days}}<div>{{range .AllDay}}<a class="ev {{.Class}}{{if .Done}} done{{end}}" href="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;ev={{.Key}}" title="{{.Title}}">{{.Title}}</a>{{end}}</div>{{end}}</div>
+  <div class="tg-body">
+    <div class="hours rows-{{.Rows}}">{{range .Hours}}<span>{{.}}</span>{{end}}</div>
+    {{range $d := .Days}}<div class="daycol rows-{{$v.Rows}} lanes-{{.Lanes}}{{if .Today}} today{{end}}">
+      {{range $v.Slots}}<a class="slot r-{{.Row}}" href="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;new={{$d.Date}}T{{.Time}}" aria-label="create at {{.Time}} on {{$d.Date}}"></a>{{end}}
+      {{range .Timed}}<a class="ev {{.Class}} r-{{.Row}} s-{{.Span}} lane-{{.Lane}}{{if .Done}} done{{end}}{{if .Cancelled}} cancelled{{end}}" title="{{.Title}}, {{.Start}} – {{.End}}" href="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;ev={{.Key}}"><b>{{.Title}}</b><small>{{.Start}} – {{.End}}</small></a>{{end}}
+      {{if .NowRow}}<i class="nowline r-{{.NowRow}}"></i>{{end}}
+    </div>{{end}}
+  </div>
+</div>
+{{else if eq .View "month"}}
+<div class="month">
+  <div class="mh">{{range $o := (split "Mon,Tue,Wed,Thu,Fri,Sat,Sun")}}<span>{{$o}}</span>{{end}}</div>
+  {{range .Weeks}}<div class="mw">{{range .}}<div class="mc{{if .Other}} other{{end}}{{if .Today}} today{{end}}">
+    <div class="mc-h"><a class="dom" href="/calendar?view=day&amp;d={{.Date}}">{{.Dom}}</a><a class="add" href="/calendar?view=month&amp;d={{$v.D}}&amp;new={{.Date}}" aria-label="create on {{.Date}}">+</a></div>
+    {{range .Shown}}<a class="chipev {{.Class}}{{if .Done}} done{{end}}{{if .Cancelled}} cancelled{{end}}" href="/calendar?view=month&amp;d={{$v.D}}&amp;ev={{.Key}}" title="{{.Title}}">{{if .Start}}<i></i><em>{{.Start}}</em>{{end}}{{.Title}}</a>{{end}}
+    {{if .More}}<a class="moreev" href="/calendar?view=day&amp;d={{.Date}}">{{.More}} more</a>{{end}}
+  </div>{{end}}</div>{{end}}
+</div>
+{{else}}
+{{if .Agenda}}<ol class="agenda">{{range .Agenda}}<li{{if .Today}} class="today"{{end}}>
+  <a class="ad" href="/calendar?view=day&amp;d={{.Date}}"><b>{{.Dom}}</b><small>{{.Label}} · {{mon .Date}}</small></a>
+  <ul>{{range .AllDay}}<li><a href="/calendar?view=schedule&amp;d={{$v.D}}&amp;ev={{.Key}}" class="{{if .Done}}done{{end}}"><i class="dot {{.Class}}"></i><span class="t">All day</span><span>{{.Title}}<small>{{.Sub}}</small></span></a></li>{{end}}
+  {{range .Timed}}<li><a href="/calendar?view=schedule&amp;d={{$v.D}}&amp;ev={{.Key}}" class="{{if .Done}}done{{end}}{{if .Cancelled}} cancelled{{end}}"><i class="dot {{.Class}}"></i><span class="t">{{.Start}} – {{.End}}</span><span>{{.Title}}<small>{{.Sub}}</small></span></a></li>{{end}}</ul>
+</li>{{end}}</ol>
+{{else}}<p class="empty">Nothing in the next eight weeks. <a href="/calendar?view=schedule&amp;d={{.D}}&amp;new={{.D}}">Schedule an interview</a></p>{{end}}
+{{end}}
+</section>
+
+<aside class="stack calside">
+{{with .Detail}}{{$e := .Event}}
+<section class="panel evcard {{$e.Class}}">
+  <div class="panel-h"><h2>{{title $e.Kind}}</h2><a class="act" href="/calendar?view={{$v.View}}&amp;d={{$v.D}}" aria-label="close">✕</a></div>
+  <h3>{{$e.Title}}</h3>
+  <p class="muted">{{.When}}</p>
+  <dl class="facts">
+    <dt>Job</dt><dd><a href="/jobs/{{.Job.ID}}">{{.Job.Company}}</a><br><small class="muted">{{.Job.Title}}</small></dd>
+    {{with .Interview}}{{if .Format}}<dt>Format</dt><dd>{{.Format}}</dd>{{end}}{{if .Location}}<dt>Where</dt><dd class="pre">{{.Location}}</dd>{{end}}{{if .Interviewer}}<dt>With</dt><dd>{{.Interviewer}}</dd>{{end}}
+    <dt>Prep</dt><dd><span class="badge {{.PrepStatus}}">{{title .PrepStatus}}</span></dd>{{if .Outcome}}<dt>Outcome</dt><dd><span class="badge {{.Outcome}}">{{.Outcome}}</span></dd>{{end}}{{end}}
+  </dl>
+  <div class="evacts">
+    <a class="btn primary" href="{{.Google}}" target="_blank" rel="noopener noreferrer">{{template "ico-calendar"}}Add to Google Calendar</a>
+    <a class="btn" href="{{.ICS}}">Download .ics</a>
+  </div>
+  {{with .Interview}}
+  <h3 class="sec">Reschedule</h3>
+  <form class="fields" method="post" action="/interviews/{{.ID}}">
+    <input type="hidden" name="back" value="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;ev={{$e.Key}}">
+    <label>Date<input type="date" name="date" value="{{$e.Date}}" required></label>
+    <label>Time<input type="time" name="time" value="{{$e.Start}}"></label>
+    <label>Length<select name="duration">{{$d := printf "%d" .Duration}}{{range $v.Mins}}<option value="{{.}}" {{if eq . $d}}selected{{end}}>{{.}} min</option>{{end}}</select></label>
+    <label>Where<input name="location" value="{{.Location}}" placeholder="Meet link, address"></label>
+    <div class="row span-2"><button class="primary">Save</button><span class="muted">Re-add it to Google Calendar after moving it.</span></div>
+  </form>
+  <h3 class="sec">Prep and outcome</h3>
+  <form class="inline wide" method="post" action="/interviews/{{.ID}}"><input type="hidden" name="back" value="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;ev={{$e.Key}}">
+    <select name="prep_status" class="prep {{.PrepStatus}}">{{$p := .PrepStatus}}{{range $o := (split "todo,in_progress,ready")}}<option value="{{$o}}" {{if eq $o $p}}selected{{end}}>{{title $o}}</option>{{end}}</select><button class="mini">Save</button></form>
+  <form class="fields" method="post" action="/interviews/{{.ID}}"><input type="hidden" name="back" value="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;ev={{$e.Key}}">
+    <label class="span-2">Outcome<select name="outcome"><option value="">—</option>{{$oc := .Outcome}}{{range $o := (split "passed,failed,pending,cancelled")}}<option value="{{$o}}" {{if eq $o $oc}}selected{{end}}>{{title $o}}</option>{{end}}</select></label>
+    <label class="span-2">What you learned<textarea name="feedback" rows="3">{{.Feedback}}</textarea></label>
+    <div class="row span-2"><button class="primary">Save</button></div>
+  </form>
+  <p class="small muted">Run <code class="cmd">/scoutjobs:interview {{.JobID}}</code> in your agent to build the prep pack.</p>
+  {{end}}
+</section>
+{{end}}
+
+{{with .New}}
+<section class="panel">
+  <div class="panel-h"><h2>New interview</h2><a class="act" href="/calendar?view={{$v.View}}&amp;d={{$v.D}}" aria-label="close">✕</a></div>
+  {{if $v.Jobs}}
+  <form class="fields" method="post" action="/interviews">
+    <label class="span-2">Job<select name="job" required>{{range $v.Jobs}}<option value="{{.ID}}">{{.Company}} · {{.Title}}</option>{{end}}</select></label>
+    <label>Date<input type="date" name="date" value="{{.Date}}" required></label>
+    <label>Time<input type="time" name="time" value="{{.Time}}"></label>
+    <label>Stage<select name="stage">{{range $v.Stages}}<option value="{{.}}">{{title .}}</option>{{end}}</select></label>
+    <label>Length<select name="duration">{{range $v.Mins}}<option value="{{.}}" {{if eq . "60"}}selected{{end}}>{{.}} min</option>{{end}}</select></label>
+    <label>Format<select name="format">{{range $v.Formats}}<option value="{{.}}">{{title .}}</option>{{end}}</select></label>
+    <label>With<input name="interviewer" placeholder="Name, role"></label>
+    <label class="span-2">Where<input name="location" placeholder="Meet link, phone number or address"></label>
+    <div class="row span-2"><button class="primary">Save</button><span class="muted">Leave time empty for an all-day entry.</span></div>
+  </form>
+  {{else}}<p class="empty">No open jobs to schedule against. <a href="/jobs/new">Add a job</a> first.</p>{{end}}
+</section>
+{{end}}
+
+<section class="panel">
+  <div class="panel-h"><h2>Calendars</h2></div>
+  <ul class="legend">
+    <li><i class="dot c-screen"></i>Screens</li><li><i class="dot c-tech"></i>Technical</li><li><i class="dot c-behav"></i>Behavioral</li><li><i class="dot c-final"></i>Onsite and final</li>
+    <li><i class="dot c-deadline"></i>Deadlines<span class="n">{{index .Counts "deadline"}}</span></li><li><i class="dot c-follow"></i>Follow-ups<span class="n">{{index .Counts "followup"}}</span></li>
+  </ul>
+  <p class="small muted">{{index .Counts "interview"}} interviews ahead.</p>
+</section>
+
+<section class="panel">
+  <div class="panel-h"><h2>Google Calendar</h2></div>
+  <ol class="steps">
+    <li><b>One event</b><small>Open it here and press <em>Add to Google Calendar</em>. Google shows the event filled in; nothing is saved until you click Save there.</small></li>
+    <li><b>Everything at once</b><small><a href="{{.FeedDownload}}">Download scoutjobs.ics</a>, then in Google Calendar: Settings › Import &amp; export › Import.</small></li>
+    <li><b>Stay in sync</b><small>Subscribe to the feed below with Settings › Add calendar › From URL. Google fetches it from its own servers, so the address must be public: run <code>serve</code> behind a tunnel. Apple Calendar and Outlook on this machine can subscribe to it as it is.</small></li>
+    <li><b>Through your agent</b><small>With the Google Calendar connector, the <code>calendar-sync</code> skill creates and updates the events for you.</small></li>
+  </ol>
+  <label class="feed">Feed<input readonly value="{{.FeedURL}}" aria-label="calendar feed URL"></label>
+  <p class="small muted">{{.FeedNote}}</p>
+</section>
+</aside>
+</div>
+{{end}}
+{{template "foot" .}}

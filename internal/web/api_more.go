@@ -82,13 +82,15 @@ func (v *server) apiPatchInterview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p struct {
-		At, Format, Interviewer, PrepStatus, Outcome, Feedback, Stage *string
+		At, Format, Interviewer, PrepStatus, Outcome, Feedback, Stage, Location *string
+		Duration                                                                *int64
 	}
 	if err := decodeJSON(w, r, &p); err != nil {
 		apiErr(w, 400, err)
 		return
 	}
-	patch := store.InterviewPatch{At: p.At, Format: p.Format, Interviewer: p.Interviewer, PrepStatus: p.PrepStatus, Outcome: p.Outcome, Feedback: p.Feedback, Stage: p.Stage}
+	patch := store.InterviewPatch{At: p.At, Format: p.Format, Interviewer: p.Interviewer, PrepStatus: p.PrepStatus, Outcome: p.Outcome, Feedback: p.Feedback, Stage: p.Stage,
+		Location: p.Location, Duration: p.Duration}
 	if err := v.s.UpdateInterview(id, patch); err != nil {
 		apiErr(w, 400, err)
 		return
@@ -101,6 +103,29 @@ func (v *server) apiPatchInterview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	apiErr(w, 404, fmt.Errorf("interview %d not found", id))
+}
+
+// apiContacts is the referral finder: people in the imported LinkedIn network at the job's company.
+func (v *server) apiContacts(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		apiErr(w, 400, err)
+		return
+	}
+	j, err := v.s.JobByID(id)
+	if err != nil {
+		apiErr(w, 404, fmt.Errorf("job %d not found", id))
+		return
+	}
+	list, err := v.s.ContactsAt(j.Company)
+	if err != nil {
+		apiErr(w, 500, err)
+		return
+	}
+	if list == nil {
+		list = []store.Contact{}
+	}
+	writeJSON(w, 200, map[string]any{"company": j.Company, "contacts": list})
 }
 
 // ---- sessions ----

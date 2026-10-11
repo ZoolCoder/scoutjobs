@@ -3,6 +3,7 @@
 package web
 
 import (
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -40,6 +41,7 @@ type Config struct {
 	Currency                                   string            // default on the add-job form
 	SearchBaseURL                              map[string]string // test override per search source
 	Version                                    string            // shown in the footer next to the release link
+	MCP                                        http.Handler      // MCP over HTTP, mounted on /mcp when api_token is set
 }
 
 func day(s string) string {
@@ -174,7 +176,11 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/note", srv.addNote)
 	mux.HandleFunc("POST /jobs/{id}/export", srv.exportPDF)
 	mux.HandleFunc("GET /interviews", srv.interviews)
+	mux.HandleFunc("POST /interviews", srv.createInterview)
 	mux.HandleFunc("POST /interviews/{id}", srv.setInterview)
+	mux.HandleFunc("GET /calendar", srv.calendar)
+	mux.HandleFunc("GET /calendar.ics", srv.calendarFeed)
+	mux.HandleFunc("GET /calendar/event/{key}", srv.calendarEvent)
 	mux.HandleFunc("GET /learning", srv.learning)
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
@@ -196,6 +202,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("GET /api/brief", srv.apiBrief)
 	api.HandleFunc("GET /api/events", srv.apiEvents)
 	api.HandleFunc("GET /api/jobs/{id}/check", srv.apiCheck)
+	api.HandleFunc("GET /api/jobs/{id}/contacts", srv.apiContacts)
 	api.HandleFunc("GET /api/jobs/{id}/files", srv.apiFiles)
 	api.HandleFunc("GET /api/jobs/{id}/files/{name}", srv.apiReadFile)
 	api.HandleFunc("PUT /api/jobs/{id}/files/{name}", srv.apiWriteFile)
@@ -220,6 +227,9 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("POST /api/decisions", srv.apiAddDecision)
 	api.HandleFunc("POST /api/search", srv.apiSearch)
 	mux.Handle("/api/", srv.auth(api))
+	if cfg.MCP != nil {
+		mux.Handle("/mcp", srv.mcpAuth(cfg.MCP))
+	}
 	return noStore(mux), nil
 }
 
@@ -262,6 +272,7 @@ var subtitles = map[string]string{
 	"overview":    "Your job search, at a glance.",
 	"pipeline":    "Every opportunity, from discovery to outcome.",
 	"interviews":  "Prepare for what is coming, learn from what passed.",
+	"calendar":    "Interviews, deadlines and follow-ups. Subscribe from Google Calendar or add one event at a time.",
 	"learning":    "Close the gaps your target roles keep asking for.",
 	"preferences": "What ScoutJobs learned from your decisions, and why.",
 	"profile":     "The source of truth behind every CV claim.",
@@ -465,9 +476,10 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		files = append(files, f.Name)
 		hasMD = hasMD || f.Name == "resume.md"
 	}
+	contacts, _ := v.s.ContactsAt(j.Company)
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
-		"Gates": gates, "Review": review, "HasReview": reviewErr == nil})
+		"Gates": gates, "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount()})
 }
 
 func (v *server) jobFile(w http.ResponseWriter, r *http.Request) {
@@ -657,6 +669,21 @@ func (v *server) setInterview(w http.ResponseWriter, r *http.Request) {
 	if s := r.FormValue("feedback"); s != "" {
 		p.Feedback = &s
 	}
+	if r.FormValue("date") != "" {
+		at, err := formAt(r)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		p.At = &at
+	}
+	if _, ok := r.Form["location"]; ok {
+		loc := strings.TrimSpace(r.FormValue("location"))
+		p.Location = &loc
+	}
+	if d, err := strconv.ParseInt(r.FormValue("duration"), 10, 64); err == nil && d > 0 {
+		p.Duration = &d
+	}
 	if err := v.s.UpdateInterview(id, p); err != nil {
 		fail(w, err)
 		return
@@ -771,6 +798,32 @@ func (v *server) auth(h http.Handler) http.Handler {
 		if v.cfg.APIToken != "" && r.Header.Get("Authorization") != "Bearer "+v.cfg.APIToken {
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			writeJSON(w, 401, map[string]string{"error": "set Authorization: Bearer <api_token from config.yaml>"})
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+// mcpAuth guards /mcp harder than /api: a tunnel delivers remote callers from loopback, so the endpoint
+// exists only with api_token set. Connectors that cannot send headers pass the token as ?token=.
+// Browsers are kept out by the Origin check, which stops a web page from driving the tools.
+func (v *server) mcpAuth(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v.cfg.APIToken == "" {
+			writeJSON(w, 403, map[string]string{"error": "set api_token in config.yaml to enable /mcp"})
+			return
+		}
+		tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if tok == "" || tok == r.Header.Get("Authorization") {
+			tok = r.URL.Query().Get("token")
+		}
+		if subtle.ConstantTimeCompare([]byte(tok), []byte(v.cfg.APIToken)) != 1 {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			writeJSON(w, 401, map[string]string{"error": "set Authorization: Bearer <api_token> or ?token=<api_token>"})
+			return
+		}
+		if o := r.Header.Get("Origin"); o != "" && o != "http://"+r.Host && o != "https://"+r.Host {
+			writeJSON(w, 403, map[string]string{"error": "cross-origin requests are refused"})
 			return
 		}
 		h.ServeHTTP(w, r)
