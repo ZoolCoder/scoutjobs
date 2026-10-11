@@ -15,6 +15,7 @@
   <nav>
     <a href="/" {{if eq .Active "overview"}}class="on" aria-current="page"{{end}}>{{template "ico-grid"}}Overview</a>
     <a href="/pipeline" {{if eq .Active "pipeline"}}class="on" aria-current="page"{{end}}>{{template "ico-columns"}}Pipeline</a>
+    <a href="/inbox" {{if eq .Active "inbox"}}class="on" aria-current="page"{{end}}>{{template "ico-inbox"}}Inbox</a>
     <a href="/search" {{if eq .Active "search"}}class="on" aria-current="page"{{end}}>{{template "ico-search"}}Search</a>
     <a href="/interviews" {{if eq .Active "interviews"}}class="on" aria-current="page"{{end}}>{{template "ico-clock"}}Interviews</a>
     <a href="/calendar" {{if eq .Active "calendar"}}class="on" aria-current="page"{{end}}>{{template "ico-calendar"}}Calendar</a>

@@ -1,26 +1,71 @@
 {{template "head" .}}
-{{with .Data}}
-<form class="search" method="get" action="/pipeline"><input name="q" value="{{.Query}}" placeholder="Search company, title, tags">{{if .Due}}<input type="hidden" name="due" value="1">{{end}}<button>Filter</button>
-<span class="chips">{{if .Due}}<a class="on" href="/pipeline{{if .Query}}?q={{.Query}}{{end}}">Due this week ×</a>{{else}}<a href="/pipeline?due=1{{if .Query}}&amp;q={{.Query}}{{end}}">Due this week</a>{{end}}</span>
-<span class="muted">{{.Count}} jobs{{if or .Query .Due}} · <a href="/pipeline">clear</a>{{end}}</span><a class="btn primary" href="/jobs/new">Add job</a></form>
-<p class="muted dnd-hint">Drag a card onto a stage, or use the buttons on the card.</p>
+{{with .Data}}{{$f := .F}}{{$sel := 0}}{{with .Sel}}{{$sel = .Job.ID}}{{end}}
+<div class="pipe{{if $f.Full}} full{{end}}{{if $f.Dense}} dense{{end}}" data-url="{{$.Path}}">
+<form class="toolbar" method="get" action="/pipeline">
+  <label class="tsearch">{{template "ico-search"}}<input name="q" value="{{$f.Q}}" placeholder="Search jobs  ( / )" aria-label="Search company, title, tags"></label>
+  {{if $f.Due}}<input type="hidden" name="due" value="1">{{end}}{{if $f.Remote}}<input type="hidden" name="remote" value="1">{{end}}{{if $f.Fit}}<input type="hidden" name="fit" value="{{$f.Fit}}">{{end}}{{if eq $f.View "list"}}<input type="hidden" name="view" value="list">{{end}}{{if $f.Full}}<input type="hidden" name="full" value="1">{{end}}{{if $f.Dense}}<input type="hidden" name="dense" value="1">{{end}}{{if $f.Closed}}<input type="hidden" name="closed" value="1">{{end}}
+  <span class="chips">
+    {{if $f.Due}}<a class="on" href="{{$f.DueURL}}">Due this week ×</a>{{else}}<a href="{{$f.DueURL}}">Due this week</a>{{end}}
+    <a {{if $f.Fit}}class="on" {{end}}href="{{$f.FitURL}}">Fit 70+{{if $f.Fit}} ×{{end}}</a>
+    <a {{if $f.Remote}}class="on" {{end}}href="{{$f.RemoteURL}}">Remote{{if $f.Remote}} ×{{end}}</a>
+    {{if ne $f.View "list"}}<a {{if $f.Closed}}class="on" {{end}}href="{{$f.ClosedURL}}">Closed stages{{if $f.Closed}} ×{{end}}</a>{{end}}
+  </span>
+  <select name="src" aria-label="source" class="auto"><option value="">All sources</option>{{range .Sources}}<option value="{{.}}" {{if eq . $f.Src}}selected{{end}}>{{.}}</option>{{end}}</select>
+  <select name="sort" aria-label="sort" class="auto">{{range .Sorts}}<option value="{{.}}" {{if eq . $f.Sort}}selected{{end}}>Sort: {{.}}</option>{{end}}</select>
+  <button class="mini apply">Apply</button>
+  <span class="muted">{{.Count}} jobs{{if $f.Active}} · <a href="/pipeline">clear</a>{{end}}</span>
+  <span class="seg"><a {{if eq $f.View "board"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "board"}}">Board</a><a {{if eq $f.View "list"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "list"}}">List</a></span>
+  <a class="btn icon{{if $f.Dense}} on{{end}}" href="{{$f.DenseURL}}" title="{{if $f.Dense}}Comfortable cards{{else}}Compact cards{{end}}" aria-label="Compact cards" aria-pressed="{{if $f.Dense}}true{{else}}false{{end}}">{{template "ico-rows"}}</a>
+  <a class="btn icon{{if $f.Full}} on{{end}}" href="{{$f.FullURL}}" data-full title="{{if $f.Full}}Exit full screen{{else}}Full screen{{end}} ( f )" aria-label="Full screen" aria-pressed="{{if $f.Full}}true{{else}}false{{end}}">{{if $f.Full}}{{template "ico-shrink"}}{{else}}{{template "ico-expand"}}{{end}}</a>
+  <a class="btn primary" href="/jobs/new">Add job</a>
+</form>
+<div class="pipe-body">
+<div class="pipe-main">
+{{if eq $f.View "list"}}
+<div class="panel tight listview"><table class="issues">
+  <thead><tr><th>Key</th><th>Job</th><th>Status</th><th>Fit</th><th>Due</th><th>Updated</th><th></th></tr></thead>
+  <tbody>{{range .Jobs}}<tr class="{{if eq .ID $sel}}sel{{end}}">
+    <td class="mono key"><a href="{{$f.JobURL .ID}}" data-issue>SJ-{{.ID}}</a></td>
+    <td><a class="row-job" href="{{$f.JobURL .ID}}" data-issue><span class="av h{{hue .Company}}">{{initial .Company}}</span><span><b>{{.Company}}</b><small>{{.Title}}</small></span></a></td>
+    <td><span class="badge {{.Status}}">{{title .Status}}</span></td>
+    <td>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else}}{{template "gauge" .FitScore}}{{end}}</td>
+    <td class="mono">{{.Deadline}}</td><td class="mono muted">{{day .UpdatedAt}}</td>
+    <td>{{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}</td>
+  </tr>{{else}}<tr><td colspan="7" class="empty">No match here</td></tr>{{end}}</tbody>
+</table>
+{{if gt .Pages 1}}<nav class="pager" aria-label="pages">{{if gt .Page 1}}<a class="btn mini" href="{{$f.PageURL (add .Page -1)}}">← Prev</a>{{end}}<span class="muted">Page {{.Page}} of {{.Pages}}</span>{{if lt .Page .Pages}}<a class="btn mini" href="{{$f.PageURL (add .Page 1)}}">Next →</a>{{end}}</nav>{{end}}
+</div>
+{{else}}
 <div class="board">
 {{range .Columns}}
-<section class="col s-{{.Status}}" data-drop="{{.Status}}">
-  <div class="col-h"><h2>{{title .Status}}</h2><span class="n">{{len .Jobs}}</span></div>
+{{if .Collapsed}}<a class="col strip s-{{.Status}}" data-drop="{{.Status}}" href="{{$f.ClosedURL}}" title="Show closed stages"><span class="n">{{.Total}}</span><b>{{title .Status}}</b></a>
+{{else}}<section class="col s-{{.Status}}" data-drop="{{.Status}}">
+  <div class="col-h"><h2>{{title .Status}}</h2><span class="n">{{.Total}}</span></div>
+  <div class="col-cards">
   {{range .Jobs}}
-  <article class="jobcard" data-id="{{.ID}}" data-status="{{.Status}}" data-company="{{.Company}}">
-    <a class="cover" href="/jobs/{{.ID}}" aria-label="Open {{.Company}} · {{.Title}}"></a>
-    <div class="row"><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
+  <article class="jobcard{{if eq .ID $sel}} sel{{end}}" data-id="{{.ID}}" data-status="{{.Status}}" data-company="{{.Company}}">
+    <a class="cover" href="{{$f.JobURL .ID}}" data-issue aria-label="Open {{.Company}} · {{.Title}}"></a>
     <div class="ttl">{{.Title}}</div>
-    <div class="meta">{{if or .Remote .Location}}<span class="chip">{{template "ico-pin"}}{{.Remote}}{{if and .Remote .Location}} · {{end}}{{.Location}}</span>{{end}}<span class="chip">{{template "ico-clock"}}{{if .Deadline}}due {{.Deadline}}{{else}}updated {{day .UpdatedAt}}{{end}}</span>{{if .Source}}<span class="chip acc">{{.Source}}</span>{{end}}</div>
-    {{template "move" (dict_status .ID .Status "/pipeline")}}
+    <div class="row"><span class="who"><span class="av h{{hue .Company}}" aria-hidden="true">{{initial .Company}}</span><a class="co" href="/jobs/{{.ID}}">{{.Company}}</a></span>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else if ge .FitScore 0}}{{template "gauge" .FitScore}}{{end}}</div>
+    <div class="cardfoot"><span class="key mono">SJ-{{.ID}}</span>
+      {{if .Deadline}}<span class="chip warn" title="deadline">{{template "ico-clock"}}{{.Deadline}}</span>{{end}}
+      {{if eq .Remote "remote"}}<span class="chip" title="{{.Location}}">{{template "ico-pin"}}remote</span>{{end}}
+      {{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}
+      <span class="age muted" title="updated {{day .UpdatedAt}}">{{day .UpdatedAt}}</span></div>
   </article>
-  {{else}}<p class="empty">{{if or $.Data.Query $.Data.Due}}No match here{{else}}No jobs in this stage<small>{{title .Status}} jobs appear here</small>{{end}}</p>{{end}}
-</section>
+  {{else}}<p class="empty">{{if $f.Active}}No match here{{else}}No jobs in this stage<small>{{title .Status}} jobs appear here</small>{{end}}</p>{{end}}
+  {{if .Expanded}}<a class="more" href="{{$f.MoreURL .Status}}">Show first {{colcap}}</a>{{else if gt .Total (len .Jobs)}}<a class="more" href="{{$f.MoreURL .Status}}">Show all {{.Total}}</a>{{end}}
+  </div>
+</section>{{end}}
 {{end}}
 </div>
 {{if .Hidden}}<div class="dropbar" aria-hidden="true"><span class="muted">Drop here to close:</span>{{range .Hidden}}<span class="drop s-{{.}}" data-drop="{{.}}">{{title .}}</span>{{end}}</div>{{end}}
+<p class="muted dnd-hint">Click a card to open it here. Drag it onto a stage to move it. <kbd>/</kbd> search · <kbd>f</kbd> full screen · <kbd>Esc</kbd> close</p>
+{{end}}
+</div>
+{{with .Sel}}{{template "issue" .}}{{end}}
+</div>
+</div>
 <p id="board-live" class="sr-only" aria-live="polite"></p>
 <script src="/board.js" defer></script>
 {{end}}

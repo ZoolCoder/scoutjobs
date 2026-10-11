@@ -1,34 +1,45 @@
 {{template "head" .}}
-{{with .Data}}
+{{with .Data}}{{$oc := .Outcomes}}
 {{with .Upcoming}}{{$i := index . 0}}
 <section class="panel">
-<div class="panel-h"><h2>Next interview</h2></div>
+<div class="panel-h"><h2>Next interview</h2><span class="act"><a href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">In calendar</a></span></div>
 <div class="nextrow">
   <span class="cal lg"><small>{{mon $i.At}}</small><b>{{dom $i.At}}</b></span>
-  <div><h3>{{$i.Company}}<small>{{title $i.Stage}}</small></h3><p class="mono">{{when $i.At}}{{if $i.Format}} · {{$i.Format}}{{end}}{{if $i.Interviewer}} · with {{$i.Interviewer}}{{end}} · prep {{title $i.PrepStatus}}</p></div>
-  <a class="btn primary" href="/jobs/{{$i.JobID}}">Open job →</a>
+  <div><h3>{{$i.Company}}<small>{{title $i.Stage}}</small></h3><p class="mono">{{when $i.At}}{{if $i.Format}} · {{$i.Format}}{{end}}{{if $i.Interviewer}} · with {{$i.Interviewer}}{{end}}</p>
+  <p class="small muted">Prep {{$i.PrepCount}}/6. Run <code class="cmd">/scoutjobs:interview {{$i.JobID}}</code> for the prep pack.</p></div>
+  <a class="btn primary" href="/pipeline?job={{$i.JobID}}">Open job</a>
 </div>
+{{template "prep-check" (prepArgs $i "/interviews")}}
+</section>
+{{end}}
+{{if .NeedsOutcome}}
+<section class="panel">
+<div class="panel-h"><h2>How did it go?</h2><span class="n">{{len .NeedsOutcome}}</span><span class="act muted">past interviews without an outcome</span></div>
+<ul class="outcomes">{{range .NeedsOutcome}}<li>
+  <span class="mono">{{day .At}}</span><a href="/pipeline?job={{.JobID}}"><b>{{.Company}}</b> <small class="muted">{{title .Stage}} · {{.Title}}</small></a>
+  <form method="post" action="/interviews/{{.ID}}" class="seg-btns"><input type="hidden" name="back" value="/interviews">{{range $oc}}<button name="outcome" value="{{.}}" class="mini">{{title .}}</button>{{end}}</form>
+</li>{{end}}</ul>
 </section>
 {{end}}
 <section class="panel">
-<div class="panel-h"><h2>Upcoming</h2><span class="n">{{len .Upcoming}}</span></div>
+<div class="panel-h"><h2>Upcoming</h2><span class="n">{{len .Upcoming}}</span><a class="act" href="/calendar?view=schedule">Calendar</a></div>
 {{if .Upcoming}}
 <table>
 <thead><tr><th>When</th><th>Company</th><th>Stage</th><th>Format</th><th>Interviewer</th><th>Prep</th><th>Outcome</th></tr></thead><tbody>
 {{range .Upcoming}}<tr>
-  <td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td class="muted">{{.Format}}</td><td class="muted">{{.Interviewer}}</td>
-  <td><form method="post" action="/interviews/{{.ID}}" class="inline"><input type="hidden" name="back" value="/interviews"><select name="prep_status" class="prep {{.PrepStatus}}">{{$p := .PrepStatus}}{{range $o := (split "todo,in_progress,ready")}}<option value="{{$o}}" {{if eq $o $p}}selected{{end}}>{{title $o}}</option>{{end}}</select><button class="mini">Save</button></form></td>
-  <td><form method="post" action="/interviews/{{.ID}}" class="inline"><input type="hidden" name="back" value="/interviews"><select name="outcome"><option value="">—</option>{{range $o := (split "passed,failed,pending,cancelled")}}<option value="{{$o}}">{{title $o}}</option>{{end}}</select><button class="mini">Save</button></form></td>
+  <td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/pipeline?job={{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td class="muted">{{.Format}}</td><td class="muted">{{.Interviewer}}</td>
+  <td><details class="prep-pop"><summary><span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span></summary>{{template "prep-check" (prepArgs . "/interviews")}}</details></td>
+  <td><form method="post" action="/interviews/{{.ID}}" class="inline"><input type="hidden" name="back" value="/interviews"><select name="outcome"><option value="">—</option>{{range $o := $oc}}<option value="{{$o}}">{{title $o}}</option>{{end}}</select><button class="mini">Save</button></form></td>
 </tr>{{end}}
 </tbody></table>
-{{else}}<p class="empty">Nothing scheduled. Interviews appear here when you add one to a job: <code>scoutjobs interview add &lt;job&gt; --stage screen --at YYYY-MM-DD</code></p>{{end}}
+{{else}}<p class="empty">Nothing scheduled. <a href="/calendar?view=schedule&amp;new={{today}}">Schedule an interview</a> or run <code>scoutjobs interview add &lt;job&gt; --stage screen --at YYYY-MM-DD</code></p>{{end}}
 </section>
 <section class="panel">
 <div class="panel-h"><h2>Past</h2><span class="n">{{len .Past}}</span></div>
 {{if .Past}}
 <table>
 <thead><tr><th>When</th><th>Company</th><th>Stage</th><th>Outcome</th><th>What you learned</th></tr></thead><tbody>
-{{range .Past}}<tr><td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td><span class="badge {{.Outcome}}">{{if .Outcome}}{{title .Outcome}}{{else}}open{{end}}</span></td>
+{{range .Past}}<tr><td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td><span class="badge {{.Outcome}}">{{title .Outcome}}</span></td>
 <td><form method="post" action="/interviews/{{.ID}}" class="inline wide"><input type="hidden" name="back" value="/interviews"><input name="feedback" value="{{.Feedback}}" placeholder="What did you learn?"><button class="mini primary">Save</button></form></td></tr>{{end}}
 </tbody></table>
 {{else}}<p class="empty">No past interviews yet. Outcomes you set above move here.</p>{{end}}

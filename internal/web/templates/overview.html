@@ -16,7 +16,7 @@
 <section class="next">
   <span class="gauge lg g0"><b>{{title $i.Stage}}</b></span>
   <div><span class="next-k">Next best move</span><h2>Prepare for {{$i.Company}}</h2><p>{{title $i.Stage}} interview · {{when $i.At}} · prep {{title $i.PrepStatus}}</p></div>
-  <a class="btn primary" href="/interviews">Open interviews</a>
+  <a class="btn primary" href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">Open prep</a>
 </section>
 {{else if not .Checks}}
 <section class="next">
@@ -31,6 +31,15 @@
   <a class="btn primary" href="/pipeline">Open pipeline</a>
 </section>
 {{end}}
+
+{{if .Today}}<section class="panel today">
+  <div class="panel-h"><h2>Today</h2><span class="n">{{len .Today}}</span><a class="act" href="/inbox">Inbox</a></div>
+  <ul class="todo">{{range .Today}}<li class="t-{{.Kind}}">
+    <span class="tk">{{.Kind}}</span>
+    <div><a href="{{.Href}}"><b>{{.Title}}</b></a><small class="muted">{{.Detail}}</small></div>
+    <div class="tact">{{range .Links}}<a class="btn mini" href="{{.Href}}"{{if .External}} rel="noopener noreferrer" target="_blank"{{end}}>{{.Label}}</a>{{end}}{{if .Status}}<form method="post" action="/jobs/{{.JobID}}/status"><input type="hidden" name="back" value="/"><button class="mini go" name="status" value="{{.Status}}">{{.StatusL}}</button></form>{{end}}</div>
+  </li>{{end}}</ul>
+</section>{{end}}
 
 <section class="kpis">
   <a class="kpi" href="/pipeline"><span class="ic">{{template "ico-doc"}}</span><span class="lbl">Open jobs</span><b>{{.Stats.Open}}</b><span class="hint">in your pipeline</span></a>

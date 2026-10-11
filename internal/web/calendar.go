@@ -84,7 +84,10 @@ type calDetail struct {
 	Time      string
 }
 
-type calNew struct{ Date, Time string }
+type calNew struct {
+	Date, Time string
+	JobID      int64 // preselected job, from ?job=
+}
 
 type calSlot struct {
 	Row  int
@@ -301,6 +304,7 @@ func (v *server) calendar(w http.ResponseWriter, r *http.Request) {
 		nd, nt, _ := strings.Cut(n, "T")
 		if _, err := time.Parse(dayLayout, nd); err == nil {
 			cv.New = &calNew{Date: nd, Time: nt}
+			cv.New.JobID, _ = strconv.ParseInt(q.Get("job"), 10, 64)
 			cv.Jobs, _ = v.s.ListJobs(store.JobFilter{Open: true})
 		}
 	}

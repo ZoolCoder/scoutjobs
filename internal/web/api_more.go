@@ -82,15 +82,15 @@ func (v *server) apiPatchInterview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p struct {
-		At, Format, Interviewer, PrepStatus, Outcome, Feedback, Stage, Location *string
-		Duration                                                                *int64
+		At, Format, Interviewer, PrepStatus, Outcome, Feedback, Stage, Location, Prep *string
+		Duration                                                                      *int64
 	}
 	if err := decodeJSON(w, r, &p); err != nil {
 		apiErr(w, 400, err)
 		return
 	}
 	patch := store.InterviewPatch{At: p.At, Format: p.Format, Interviewer: p.Interviewer, PrepStatus: p.PrepStatus, Outcome: p.Outcome, Feedback: p.Feedback, Stage: p.Stage,
-		Location: p.Location, Duration: p.Duration}
+		Location: p.Location, Duration: p.Duration, Prep: p.Prep}
 	if err := v.s.UpdateInterview(id, patch); err != nil {
 		apiErr(w, 400, err)
 		return

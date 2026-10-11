@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,58 @@ type searchForm struct {
 	Added           int
 	Errors          []string
 	BoardNames      []string
+	Saved           []store.SavedSearch
+	Name            string // the saved search this form came from or is saved as
+	Filter          resultFilter
+	Hidden          int // postings the result filter dropped
+}
+
+// resultFilter narrows what the boards return; it is stored with a saved search as url-encoded values.
+type resultFilter struct {
+	RemoteOnly bool
+	Exclude    string // comma separated words; a title containing any of them is dropped
+	Days       int    // posted within the last N days; undated postings stay
+	MinSalary  int64  // drops postings whose top of range is below it; postings without a salary stay
+}
+
+func filterFromValues(q url.Values) resultFilter {
+	f := resultFilter{RemoteOnly: q.Get("remote_only") != "", Exclude: strings.TrimSpace(q.Get("exclude"))}
+	f.Days, _ = strconv.Atoi(q.Get("days"))
+	f.MinSalary, _ = strconv.ParseInt(q.Get("min_salary"), 10, 64)
+	return f
+}
+
+func (f resultFilter) encode() string {
+	q := url.Values{}
+	if f.RemoteOnly {
+		q.Set("remote_only", "1")
+	}
+	if f.Exclude != "" {
+		q.Set("exclude", f.Exclude)
+	}
+	if f.Days > 0 {
+		q.Set("days", strconv.Itoa(f.Days))
+	}
+	if f.MinSalary > 0 {
+		q.Set("min_salary", strconv.FormatInt(f.MinSalary, 10))
+	}
+	return q.Encode()
+}
+
+func (f resultFilter) keep(p search.Posting, now time.Time) bool {
+	if f.RemoteOnly && !strings.Contains(strings.ToLower(p.Remote), "remote") {
+		return false
+	}
+	title := strings.ToLower(p.Title)
+	for _, w := range splitList(f.Exclude) {
+		if strings.Contains(title, strings.ToLower(w)) {
+			return false
+		}
+	}
+	if f.Days > 0 && len(p.PostedAt) >= 10 && p.PostedAt[:10] < now.AddDate(0, 0, -f.Days).Format("2006-01-02") {
+		return false
+	}
+	return f.MinSalary <= 0 || p.SalaryMax == 0 || p.SalaryMax >= f.MinSalary
 }
 
 // searchRow is a posting plus the tracked job it already matches, if any.
@@ -108,10 +161,12 @@ func (v *server) searchRows(ps []search.Posting) []searchRow {
 }
 
 func (v *server) searchPage(w http.ResponseWriter, r *http.Request) {
-	v.render(w, r, "search.html", "search", searchForm{
+	f := searchForm{
 		Queries: strings.Join(v.cfg.SearchQueries, ", "), Boards: strings.Join(v.cfg.SearchBoards, ", "),
 		Remote: v.cfg.SearchRemote, Limit: 50, BoardNames: search.Boards,
-	})
+	}
+	f.Saved, _ = v.s.SavedSearches()
+	v.render(w, r, "search.html", "search", f)
 }
 
 // runSearch runs the boards from the form; "add=1" tracks every hit as a new job, otherwise the rows get an Add button each.
@@ -121,7 +176,22 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := searchForm{Queries: strings.TrimSpace(r.FormValue("queries")), Boards: strings.TrimSpace(r.FormValue("boards")),
-		Remote: r.FormValue("remote") != "", Ran: true, BoardNames: search.Boards}
+		Remote: r.FormValue("remote") != "", Ran: true, BoardNames: search.Boards, Filter: filterFromValues(r.Form), Name: strings.TrimSpace(r.FormValue("name"))}
+	if id, err := strconv.ParseInt(r.FormValue("saved"), 10, 64); err == nil {
+		x, err := v.s.SavedSearch(id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		fq, _ := url.ParseQuery(x.Filters)
+		f.Queries, f.Boards, f.Remote, f.Filter, f.Name = x.Queries, x.Boards, x.Remote, filterFromValues(fq), x.Name
+	} else if r.FormValue("save") != "" && f.Name != "" {
+		if _, err := v.s.SaveSearch(store.SavedSearch{Name: f.Name, Queries: f.Queries, Boards: f.Boards, Remote: f.Remote, Filters: f.Filter.encode()}); err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	f.Saved, _ = v.s.SavedSearches()
 	f.Limit, _ = strconv.Atoi(r.FormValue("limit"))
 	if f.Limit <= 0 {
 		f.Limit = 50
@@ -136,6 +206,15 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	res := search.Run(ctx, search.Options{Queries: splitList(f.Queries), Boards: boards, Remote: f.Remote, Limit: f.Limit, BaseURL: v.cfg.SearchBaseURL})
 	f.Errors = res.Errors
+	kept := res.Postings[:0:0]
+	now := time.Now()
+	for _, p := range res.Postings {
+		if f.Filter.keep(p, now) {
+			kept = append(kept, p)
+		}
+	}
+	f.Hidden = len(res.Postings) - len(kept)
+	res.Postings = kept
 	if r.FormValue("add") != "" {
 		for _, p := range res.Postings {
 			if _, created, err := v.s.UpsertJob(p.Job()); err != nil {
@@ -148,6 +227,19 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	f.Postings = v.searchRows(res.Postings)
 	v.render(w, r, "search.html", "search", f)
+}
+
+func (v *server) deleteSearch(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if err := v.s.DeleteSearch(id); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/search", http.StatusSeeOther)
 }
 
 func splitList(s string) []string {

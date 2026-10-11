@@ -42,6 +42,14 @@ type Config struct {
 	SearchBaseURL                              map[string]string // test override per search source
 	Version                                    string            // shown in the footer next to the release link
 	MCP                                        http.Handler      // MCP over HTTP, mounted on /mcp when api_token is set
+	Mail                                       MailHooks         // inbox sync and Gmail drafts; nil funcs hide the buttons
+}
+
+// MailHooks reach the mail code in cli without an import cycle.
+type MailHooks struct {
+	Status func() (source, account string) // source: gmail | imap | ""
+	Sync   func() (int, error)
+	Draft  func(jobID int64) (openURL string, err error)
 }
 
 func day(s string) string {
@@ -114,9 +122,18 @@ var funcs = template.FuncMap{
 		}
 		return parts
 	},
-	"statuses": func() []string { return store.Statuses },
-	"next":     func(st string) []string { return store.NextStatuses[st] },
-	"leaving":  func(st string) bool { return store.Leaving[st] },
+	"statuses":  func() []string { return store.Statuses },
+	"next":      func(st string) []string { return store.NextStatuses[st] },
+	"initial":   initial,
+	"hue":       hue,
+	"today":     func() string { return time.Now().Format("2006-01-02") },
+	"add":       func(a, b int) int { return a + b },
+	"colcap":    func() int { return colCap },
+	"prepItems": func() []store.PrepItem { return store.PrepItems },
+	"prepArgs": func(i store.Interview, back string) map[string]any {
+		return map[string]any{"I": i, "Back": back}
+	},
+	"leaving": func(st string) bool { return store.Leaving[st] },
 	"dict_status": func(id int64, status, back string) map[string]any {
 		return map[string]any{"ID": id, "Status": status, "Back": back}
 	},
@@ -168,6 +185,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /jobs", srv.createJob)
 	mux.HandleFunc("GET /search", srv.searchPage)
 	mux.HandleFunc("POST /search", srv.runSearch)
+	mux.HandleFunc("POST /search/saved/{id}/delete", srv.deleteSearch)
 	mux.HandleFunc("GET /jobs/{id}", srv.job)
 	mux.HandleFunc("GET /jobs/{id}/files/{name}", srv.jobFile)
 	mux.HandleFunc("POST /jobs/{id}/files/{name}", srv.saveFile)
@@ -175,6 +193,9 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/status", srv.setStatus)
 	mux.HandleFunc("POST /jobs/{id}/note", srv.addNote)
 	mux.HandleFunc("POST /jobs/{id}/export", srv.exportPDF)
+	mux.HandleFunc("POST /jobs/{id}/gmail-draft", srv.gmailDraft)
+	mux.HandleFunc("GET /inbox", srv.inbox)
+	mux.HandleFunc("POST /inbox/sync", srv.syncInbox)
 	mux.HandleFunc("GET /interviews", srv.interviews)
 	mux.HandleFunc("POST /interviews", srv.createInterview)
 	mux.HandleFunc("POST /interviews/{id}", srv.setInterview)
@@ -226,6 +247,8 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("GET /api/decisions", srv.apiDecisions)
 	api.HandleFunc("POST /api/decisions", srv.apiAddDecision)
 	api.HandleFunc("POST /api/search", srv.apiSearch)
+	api.HandleFunc("GET /api/mail", srv.apiMail)
+	api.HandleFunc("POST /api/jobs/{id}/mail", srv.apiLogMail)
 	mux.Handle("/api/", srv.auth(api))
 	if cfg.MCP != nil {
 		mux.Handle("/mcp", srv.mcpAuth(cfg.MCP))
@@ -268,10 +291,27 @@ type page struct {
 	Sub    string
 }
 
+// initial and hue draw a company avatar: first letter, one of eight colors picked by the name.
+func initial(s string) string {
+	for _, r := range strings.TrimSpace(s) {
+		return strings.ToUpper(string(r))
+	}
+	return "?"
+}
+
+func hue(s string) int {
+	h := 0
+	for _, r := range strings.ToLower(s) {
+		h = (h*31 + int(r)) % 9973
+	}
+	return h % 8
+}
+
 var subtitles = map[string]string{
+	"inbox":       "Replies from companies, matched to your applications.",
 	"overview":    "Your job search, at a glance.",
 	"pipeline":    "Every opportunity, from discovery to outcome.",
-	"interviews":  "Prepare for what is coming, learn from what passed.",
+	"interviews":  "Prepare for what is coming, record how it went.",
 	"calendar":    "Interviews, deadlines and follow-ups. Subscribe from Google Calendar or add one event at a time.",
 	"learning":    "Close the gaps your target roles keep asking for.",
 	"preferences": "What ScoutJobs learned from your decisions, and why.",
@@ -336,6 +376,7 @@ type overviewData struct {
 	Decisions []store.Decision
 	Checks    []store.CVCheck
 	Target    int
+	Today     []todo
 }
 
 type funnelRow struct {
@@ -396,41 +437,8 @@ func (v *server) overview(w http.ResponseWriter, r *http.Request) {
 	d.TodoJobs, _ = v.s.ListJobs(store.JobFilter{Status: "drafted", Limit: 5})
 	d.Decisions, _ = v.s.Decisions(5)
 	d.Checks, _ = v.s.CVChecks(1)
+	d.Today = v.today(st, d.Upcoming)
 	v.render(w, r, "overview.html", "overview", d)
-}
-
-// ---- pipeline ----
-
-type column struct {
-	Status string
-	Jobs   []store.Job
-}
-
-func (v *server) pipeline(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query().Get("q")
-	due := r.URL.Query().Get("due") != ""
-	jobs, err := v.s.ListJobs(store.JobFilter{Query: q})
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	if due {
-		jobs = v.dueJobs(jobs)
-	}
-	by := map[string][]store.Job{}
-	for _, j := range jobs {
-		by[j.Status] = append(by[j.Status], j)
-	}
-	var cols []column
-	var hidden []string // empty final stages get no column but stay reachable as drop targets
-	for _, st := range store.Statuses {
-		if len(by[st]) == 0 && store.FinalStatuses[st] {
-			hidden = append(hidden, st)
-			continue
-		}
-		cols = append(cols, column{st, by[st]})
-	}
-	v.render(w, r, "pipeline.html", "pipeline", map[string]any{"Columns": cols, "Hidden": hidden, "Query": q, "Due": due, "Count": len(jobs)})
 }
 
 // dueJobs keeps what needs a hand this week: a deadline within 7 days (or passed) on an open job, or a follow-up due.
@@ -477,7 +485,18 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		hasMD = hasMD || f.Name == "resume.md"
 	}
 	contacts, _ := v.s.ContactsAt(j.Company)
-	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
+	tab := r.URL.Query().Get("tab")
+	switch tab {
+	case "mail", "interviews", "files", "activity":
+	default:
+		tab = "overview"
+	}
+	self := fmt.Sprintf("/jobs/%d", id)
+	if tab != "overview" {
+		self += "?tab=" + tab
+	}
+	p := v.panel(j, self, "/pipeline")
+	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount()})
 }
@@ -605,7 +624,7 @@ func (v *server) addNote(w http.ResponseWriter, r *http.Request) {
 	if n := strings.TrimSpace(r.FormValue("note")); n != "" {
 		_ = v.s.AddEvent(id, "note", n)
 	}
-	http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)
+	http.Redirect(w, r, back(r, fmt.Sprintf("/jobs/%d", id)), http.StatusSeeOther)
 }
 
 // exportPDF is the "Export PDF" button on the job page: resume.md in the folder becomes resume.pdf.
@@ -642,15 +661,18 @@ func back(r *http.Request, def string) string {
 func (v *server) interviews(w http.ResponseWriter, r *http.Request) {
 	all, _ := v.s.Interviews(0, false)
 	now := time.Now().UTC().Format("2006-01-02T15:04")
-	var up, past []store.Interview
+	var up, open, past []store.Interview
 	for _, i := range all {
-		if i.At >= now[:len(i.At)] || i.Outcome == "" && i.At >= now[:10] {
+		switch {
+		case i.At >= now[:len(i.At)] || i.Outcome == "" && i.At >= now[:10]:
 			up = append(up, i)
-		} else {
+		case i.Outcome == "":
+			open = append(open, i)
+		default:
 			past = append(past, i)
 		}
 	}
-	v.render(w, r, "interviews.html", "interviews", map[string]any{"Upcoming": up, "Past": past})
+	v.render(w, r, "interviews.html", "interviews", map[string]any{"Upcoming": up, "NeedsOutcome": open, "Past": past, "Outcomes": []string{"passed", "failed", "pending", "cancelled"}})
 }
 
 func (v *server) setInterview(w http.ResponseWriter, r *http.Request) {
@@ -660,6 +682,10 @@ func (v *server) setInterview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p store.InterviewPatch
+	if r.FormValue("prep_form") != "" { // the checklist: unticked boxes are absent from the form
+		done := strings.Join(r.Form["prep"], ",")
+		p.Prep = &done
+	}
 	if s := r.FormValue("prep_status"); s != "" {
 		p.PrepStatus = &s
 	}

@@ -50,7 +50,7 @@
   <dl class="facts">
     <dt>Job</dt><dd><a href="/jobs/{{.Job.ID}}">{{.Job.Company}}</a><br><small class="muted">{{.Job.Title}}</small></dd>
     {{with .Interview}}{{if .Format}}<dt>Format</dt><dd>{{.Format}}</dd>{{end}}{{if .Location}}<dt>Where</dt><dd class="pre">{{.Location}}</dd>{{end}}{{if .Interviewer}}<dt>With</dt><dd>{{.Interviewer}}</dd>{{end}}
-    <dt>Prep</dt><dd><span class="badge {{.PrepStatus}}">{{title .PrepStatus}}</span></dd>{{if .Outcome}}<dt>Outcome</dt><dd><span class="badge {{.Outcome}}">{{.Outcome}}</span></dd>{{end}}{{end}}
+    <dt>Prep</dt><dd><span class="badge {{.PrepStatus}}">{{.PrepCount}}/6 · {{title .PrepStatus}}</span></dd>{{if .Outcome}}<dt>Outcome</dt><dd><span class="badge {{.Outcome}}">{{.Outcome}}</span></dd>{{end}}{{end}}
   </dl>
   <div class="evacts">
     <a class="btn primary" href="{{.Google}}" target="_blank" rel="noopener noreferrer">{{template "ico-calendar"}}Add to Google Calendar</a>
@@ -66,9 +66,9 @@
     <label>Where<input name="location" value="{{.Location}}" placeholder="Meet link, address"></label>
     <div class="row span-2"><button class="primary">Save</button><span class="muted">Re-add it to Google Calendar after moving it.</span></div>
   </form>
-  <h3 class="sec">Prep and outcome</h3>
-  <form class="inline wide" method="post" action="/interviews/{{.ID}}"><input type="hidden" name="back" value="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;ev={{$e.Key}}">
-    <select name="prep_status" class="prep {{.PrepStatus}}">{{$p := .PrepStatus}}{{range $o := (split "todo,in_progress,ready")}}<option value="{{$o}}" {{if eq $o $p}}selected{{end}}>{{title $o}}</option>{{end}}</select><button class="mini">Save</button></form>
+  <h3 class="sec">Prep checklist</h3>
+  {{template "prep-check" (prepArgs . (printf "/calendar?view=%s&d=%s&ev=%s" $v.View $v.D $e.Key))}}
+  <h3 class="sec">Outcome</h3>
   <form class="fields" method="post" action="/interviews/{{.ID}}"><input type="hidden" name="back" value="/calendar?view={{$v.View}}&amp;d={{$v.D}}&amp;ev={{$e.Key}}">
     <label class="span-2">Outcome<select name="outcome"><option value="">—</option>{{$oc := .Outcome}}{{range $o := (split "passed,failed,pending,cancelled")}}<option value="{{$o}}" {{if eq $o $oc}}selected{{end}}>{{title $o}}</option>{{end}}</select></label>
     <label class="span-2">What you learned<textarea name="feedback" rows="3">{{.Feedback}}</textarea></label>
@@ -84,7 +84,7 @@
   <div class="panel-h"><h2>New interview</h2><a class="act" href="/calendar?view={{$v.View}}&amp;d={{$v.D}}" aria-label="close">✕</a></div>
   {{if $v.Jobs}}
   <form class="fields" method="post" action="/interviews">
-    <label class="span-2">Job<select name="job" required>{{range $v.Jobs}}<option value="{{.ID}}">{{.Company}} · {{.Title}}</option>{{end}}</select></label>
+    <label class="span-2">Job{{$pick := .JobID}}<select name="job" required>{{range $v.Jobs}}<option value="{{.ID}}" {{if eq .ID $pick}}selected{{end}}>{{.Company}} · {{.Title}}</option>{{end}}</select></label>
     <label>Date<input type="date" name="date" value="{{.Date}}" required></label>
     <label>Time<input type="time" name="time" value="{{.Time}}"></label>
     <label>Stage<select name="stage">{{range $v.Stages}}<option value="{{.}}">{{title .}}</option>{{end}}</select></label>
