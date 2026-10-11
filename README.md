@@ -98,7 +98,7 @@ The full list of the 33 skills, what triggers each and which ones are reference 
 
 ## Install per platform
 
-**Claude Code** (slash commands `/scoutjobs:brief`, `/scoutjobs:search`, `/scoutjobs:fit`, `/scoutjobs:apply`, `/scoutjobs:track`, `/scoutjobs:interview`, `/scoutjobs:mock`, `/scoutjobs:debrief`, `/scoutjobs:learn`, `/scoutjobs:upskill`, `/scoutjobs:review`, `/scoutjobs:story`, `/scoutjobs:dash`, `/scoutjobs:setup`, `/scoutjobs:cv`, `/scoutjobs:cover`, `/scoutjobs:tailor`, `/scoutjobs:send`):
+**Claude Code** (slash commands `/scoutjobs:brief`, `/scoutjobs:search`, `/scoutjobs:fit`, `/scoutjobs:apply`, `/scoutjobs:track`, `/scoutjobs:interview`, `/scoutjobs:mock`, `/scoutjobs:debrief`, `/scoutjobs:learn`, `/scoutjobs:upskill`, `/scoutjobs:review`, `/scoutjobs:story`, `/scoutjobs:dash`, `/scoutjobs:setup`, `/scoutjobs:cv`, `/scoutjobs:cover`, `/scoutjobs:tailor`, `/scoutjobs:run`, `/scoutjobs:send`):
 
 ```
 /plugin marketplace add zoolcoder/scoutjobs
@@ -325,6 +325,10 @@ Every page is described in the manual: [Dashboard](https://zoolcoder.github.io/s
 | GET | `/api/jobs/{id}/files` | the application folder and the "get selected" kit |
 | GET, PUT | `/api/jobs/{id}/files/{name}` | read a draft; write `.md`, `.txt`, `.json` (1 MB, inside the job folder) |
 | POST | `/api/jobs/{id}/export` | render `resume.md` in the job folder to `resume.pdf` |
+| POST | `/api/jobs/{id}/run` | prepare the application with an agent CLI: `{"steps":"safe" or ["tailor","cover"],"agent":"claude","force":false,"dry_run":false}`; 202 with the run id; nothing is sent |
+| GET | `/api/runs/{id}` | run status: steps, log, state (`running`, `done`, `failed`, `cancelled`) |
+| POST | `/api/runs/{id}/cancel` | stop a run |
+| GET | `/api/agents` | agent CLIs found on this machine, and the run steps |
 | POST | `/api/jobs/{id}/email/draft` | build `email.json` and `email.eml` from the cover letter |
 | GET | `/api/profile` | profile, preferences, CV files, latest CV check |
 | GET, POST | `/api/cv/checks` | CV check history, log one |

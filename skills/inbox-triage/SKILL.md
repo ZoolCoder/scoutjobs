@@ -1,23 +1,30 @@
 ---
 name: inbox-triage
-description: Reads the user's Gmail through the Gmail connector, matches replies from companies in the pipeline to tracked jobs, and proposes the ScoutJobs updates they imply - rejection, interview invitation, recruiter outreach, request for documents - applying them only after the user confirms. Use when the user says "check my inbox", "did anyone reply", "triage my mail", "any news from recruiters", or when the daily briefing has no imap_host to sync from.
+description: Reads the user's Gmail through the scoutjobs Gmail API sync (or, without it, the Gmail connector), matches replies from companies in the pipeline to tracked jobs, and proposes the ScoutJobs updates they imply - rejection, interview invitation, recruiter outreach, request for documents - applying them only after the user confirms. Use when the user says "check my inbox", "did anyone reply", "triage my mail", "any news from recruiters", or when the daily briefing has no imap_host to sync from.
 license: MIT
-compatibility: Needs the scoutjobs binary and a Gmail connector in the agent (claude.ai Gmail, or any MCP server that searches and reads Gmail). Without a connector, use `scoutjobs email sync` with imap_host instead.
+compatibility: Needs the scoutjobs binary with Gmail connected (`scoutjobs gmail setup`) or imap_host set. Without either, a Gmail connector in the agent (claude.ai Gmail, or any MCP server that searches and reads Gmail) works too, at a higher token cost.
 ---
 
 # Inbox triage
 
-Input: the user's Gmail, read through the connector. Output: a table of proposed updates, applied with the `scoutjobs` CLI after the user says yes. The mailbox is never changed: no labels, no archive, no delete, no reply sent.
+Input: the user's inbox, read on the machine by `scoutjobs email sync`; a Gmail connector only when that is not set up. Output: a table of proposed updates, applied with the `scoutjobs` CLI after the user says yes. The mailbox is never changed: no labels, no archive, no delete, no reply sent.
 
-## 1. Know who to look for
+## 1. Sync on the machine first
 
 ```bash
-scoutjobs job list --open --json
+scoutjobs gmail status --json
+scoutjobs email sync --since 14d --json
 ```
 
-Collect, per open job: id, company, title, status, `contact`, and the `updated_at` date. Companies at `applied` or `interview` matter most. If `imap_host` is set in `config.yaml`, run `scoutjobs email sync --since 14d --json` first; it already logs replies it can match, so skip those messages below.
+When Gmail is connected or `imap_host` is set, `email sync` reads metadata and Gmail's snippet only, matches replies to jobs by thread, contact and company domain, logs them and moves clear rejections and invitations. None of that mail enters this conversation. Report its `replies` in one line each.
 
-## 2. Search
+Its `review` list holds the few unmatched messages that look like they concern the search: an ATS sender, an open company's name (`company`), or application wording, with a `hint` from the wording. Classify only those, from `from`, `subject` and `snippet`. Open a full message through a connector only when the snippet cannot decide it.
+
+If `email sync` says there is no inbox to read, tell the user once that `scoutjobs gmail setup` (or Connect Gmail on the dashboard's Inbox page) makes this check cheaper and private, then continue with step 2.
+
+## 2. Connector fallback: search
+
+Only without the API sync. Collect, per open job, from `scoutjobs job list --open --json`: id, company, title, status, `contact`, `updated_at`. Companies at `applied` or `interview` matter most.
 
 Search the inbox for the last 14 days. One query per company is too many with a long pipeline; combine:
 
@@ -26,11 +33,11 @@ Search the inbox for the last 14 days. One query per company is too many with a 
 - ATS senders: greenhouse.io, lever.co, ashbyhq.com, workablemail.com, smartrecruiters.com, personio, myworkday.com
 - recruiter phrases: "your application", "next steps", "schedule", "interview", "unfortunately", "moving forward"
 
-Read only the matching threads. Skip newsletters, job alerts and marketing.
+Read only the matching threads, and only as far as needed to classify. Skip newsletters, job alerts and marketing.
 
 ## 3. Classify
 
-For each thread, decide one of:
+For each `review` message (or thread from step 2), decide one of:
 
 | Kind | Signal | Proposed update |
 |---|---|---|
@@ -57,7 +64,7 @@ scoutjobs email log <id> --from <address> --subject "<subject>" --snippet "<one 
   --kind rejected|interview|offer|request|ack [--status <new status>]
 ```
 
-`--message-id` dedupes repeat runs; pass the connector's id. `--status` replaces a separate `job set --status` for that thread. The snippet is one or two lines, never the whole body.
+`--message-id` dedupes repeat runs; pass `message_id` from the `review` list, or the connector's id. `--status` replaces a separate `job set --status` for that thread. The snippet is one or two lines, never the whole body.
 
 After applying, suggest the next skill: `interview-prep` for an invitation, `application-tracker` for a rejection streak, `calendar-sync` to put new interviews in Google Calendar.
 

@@ -31,6 +31,8 @@ type Config struct {
 	SearchBoards  []string `json:"search_boards"`
 	SearchRemote  bool     `json:"search_remote"`
 	Theme         string   `json:"theme"`
+	Agent         string   `json:"agent"`         // agent CLI for job run: claude | codex | custom | auto
+	AgentCommand  string   `json:"agent_command"` // any other agent: command that reads the prompt on stdin
 }
 
 func DefaultConfig() Config {
@@ -107,6 +109,10 @@ func LoadConfig(home string) Config {
 			c.SearchBoards = splitList(v)
 		case "search_remote":
 			c.SearchRemote = v != "false" && v != "no" && v != "0"
+		case "agent":
+			c.Agent = strings.Trim(v, `"'`)
+		case "agent_command":
+			c.AgentCommand = strings.Trim(v, `"'`)
 		case "theme":
 			if v == "dark" || v == "light" || v == "auto" {
 				c.Theme = v

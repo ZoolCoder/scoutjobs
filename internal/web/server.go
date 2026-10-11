@@ -20,7 +20,9 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/mail"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -28,9 +30,11 @@ import (
 var assets embed.FS
 
 type server struct {
-	s   *store.Store
-	tpl *template.Template
-	cfg Config
+	s     *store.Store
+	tpl   *template.Template
+	cfg   Config
+	gmail gmailFlows
+	gcal  googleCal
 }
 
 // Config is the subset of config.yaml the dashboard needs; cli passes it in to avoid an import cycle.
@@ -46,6 +50,7 @@ type Config struct {
 	Version                                    string            // shown in the footer next to the release link
 	MCP                                        http.Handler      // MCP over HTTP, mounted on /mcp when api_token is set
 	Mail                                       MailHooks         // inbox sync and Gmail drafts; nil funcs hide the buttons
+	Runner                                     *runner.Manager   // Prepare application on the job page; nil hides it
 }
 
 // MailHooks reach the mail code in cli without an import cycle.
@@ -53,6 +58,7 @@ type MailHooks struct {
 	Status func() (source, account string) // source: gmail | imap | ""
 	Sync   func() (int, error)
 	Draft  func(jobID int64) (openURL string, err error)
+	Gmail  func() *gmail.Client // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
 }
 
 func day(s string) string {
@@ -230,7 +236,14 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/status", srv.setStatus)
 	mux.HandleFunc("POST /jobs/{id}/note", srv.addNote)
 	mux.HandleFunc("POST /jobs/{id}/export", srv.exportPDF)
+	mux.HandleFunc("POST /jobs/{id}/run", srv.startRun)
+	mux.HandleFunc("POST /jobs/{id}/run/cancel", srv.cancelRun)
+	mux.HandleFunc("GET /jobs/{id}/run", srv.runState)
 	mux.HandleFunc("POST /jobs/{id}/gmail-draft", srv.gmailDraft)
+	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
+	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
+	mux.HandleFunc("GET /gmail/callback", srv.gmailCallback)
+	mux.HandleFunc("POST /gmail/disconnect", srv.gmailDisconnect)
 	mux.HandleFunc("GET /inbox", srv.inbox)
 	mux.HandleFunc("POST /inbox/sync", srv.syncInbox)
 	mux.HandleFunc("GET /interviews", srv.interviews)
@@ -278,6 +291,10 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("PUT /api/jobs/{id}/files/{name}", srv.apiWriteFile)
 	api.HandleFunc("POST /api/jobs/{id}/email/draft", srv.apiEmailDraft)
 	api.HandleFunc("POST /api/jobs/{id}/export", srv.apiExport)
+	api.HandleFunc("POST /api/jobs/{id}/run", srv.apiRun)
+	api.HandleFunc("GET /api/runs/{id}", srv.apiRunGet)
+	api.HandleFunc("POST /api/runs/{id}/cancel", srv.apiRunCancel)
+	api.HandleFunc("GET /api/agents", srv.apiAgents)
 	api.HandleFunc("GET /api/profile", srv.apiProfile)
 	api.HandleFunc("POST /api/cv/checks", srv.apiCVCheck)
 	api.HandleFunc("GET /api/cv/checks", srv.apiCVChecks)
@@ -550,7 +567,8 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 	p := v.panel(j, self, "/pipeline")
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
-		"Gates": gates, "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount()})
+		"Gates": gates, "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
+		"RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr")})
 }
 
 func (v *server) jobFile(w http.ResponseWriter, r *http.Request) {

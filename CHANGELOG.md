@@ -7,6 +7,26 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-11
+
+### Added
+- One-click application prep (#24): the job page's **Prepare application**
+  panel, `scoutjobs job run <id>`, `POST /api/jobs/{id}/run` and
+  `/scoutjobs:run` run fit review, tailored resume, cover letter, draft
+  review, resume PDF, ATS check, quality gates and a local e-mail draft in
+  order. It drives Claude Code, Codex or any CLI set as `agent_command`, skips
+  finished steps, stops at the first failure with the reason, logs each step
+  as an Activity event, and can be cancelled. Nothing is sent.
+- Gmail without YAML: `scoutjobs gmail setup` and the Inbox page guide you
+  through your own Google client, and inbox triage runs locally first to save
+  agent tokens.
+- Google Calendar, read-only, with the same sign-in (#22): your events show on
+  the Calendar page, and one that names a tracked company can be tracked as an
+  interview. `scoutjobs gmail test` checks mail and calendar separately.
+
+### Changed
+- Mail sync never reads messages older than your first tracked job.
+
 ## [0.3.2] - 2026-10-11
 
 ### Added
@@ -133,7 +153,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.0

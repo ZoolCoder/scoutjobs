@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -196,4 +197,14 @@ func (s *Store) DecisionSummary(limit int) (DecisionSummary, error) {
 		rows.Close()
 	}
 	return ds, nil
+}
+
+// Started is when the first job was tracked, the day the user began with ScoutJobs; false when there is none.
+func (s *Store) Started() (time.Time, bool) {
+	var first sql.NullString
+	if s.DB.QueryRow(`SELECT MIN(created_at) FROM jobs`).Scan(&first) != nil || !first.Valid {
+		return time.Time{}, false
+	}
+	t, err := time.Parse(time.RFC3339, first.String)
+	return t, err == nil
 }

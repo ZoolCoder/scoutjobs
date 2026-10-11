@@ -107,3 +107,16 @@ func TestMCP(t *testing.T) {
 		}
 	}
 }
+
+func TestMCPDeniesGoogleToTheRunner(t *testing.T) {
+	if mcpDenied([]string{"gmail", "status"}) {
+		t.Error("gmail status refused outside a run")
+	}
+	if !mcpDenied([]string{"job", "run", "3"}) {
+		t.Error("an agent may start a nested run")
+	}
+	t.Setenv("SCOUTJOBS_RUNNER", "1")
+	if !mcpDenied([]string{"gmail", "draft", "3"}) {
+		t.Error("a job run reaches Gmail")
+	}
+}

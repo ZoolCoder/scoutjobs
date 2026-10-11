@@ -2,6 +2,8 @@ package cli
 
 import (
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -119,5 +121,89 @@ func TestEmailLog(t *testing.T) {
 	}
 	if err := Run([]string{"email", "log", "1", "--from", "x@y"}, io.Discard); err == nil {
 		t.Error("log without --subject should fail")
+	}
+}
+
+func TestReviewCandidates(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev", "--contact", "jobs@acme.test")
+	run(t, "job", "add", "--company", "Globex", "--title", "SRE")
+	s, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	mails := []mail.Mail{
+		{From: "jobs@acme.test", Subject: "Re: Go Dev", MessageID: "<matched@acme>"},
+		{From: "noreply@newsletter.test", Subject: "Weekly digest", MessageID: "<n1@x>"},
+		{From: "no-reply@us.greenhouse.io", Subject: "Thanks", MessageID: "<g1@x>"},
+		{From: "talent@globex-careers.test", Subject: "Globex: next steps", Text: "We would like to schedule an interview", MessageID: "<x1@x>"},
+		{From: "someone@corp.test", Subject: "Your application for Data Engineer", MessageID: "<y1@x>"},
+	}
+	got := reviewCandidates(s, mails)
+	if len(got) != 3 {
+		t.Fatalf("want 3 candidates, got %+v", got)
+	}
+	if got[0].MessageID != "<g1@x>" || got[1].Company != "Globex" || got[1].Hint != "interview" || got[2].MessageID != "<y1@x>" {
+		t.Errorf("%+v", got)
+	}
+}
+
+func TestGmailSetupImportsDownload(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SCOUTJOBS_HOME", home)
+	run(t, "init")
+	file := filepath.Join(t.TempDir(), "client_secret_1.json")
+	if err := os.WriteFile(file, []byte(`{"installed":{"client_id":"1-a.apps.googleusercontent.com","client_secret":"s"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := run(t, "gmail", "setup", "--file", file, "--no-connect")
+	if !strings.Contains(out, "client imported") || strings.Contains(out, `"s"`) {
+		t.Errorf("setup output: %s", out)
+	}
+	if st := run(t, "gmail", "status"); !strings.Contains(st, "client set, not connected") {
+		t.Errorf("status after setup: %s", st)
+	}
+	if out := run(t, "gmail", "setup", "--no-connect"); !strings.Contains(out, "already set up") {
+		t.Errorf("second setup: %s", out)
+	}
+}
+
+func TestSentSinceDropsMailFromBeforeTheFirstJob(t *testing.T) {
+	start := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	got := sentSince([]mail.Mail{
+		{Subject: "old", Date: "Thu, 1 Oct 2026 09:00:00 +0000"},
+		{Subject: "new", Date: "Thu, 1 Oct 2026 13:00:00 +0000"},
+		{Subject: "api", Date: "2026-10-02T08:00:00Z"},
+		{Subject: "undated", Date: "someday"},
+	}, start)
+	var subjects []string
+	for _, m := range got {
+		subjects = append(subjects, m.Subject)
+	}
+	if strings.Join(subjects, ",") != "new,api,undated" {
+		t.Fatalf("kept %v", subjects)
+	}
+}
+
+func TestFetchMailReadsNothingBeforeAnyJob(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	s, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, ok := s.Started(); ok {
+		t.Fatal("no job yet, so no start")
+	}
+	// imap_host is unset: reaching the server would fail, so a nil error proves nothing was fetched
+	if mails, err := fetchMail(s, Config{}, "imap", time.Now().AddDate(-1, 0, 0), 10); err != nil || mails != nil {
+		t.Fatalf("got %v, %v", mails, err)
+	}
+	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev")
+	if st, ok := s.Started(); !ok || time.Since(st) > time.Minute {
+		t.Fatalf("started %v %v", st, ok)
 	}
 }

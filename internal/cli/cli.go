@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 	"github.com/zoolcoder/scoutjobs/internal/web"
 )
@@ -27,12 +28,15 @@ Usage: scoutjobs <command> [subcommand] [flags]
   version                    print the version
   update [--check] [--yes] [--version vX.Y.Z]   install the latest release over this binary (brew/deb/rpm installs are handed to their manager)
   job add [--from url]|list [--compact]|show|set|skip|rm|import
+  job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF
   email draft|show|send   application e-mail from the cover letter; send needs --yes
   email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
   email log <job>         record a message an agent's Gmail connector matched to a job
-  gmail connect|status|disconnect|draft <job>   Gmail API with your own OAuth client: read replies, create drafts (never sends)
+  gmail setup [--file client.json]|connect|status|test|disconnect|draft <job>
+                                     Gmail API with your own OAuth client: setup links the Google Cloud pages, imports the
+                                     downloaded client from ~/Downloads and connects; reads replies, creates drafts (never sends)
   decision log|summary
   pref set|list|rm|render|propose|review|confirm|reject
   interview add|list|set     --duration 45 --location <meeting link or address>
@@ -122,7 +126,7 @@ func Run(args []string, out io.Writer) error {
 		if err := fs.Parse(rest); err != nil {
 			return err
 		}
-		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg)})
+		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -241,6 +245,10 @@ currency: EUR           # salaries converted to yearly figures in this currency,
 dashboard_addr: 127.0.0.1:7070
 theme: light            # dashboard: light | dark | auto (follow system)
 
+# job run and the dashboard's Prepare application: which agent CLI writes the drafts
+agent: auto             # claude | codex | custom | auto (the first one found)
+agent_command:          # any other agent that reads the prompt on stdin, e.g. "gemini --yolo"; used as "custom"
+
 # job search defaults for ` + "`scoutjobs search`" + ` (flags override)
 search_queries: senior backend engineer, go developer
 search_boards:          # company boards: greenhouse:stripe, lever:netlify, ashby:linear, workable:acme, smartrecruiters:Acme, personio:acme, rss:https://...
@@ -253,7 +261,8 @@ smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
 
-# Gmail API instead of IMAP (scoutjobs gmail connect): a Desktop OAuth client from your own Google Cloud project
+# Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Gmail on the dashboard's Inbox page); it stores
+# the client in gmail-client.json, so these two stay empty unless you prefer them here
 gmail_client_id:        # xxxx.apps.googleusercontent.com
 gmail_client_secret:    # the Desktop client's secret; or set $SCOUTJOBS_GMAIL_CLIENT_SECRET
 
@@ -514,6 +523,8 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		return runJobReview(s, rest, out)
 	case "check":
 		return runJobCheck(s, rest, out)
+	case "run":
+		return runJobRun(s, rest, out)
 	case "rm":
 		if len(rest) == 0 {
 			return errors.New("usage: job rm <id>")

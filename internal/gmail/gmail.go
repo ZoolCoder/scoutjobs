@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -25,8 +24,9 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 )
 
-// Scopes: read for reply matching, compose for drafts. Compose cannot send without the user pressing Send.
-const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose"
+// Scopes: read for reply matching, compose for drafts, calendar read for interviews already in Google Calendar.
+// Compose cannot send without the user pressing Send; nothing here writes to the calendar.
+const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose " + CalendarScope
 
 const TokenFile = "gmail-token.json"
 
@@ -39,6 +39,7 @@ type Client struct {
 	TokenURL   string
 	APIBase    string
 	RevokeURL  string
+	CalBase    string
 }
 
 // Token is what gmail-token.json holds. The refresh token is the long-lived secret; the file is 0600.
@@ -47,6 +48,7 @@ type Token struct {
 	RefreshToken string    `json:"refresh_token"`
 	Expiry       time.Time `json:"expiry"`
 	Email        string    `json:"email"`
+	Scope        string    `json:"scope,omitempty"` // granted scopes; tokens from before Calendar have none
 }
 
 func (c *Client) defaults() {
@@ -64,6 +66,9 @@ func (c *Client) defaults() {
 	}
 	if c.RevokeURL == "" {
 		c.RevokeURL = "https://oauth2.googleapis.com/revoke"
+	}
+	if c.CalBase == "" {
+		c.CalBase = "https://www.googleapis.com/calendar/v3"
 	}
 }
 
@@ -108,22 +113,16 @@ func randomString(n int) string {
 // Connect runs the installed-app flow: a one-shot listener on 127.0.0.1, the consent page in the
 // browser, PKCE so an intercepted code is useless. show receives the URL to open.
 func (c *Client) Connect(ctx context.Context, show func(authURL string)) (Token, error) {
-	c.defaults()
-	if c.ID == "" {
-		return Token{}, errors.New("gmail_client_id missing in config.yaml: create a Desktop OAuth client in Google Cloud and paste its id")
-	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return Token{}, err
 	}
 	defer ln.Close()
-	redirect := "http://" + ln.Addr().String() + "/callback"
-	state, verifier := randomString(16), randomString(48)
-	sum := sha256.Sum256([]byte(verifier))
-	q := url.Values{"client_id": {c.ID}, "redirect_uri": {redirect}, "response_type": {"code"}, "scope": {Scopes},
-		"access_type": {"offline"}, "prompt": {"consent"}, "state": {state},
-		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}, "code_challenge_method": {"S256"}}
-	show(c.AuthURL + "?" + q.Encode())
+	authURL, p, err := c.Begin("http://" + ln.Addr().String() + "/callback")
+	if err != nil {
+		return Token{}, err
+	}
+	show(authURL)
 
 	type result struct {
 		code string
@@ -135,18 +134,13 @@ func (c *Client) Connect(ctx context.Context, show func(authURL string)) (Token,
 			http.NotFound(w, r)
 			return
 		}
-		v := r.URL.Query()
-		switch {
-		case v.Get("state") != state:
-			http.Error(w, "state mismatch", http.StatusBadRequest)
-			done <- result{err: errors.New("oauth state mismatch")}
-		case v.Get("error") != "":
-			fmt.Fprintln(w, "Gmail was not connected. You can close this tab.")
-			done <- result{err: fmt.Errorf("google refused: %s", v.Get("error"))}
-		default:
+		code, err := p.Code(r.URL.Query())
+		if err != nil {
+			http.Error(w, "Gmail was not connected: "+err.Error(), http.StatusBadRequest)
+		} else {
 			fmt.Fprintln(w, "Gmail connected to ScoutJobs. You can close this tab.")
-			done <- result{code: v.Get("code")}
 		}
+		done <- result{code, err}
 	})}
 	go func() { _ = hs.Serve(ln) }()
 	defer func() { _ = hs.Close() }()
@@ -160,17 +154,7 @@ func (c *Client) Connect(ctx context.Context, show func(authURL string)) (Token,
 	if res.err != nil {
 		return Token{}, res.err
 	}
-	t, err := c.grant(ctx, url.Values{"grant_type": {"authorization_code"}, "code": {res.code}, "redirect_uri": {redirect}, "code_verifier": {verifier}})
-	if err != nil {
-		return Token{}, err
-	}
-	var prof struct {
-		EmailAddress string `json:"emailAddress"`
-	}
-	if err := c.call(ctx, t.AccessToken, "GET", "/profile", nil, &prof); err == nil {
-		t.Email = prof.EmailAddress
-	}
-	return t, c.save(t)
+	return c.Finish(ctx, p, res.code)
 }
 
 // grant posts to the token endpoint; refresh keeps the old refresh token when Google sends none.
@@ -190,6 +174,7 @@ func (c *Client) grant(ctx context.Context, form url.Values) (Token, error) {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int    `json:"expires_in"`
+		Scope        string `json:"scope"`
 		Error        string `json:"error"`
 		Desc         string `json:"error_description"`
 	}
@@ -199,7 +184,7 @@ func (c *Client) grant(ctx context.Context, form url.Values) (Token, error) {
 	if out.Error != "" || out.AccessToken == "" {
 		return Token{}, fmt.Errorf("token endpoint: %s %s", out.Error, out.Desc)
 	}
-	return Token{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, Expiry: time.Now().Add(time.Duration(out.ExpiresIn) * time.Second)}, nil
+	return Token{AccessToken: out.AccessToken, RefreshToken: out.RefreshToken, Scope: out.Scope, Expiry: time.Now().Add(time.Duration(out.ExpiresIn) * time.Second)}, nil
 }
 
 // access returns a valid access token, refreshing and saving it when it is about to expire.
@@ -223,16 +208,23 @@ func (c *Client) access(ctx context.Context) (string, error) {
 	if n.RefreshToken != "" {
 		t.RefreshToken = n.RefreshToken
 	}
+	if n.Scope != "" {
+		t.Scope = n.Scope
+	}
 	return t.AccessToken, c.save(t)
 }
 
 func (c *Client) call(ctx context.Context, tok, method, path string, body, out any) error {
+	return c.callURL(ctx, tok, method, c.APIBase+path, body, out)
+}
+
+func (c *Client) callURL(ctx context.Context, tok, method, u string, body, out any) error {
 	var rd io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
 		rd = bytes.NewReader(b)
 	}
-	req, _ := http.NewRequestWithContext(ctx, method, c.APIBase+path, rd)
+	req, _ := http.NewRequestWithContext(ctx, method, u, rd)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -244,7 +236,8 @@ func (c *Client) call(ctx context.Context, tok, method, path string, body, out a
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("gmail %s %s: %s %s", method, strings.SplitN(path, "?", 2)[0], resp.Status, strings.TrimSpace(string(msg)))
+		path := strings.TrimPrefix(strings.SplitN(u, "?", 2)[0], c.APIBase)
+		return apiError(fmt.Errorf("google %s %s: %s %s", method, path, resp.Status, strings.TrimSpace(string(msg))))
 	}
 	if out == nil {
 		return nil

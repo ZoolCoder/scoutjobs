@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -29,7 +30,7 @@ type check struct {
 	Fix    string `json:"fix,omitempty"`
 }
 
-var configKeys = map[string]bool{"follow_up_days": true, "stale_days": true, "weekly_apply_target": true, "fit_apply_floor": true, "currency": true, "dashboard_addr": true, "api_token": true, "webhook_url": true, "webhook_secret": true, "email_from": true, "smtp_host": true, "smtp_user": true, "imap_host": true, "imap_user": true, "search_queries": true, "search_boards": true, "search_remote": true, "theme": true}
+var configKeys = map[string]bool{"follow_up_days": true, "stale_days": true, "weekly_apply_target": true, "fit_apply_floor": true, "currency": true, "dashboard_addr": true, "api_token": true, "webhook_url": true, "webhook_secret": true, "email_from": true, "smtp_host": true, "smtp_user": true, "imap_host": true, "imap_user": true, "gmail_client_id": true, "gmail_client_secret": true, "search_queries": true, "search_boards": true, "search_remote": true, "theme": true}
 
 var agentSkillDirs = []struct{ name, dir string }{
 	{"claude code", ".claude/skills"}, {"codex", ".codex/skills"}, {"agent skills", ".agents/skills"},
@@ -74,6 +75,7 @@ func runDoctor(rest []string, out io.Writer) error {
 		add("ok", "database", fmt.Sprintf("%d jobs tracked", st.Total), "")
 	}
 	cs = append(cs, mailChecks(cfg)...)
+	cs = append(cs, gmailCheck(home, cfg))
 	cs = append(cs, agentChecks(home)...)
 
 	cs = append(cs, dashboardCheck(cfg.DashboardAddr, home))
@@ -167,6 +169,19 @@ func mailChecks(cfg Config) []check {
 		}
 	}
 	return cs
+}
+
+func gmailCheck(home string, cfg Config) check {
+	c := gmail.Client{Home: home}
+	switch {
+	case c.Connected() && !c.HasCalendar():
+		return check{"warn", "gmail", "connected as " + orDash(c.Account()) + ", Calendar not allowed", "scoutjobs gmail connect, and allow Calendar (read-only)"}
+	case c.Connected():
+		return check{"ok", "gmail", "connected as " + orDash(c.Account()) + ", with Calendar", "scoutjobs gmail test checks both"}
+	case cfg.GmailClientID != "" || gmail.LoadCredentials(home).ID != "":
+		return check{"warn", "gmail", "OAuth client set, not connected", "scoutjobs gmail connect"}
+	}
+	return check{"warn", "gmail", "not connected", "scoutjobs gmail setup: replies matched without an agent reading your mail"}
 }
 
 func agentChecks(home string) []check {

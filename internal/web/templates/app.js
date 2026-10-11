@@ -34,3 +34,33 @@
   setInterval(check, 30000);
   document.addEventListener('visibilitychange', check);
 })();
+
+// Job page: while a run prepares the application, follow its steps and log, and reload when it ends.
+(function () {
+  var panel = document.querySelector('[data-run]');
+  if (!panel || !window.fetch) return;
+  var url = panel.dataset.run;
+
+  function tick() {
+    fetch(url, { cache: 'no-store', credentials: 'same-origin' }).then(function (res) {
+      return res.ok ? res.json() : null;
+    }).then(function (run) {
+      if (!run) return;
+      if (run.state !== 'running') { location.reload(); return; }
+      (run.steps || []).forEach(function (s) {
+        var li = panel.querySelector('[data-step="' + s.name + '"]');
+        if (!li) return;
+        var badge = li.querySelector('.badge');
+        badge.className = 'badge ' + s.state;
+        badge.textContent = s.state;
+      });
+      var pre = panel.querySelector('details.runlog pre');
+      if (pre && run.log) {
+        pre.textContent = run.log.slice(-60).join('\n') + '\n';
+        pre.scrollTop = pre.scrollHeight;
+      }
+    }).catch(function () { /* next tick */ });
+  }
+
+  setInterval(tick, 2000);
+})();

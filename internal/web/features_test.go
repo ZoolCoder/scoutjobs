@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -322,5 +323,52 @@ func TestPreferenceReview(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != 404 {
 		t.Errorf("confirm unknown: %d", rec.Code)
+	}
+}
+
+func TestGmailConnectFromInbox(t *testing.T) {
+	s := testStore(t)
+	client := func() *gmail.Client {
+		c := gmail.LoadCredentials(s.Home)
+		return &gmail.Client{ID: c.ID, Home: s.Home, AuthURL: "https://auth.test/o"}
+	}
+	h, _ := Handler(s, Config{Mail: MailHooks{Gmail: client}})
+	send := func(method, path, body, origin string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Host = "127.0.0.1:7070"
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, "Connect Gmail") || !strings.Contains(b, `action="/gmail/client"`) {
+		t.Fatal("inbox lacks the Gmail setup panel")
+	}
+	clientForm := url.Values{"client": {`{"installed":{"client_id":"1-a.apps.googleusercontent.com","client_secret":"s"}}`}}.Encode()
+	if rec := send("POST", "/gmail/client", clientForm, "https://evil.test"); rec.Code != http.StatusForbidden {
+		t.Errorf("cross-origin client save: %d", rec.Code)
+	}
+	if rec := send("POST", "/gmail/client", clientForm, "http://127.0.0.1:7070"); !strings.Contains(rec.Header().Get("Location"), "msg=") {
+		t.Fatalf("client save: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	if gmail.LoadCredentials(s.Home).ID != "1-a.apps.googleusercontent.com" {
+		t.Fatal("client not stored")
+	}
+	if b := get(h, "/inbox").Body.String(); !strings.Contains(b, `action="/gmail/connect"`) {
+		t.Error("no Connect button once the client is saved")
+	}
+	rec := send("POST", "/gmail/connect", "", "")
+	loc, _ := url.Parse(rec.Header().Get("Location"))
+	if loc.Host != "auth.test" || loc.Query().Get("redirect_uri") != "http://127.0.0.1:7070/gmail/callback" {
+		t.Fatalf("connect redirect %q", rec.Header().Get("Location"))
+	}
+	if rec := send("GET", "/gmail/callback?state=forged&code=c", "", ""); !strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Errorf("forged state: %s", rec.Header().Get("Location"))
+	}
+	if rec := send("GET", "/gmail/callback?state="+loc.Query().Get("state")+"&error=access_denied", "", ""); !strings.Contains(rec.Header().Get("Location"), "access_denied") {
+		t.Errorf("refusal: %s", rec.Header().Get("Location"))
 	}
 }
