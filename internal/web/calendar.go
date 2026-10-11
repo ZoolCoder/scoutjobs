@@ -74,6 +74,7 @@ type calView struct {
 	Counts                map[string]int
 	GoogleCal             string // on | reconnect | setup | "" when Gmail is not offered
 	GoogleErr             string
+	Msg, Err              string
 	Stages, Formats, Mins []string
 }
 
@@ -88,6 +89,7 @@ type calDetail struct {
 	Time      string
 	Open      string // Google Calendar's own page for an event read from it
 	Track     string // the new-interview form, filled from that event
+	Synced    bool   // linked to an event in Google Calendar, which follows its edits
 }
 
 type calNew struct {
@@ -274,8 +276,12 @@ func (v *server) calendar(w http.ResponseWriter, r *http.Request) {
 	if t, err := time.ParseInLocation(dayLayout, q.Get("d"), time.Local); err == nil {
 		d = t
 	}
+	_, serr := v.syncCalendar(r.Context(), false)
 	all := v.events(today)
 	gev, gerr := v.googleEvents(r.Context(), d)
+	if gerr == "" && serr != "" {
+		gerr = "sync: " + serr
+	}
 	all = sortEvents(append(all, gev...))
 	cv := calView{View: view, D: d.Format(dayLayout), Today: today.Format(dayLayout), Counts: map[string]int{},
 		Stages:  []string{"screen", "technical", "system_design", "behavioral", "case", "onsite", "final", "other"},
@@ -326,10 +332,13 @@ func (v *server) calendar(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cv.GoogleErr = gerr
+	cv.Msg, cv.Err = q.Get("msg"), q.Get("err")
 	if c := v.gmailClient(); c != nil {
 		switch {
-		case c.HasCalendar():
+		case c.CanWriteCalendar():
 			cv.GoogleCal = "on"
+		case c.HasCalendar():
+			cv.GoogleCal = "readonly"
 		case c.Connected():
 			cv.GoogleCal = "reconnect"
 		default:
@@ -484,8 +493,10 @@ func (v *server) detail(r *http.Request, e calEvent, j store.Job) *calDetail {
 		if e.JobID != 0 {
 			d.Track += fmt.Sprintf("&job=%d", e.JobID)
 		}
-	} else {
+	} else if e.iv == nil || e.iv.GoogleMode == "" || e.iv.GoogleMode == "gone" {
 		d.Google, d.ICS = googleURL(e, v.jobURL(r, e.JobID)), "/calendar/event/"+e.Key
+	} else {
+		d.Synced = true
 	}
 	if e.allDay {
 		d.When = e.start.Format("Monday 2 January 2006") + " · all day"
@@ -693,6 +704,7 @@ func (v *server) createInterview(w http.ResponseWriter, r *http.Request) {
 		st := "interview"
 		_ = v.s.UpdateJob(j.ID, store.JobPatch{Status: &st})
 	}
+	v.syncSoon()
 	http.Redirect(w, r, fmt.Sprintf("/calendar?view=week&d=%s&ev=i%d", day(at), id), http.StatusSeeOther)
 }
 

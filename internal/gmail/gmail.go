@@ -24,9 +24,9 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 )
 
-// Scopes: read for reply matching, compose for drafts, calendar read for interviews already in Google Calendar.
-// Compose cannot send without the user pressing Send; nothing here writes to the calendar.
-const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose " + CalendarScope
+// Scopes: read for reply matching, compose for drafts, calendar events to read the user's calendar and
+// keep the interviews ScoutJobs tracks in it. Compose cannot send without the user pressing Send.
+const Scopes = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose " + CalendarEventsScope
 
 const TokenFile = "gmail-token.json"
 

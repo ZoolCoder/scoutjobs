@@ -73,6 +73,7 @@ func (v *server) apiAddInterview(w http.ResponseWriter, r *http.Request) {
 		_ = v.s.UpdateJob(j.ID, store.JobPatch{Status: &st})
 	}
 	i.ID, i.Company, i.Title = id, j.Company, j.Title
+	v.syncSoon()
 	writeJSON(w, 201, i)
 }
 
@@ -92,6 +93,7 @@ func (v *server) apiPatchInterview(w http.ResponseWriter, r *http.Request) {
 	}
 	patch := store.InterviewPatch{At: p.At, Format: p.Format, Interviewer: p.Interviewer, PrepStatus: p.PrepStatus, Outcome: p.Outcome, Feedback: p.Feedback, Stage: p.Stage,
 		Location: p.Location, Duration: p.Duration, Prep: p.Prep}
+	defer v.syncSoon()
 	if err := v.s.UpdateInterview(id, patch); err != nil {
 		apiErr(w, 400, err)
 		return

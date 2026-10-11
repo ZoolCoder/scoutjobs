@@ -324,7 +324,9 @@ func (s *Store) migrate() error {
 		`ALTER TABLE mail ADD COLUMN from_addr TEXT NOT NULL DEFAULT ''`, `ALTER TABLE mail ADD COLUMN subject TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE mail ADD COLUMN snippet TEXT NOT NULL DEFAULT ''`, `ALTER TABLE mail ADD COLUMN date TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE mail ADD COLUMN thread TEXT NOT NULL DEFAULT ''`, `ALTER TABLE mail ADD COLUMN source TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE mail ADD COLUMN kind TEXT NOT NULL DEFAULT ''`} {
+		`ALTER TABLE mail ADD COLUMN kind TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE interviews ADD COLUMN google_id TEXT NOT NULL DEFAULT ''`, `ALTER TABLE interviews ADD COLUMN google_mode TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE interviews ADD COLUMN google_sig TEXT NOT NULL DEFAULT ''`} {
 		if _, err := s.DB.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}
@@ -742,6 +744,11 @@ type Interview struct {
 	CreatedAt   string `json:"created_at"`
 	Company     string `json:"company"`
 	Title       string `json:"title"`
+	// Google Calendar link: the event id; mode "push" (ScoutJobs created it), "pull" (found in the
+	// user's calendar) or "gone" (deleted there, never recreated); sig is the state last synced.
+	GoogleID   string `json:"google_id,omitempty"`
+	GoogleMode string `json:"google_mode,omitempty"`
+	GoogleSig  string `json:"-"`
 }
 
 func (s *Store) AddInterview(i Interview) (int64, error) {
@@ -800,8 +807,14 @@ func (s *Store) UpdateInterview(id int64, p InterviewPatch) error {
 	return err
 }
 
+// LinkGoogle records the Google Calendar event an interview is synced with.
+func (s *Store) LinkGoogle(id int64, eventID, mode, sig string) error {
+	_, err := s.DB.Exec(`UPDATE interviews SET google_id=?,google_mode=?,google_sig=? WHERE id=?`, eventID, mode, sig, id)
+	return err
+}
+
 func (s *Store) Interviews(jobID int64, upcomingOnly bool) ([]Interview, error) {
-	q := `SELECT i.id,i.job_id,i.stage,i.at,i.format,i.interviewer,i.prep_status,i.outcome,i.feedback,i.duration,i.location,i.prep,i.created_at,j.company,j.title FROM interviews i JOIN jobs j ON j.id=i.job_id WHERE 1=1`
+	q := `SELECT i.id,i.job_id,i.stage,i.at,i.format,i.interviewer,i.prep_status,i.outcome,i.feedback,i.duration,i.location,i.prep,i.created_at,j.company,j.title,i.google_id,i.google_mode,i.google_sig FROM interviews i JOIN jobs j ON j.id=i.job_id WHERE 1=1`
 	var args []any
 	if jobID > 0 {
 		q += ` AND i.job_id=?`
@@ -820,7 +833,7 @@ func (s *Store) Interviews(jobID int64, upcomingOnly bool) ([]Interview, error) 
 	var out []Interview
 	for rows.Next() {
 		var i Interview
-		if err := rows.Scan(&i.ID, &i.JobID, &i.Stage, &i.At, &i.Format, &i.Interviewer, &i.PrepStatus, &i.Outcome, &i.Feedback, &i.Duration, &i.Location, &i.Prep, &i.CreatedAt, &i.Company, &i.Title); err != nil {
+		if err := rows.Scan(&i.ID, &i.JobID, &i.Stage, &i.At, &i.Format, &i.Interviewer, &i.PrepStatus, &i.Outcome, &i.Feedback, &i.Duration, &i.Location, &i.Prep, &i.CreatedAt, &i.Company, &i.Title, &i.GoogleID, &i.GoogleMode, &i.GoogleSig); err != nil {
 			return nil, err
 		}
 		out = append(out, i)

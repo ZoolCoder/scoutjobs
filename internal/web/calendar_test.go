@@ -159,6 +159,12 @@ func TestGoogleEventMatchesJobAndSkipsDuplicates(t *testing.T) {
 	if _, ok := googleEvent(gmail.Event{ID: "x", Title: "Interview", Start: start, Text: "scoutjobs:interview:3"}, open, nil); ok {
 		t.Error("an event ScoutJobs exported shows twice")
 	}
+	if _, ok := googleEvent(gmail.Event{ID: "w", Title: "Interview: Acme", Start: start, Interview: "4"}, open, nil); ok {
+		t.Error("an event ScoutJobs wrote shows twice")
+	}
+	if _, ok := googleEvent(gmail.Event{ID: "m", Title: "Acme call", Start: start.Add(time.Hour)}, open, []store.Interview{{JobID: 7, GoogleID: "m"}}); ok {
+		t.Error("an event linked to an interview shows twice")
+	}
 	if e, _ := googleEvent(gmail.Event{ID: "d", Title: "Dentist", Start: start}, open, nil); e.JobID != 0 || e.End != "15:00" {
 		t.Errorf("unrelated event: %+v", e)
 	}

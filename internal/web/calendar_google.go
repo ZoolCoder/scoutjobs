@@ -2,10 +2,12 @@ package web
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/calsync"
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -18,6 +20,10 @@ type googleCal struct {
 	fetched time.Time
 	events  []calEvent
 	err     string
+
+	syncMu  sync.Mutex // one two-way sync at a time
+	synced  time.Time
+	syncErr string
 }
 
 const googleTTL = 5 * time.Minute
@@ -53,11 +59,63 @@ func (v *server) googleEvents(ctx context.Context, d time.Time) ([]calEvent, str
 	return v.gcal.events, ""
 }
 
-// googleEvent draws a Google event; one that ScoutJobs itself exported, or that is already tracked
-// as an interview at the same time, is left out so nothing shows twice.
+// syncCalendar runs the two-way sync with Google Calendar, at most every googleTTL unless forced.
+// The error is the last sync's, so a page shows it until a sync succeeds.
+func (v *server) syncCalendar(ctx context.Context, force bool) (calsync.Report, string) {
+	c := v.gmailClient()
+	if c == nil || !c.HasCalendar() {
+		return calsync.Report{}, ""
+	}
+	v.gcal.syncMu.Lock()
+	defer v.gcal.syncMu.Unlock()
+	if !force && time.Since(v.gcal.synced) < googleTTL {
+		return calsync.Report{}, v.gcal.syncErr
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	rep, err := calsync.Sync(ctx, v.s, c, time.Now())
+	v.gcal.synced, v.gcal.syncErr = time.Now(), ""
+	if err != nil {
+		v.gcal.syncErr = err.Error()
+	}
+	if rep != (calsync.Report{}) {
+		v.gcal.mu.Lock()
+		v.gcal.fetched = time.Time{} // the events changed: read them again
+		v.gcal.mu.Unlock()
+	}
+	return rep, v.gcal.syncErr
+}
+
+// syncSoon pushes an interview just created or edited to Google Calendar without holding up the page.
+func (v *server) syncSoon() {
+	go func() { _, _ = v.syncCalendar(context.Background(), true) }()
+}
+
+// calendarSync is the Calendar page's "Sync now".
+func (v *server) calendarSync(w http.ResponseWriter, r *http.Request) {
+	if err := sameOrigin(r); err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
+	rep, serr := v.syncCalendar(r.Context(), true)
+	dest := back(r, "/calendar")
+	if serr != "" {
+		http.Redirect(w, r, withParam(dest, "err", "Google Calendar sync: "+serr), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, withParam(dest, "msg", "Google Calendar: "+rep.String()), http.StatusSeeOther)
+}
+
+// googleEvent draws a Google event; one that ScoutJobs itself wrote or exported, or that is already
+// tracked as an interview, is left out so nothing shows twice.
 func googleEvent(g gmail.Event, open []store.Job, ivs []store.Interview) (calEvent, bool) {
-	if strings.Contains(g.Text, "scoutjobs:") || g.Start.IsZero() {
+	if strings.Contains(g.Text, "scoutjobs:") || g.Interview != "" || g.Start.IsZero() {
 		return calEvent{}, false
+	}
+	for _, i := range ivs {
+		if i.GoogleID == g.ID {
+			return calEvent{}, false
+		}
 	}
 	start, stop := g.Start.Local(), g.End.Local()
 	if !stop.After(start) {
@@ -71,7 +129,7 @@ func googleEvent(g gmail.Event, open []store.Job, ivs []store.Interview) (calEve
 	if !g.AllDay {
 		e.Start, e.End = start.Format("15:04"), stop.Format("15:04")
 	}
-	if j, ok := companyOf(g, open); ok {
+	if j, ok := calsync.MatchJob(g, open); ok {
 		e.JobID = j.ID
 		e.Sub = j.Company + " · " + j.Title
 		for _, i := range ivs {
@@ -81,27 +139,6 @@ func googleEvent(g gmail.Event, open []store.Job, ivs []store.Interview) (calEve
 		}
 	}
 	return e, true
-}
-
-// companyOf finds the open job an event is about: the company named in it, or an attendee at its domain.
-func companyOf(g gmail.Event, open []store.Job) (store.Job, bool) {
-	text := strings.ToLower(g.Title + " " + g.Location + " " + g.Text)
-	for _, j := range open {
-		name := strings.ToLower(strings.TrimSpace(j.Company))
-		if len(name) < 3 {
-			continue
-		}
-		if strings.Contains(text, name) {
-			return j, true
-		}
-		domain := strings.ReplaceAll(name, " ", "")
-		for _, a := range g.Attendees {
-			if _, host, ok := strings.Cut(strings.ToLower(a), "@"); ok && strings.HasPrefix(host, domain+".") {
-				return j, true
-			}
-		}
-	}
-	return store.Job{}, false
 }
 
 func (v *server) googleByKey(id string) (calEvent, bool) {

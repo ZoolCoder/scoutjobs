@@ -250,6 +250,7 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("POST /interviews", srv.createInterview)
 	mux.HandleFunc("POST /interviews/{id}", srv.setInterview)
 	mux.HandleFunc("GET /calendar", srv.calendar)
+	mux.HandleFunc("POST /calendar/sync", srv.calendarSync)
 	mux.HandleFunc("GET /calendar.ics", srv.calendarFeed)
 	mux.HandleFunc("GET /calendar/event/{key}", srv.calendarEvent)
 	mux.HandleFunc("GET /learning", srv.learning)
@@ -784,6 +785,7 @@ func (v *server) setInterview(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
+	v.syncSoon()
 	http.Redirect(w, r, back(r, "/interviews"), http.StatusSeeOther)
 }
 

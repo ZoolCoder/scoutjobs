@@ -10,9 +10,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/calsync"
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -105,7 +105,7 @@ func connectGmail(s *store.Store, cfg Config, out io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(out, "gmail connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
-	if !strings.Contains(t.Scope, gmail.CalendarScope) {
+	if !gmail.HasScope(t.Scope, gmail.CalendarScope) && !gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
 		fmt.Fprintln(out, "calendar was not allowed: the dashboard calendar shows only ScoutJobs events (connect again and tick Calendar to add yours)")
 	}
 	return nil
@@ -167,11 +167,12 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		if _, err := parse(fs, rest); err != nil {
 			return err
 		}
-		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "calendar": c.HasCalendar(), "imap_host": cfg.IMAPHost}
+		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "calendar": c.HasCalendar(),
+			"calendar_sync": c.CanWriteCalendar(), "imap_host": cfg.IMAPHost}
 		return emit(out, *asJSON, res, func() {
 			switch {
 			case c.Connected():
-				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), map[bool]string{true: "on (read-only)", false: "off"}[c.HasCalendar()])
+				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), calendarState(c))
 			case c.ID == "":
 				fmt.Fprintln(out, "gmail: off (scoutjobs gmail setup connects it in a few minutes)")
 			default:
@@ -333,4 +334,40 @@ func openBrowser(u string) {
 	if cmd.Start() == nil {
 		go func() { _ = cmd.Wait() }()
 	}
+}
+
+func calendarState(c *gmail.Client) string {
+	switch {
+	case c.CanWriteCalendar():
+		return "on (two-way sync)"
+	case c.HasCalendar():
+		return "read-only (scoutjobs gmail connect again to sync interviews)"
+	}
+	return "off"
+}
+
+// runCalendar syncs interviews with Google Calendar both ways; the dashboard does the same every few minutes.
+func runCalendar(s *store.Store, cfg Config, args []string, out io.Writer) error {
+	if len(args) == 0 || args[0] != "sync" {
+		return errors.New("usage: calendar sync [--json]")
+	}
+	fs := flag.NewFlagSet("calendar sync", flag.ContinueOnError)
+	asJSON := fs.Bool("json", false, "")
+	if _, err := parse(fs, args[1:]); err != nil {
+		return err
+	}
+	c := gmailClient(s, cfg)
+	if !c.HasCalendar() {
+		return errors.New("Google Calendar is not connected: run scoutjobs gmail connect and allow Calendar")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	rep, err := calsync.Sync(ctx, s, c, time.Now())
+	if e := emit(out, *asJSON, rep, func() { fmt.Fprintln(out, rep.String()) }); e != nil {
+		return e
+	}
+	if err == nil && !c.CanWriteCalendar() {
+		fmt.Fprintln(os.Stderr, "calendar is read-only: interviews are read from it, not added; scoutjobs gmail connect again to allow that")
+	}
+	return err
 }

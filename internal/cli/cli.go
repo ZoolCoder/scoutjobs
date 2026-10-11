@@ -40,6 +40,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   decision log|summary
   pref set|list|rm|render|propose|review|confirm|reject
   interview add|list|set     --duration 45 --location <meeting link or address>
+  calendar sync              interviews to Google Calendar and back; interviews found there are tracked (the dashboard syncs every few minutes)
   linkedin import <zip|dir>  LinkedIn data export: profile for setup, connections for referrals
   contacts <job>|--company x who you know at a company (from the LinkedIn import)
   session log|list
@@ -109,6 +110,8 @@ func Run(args []string, out io.Writer) error {
 		return runLearn(s, rest, out)
 	case "gmail":
 		return runGmail(s, cfg, rest, out)
+	case "calendar":
+		return runCalendar(s, cfg, rest, out)
 	case "linkedin":
 		return runLinkedIn(s, rest, out)
 	case "contacts":
