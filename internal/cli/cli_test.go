@@ -381,3 +381,19 @@ func TestJobFitReviewAndCheck(t *testing.T) {
 		t.Errorf("check text: %s", out)
 	}
 }
+
+func TestPrefReviewCommands(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	run(t, "pref", "propose", "stack_avoid", "java", "--support", "5", "--evidence", "5 skips mention Java")
+	if out := run(t, "pref", "review"); !strings.Contains(out, "stack_avoid") || !strings.Contains(out, "5/0") {
+		t.Errorf("review: %s", out)
+	}
+	if out := run(t, "pref", "confirm", "stack_avoid"); !strings.Contains(out, "learned") {
+		t.Errorf("confirm: %s", out)
+	}
+	var b bytes.Buffer
+	if err := Run([]string{"pref", "reject", "stack_avoid"}, &b); err == nil {
+		t.Error("rejected a proposal that is no longer pending")
+	}
+}

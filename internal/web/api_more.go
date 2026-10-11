@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -245,10 +246,80 @@ func (v *server) apiSetPreference(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := v.s.SetPreference(p); err != nil {
-		apiErr(w, 500, err)
+		apiErr(w, prefErrCode(err), err)
 		return
 	}
 	writeJSON(w, 200, p)
+}
+
+func prefErrCode(err error) int {
+	switch {
+	case errors.Is(err, store.ErrStated):
+		return 409
+	case errors.Is(err, store.ErrNoProposal):
+		return 404
+	}
+	return 400
+}
+
+func (v *server) apiProposals(w http.ResponseWriter, r *http.Request) {
+	ps, err := v.s.Proposals(r.URL.Query().Get("all") == "true")
+	if err != nil {
+		apiErr(w, 500, err)
+		return
+	}
+	if ps == nil {
+		ps = []store.Proposal{}
+	}
+	writeJSON(w, 200, ps)
+}
+
+func (v *server) apiPropose(w http.ResponseWriter, r *http.Request) {
+	var p store.Proposal
+	if err := decodeJSON(w, r, &p); err != nil {
+		apiErr(w, 400, err)
+		return
+	}
+	p.Key = r.PathValue("key")
+	if err := v.s.ProposePreference(p); err != nil {
+		apiErr(w, prefErrCode(err), err)
+		return
+	}
+	writeJSON(w, 201, p)
+}
+
+// apiReviewProposal takes {"action":"confirm|reject","value":"edited wording","reason":"..."}.
+func (v *server) apiReviewProposal(w http.ResponseWriter, r *http.Request) {
+	var in struct{ Action, Value, Reason string }
+	if err := decodeJSON(w, r, &in); err != nil {
+		apiErr(w, 400, err)
+		return
+	}
+	pref, err := v.reviewProposal(r.PathValue("key"), in.Action, in.Value, in.Reason)
+	if err != nil {
+		apiErr(w, prefErrCode(err), err)
+		return
+	}
+	if pref == nil {
+		w.WriteHeader(204)
+		return
+	}
+	writeJSON(w, 200, pref)
+}
+
+// reviewProposal is shared by the Preferences page and the API.
+func (v *server) reviewProposal(key, action, value, reason string) (*store.Preference, error) {
+	switch action {
+	case "confirm":
+		p, err := v.s.ConfirmProposal(key, value)
+		if err != nil {
+			return nil, err
+		}
+		return &p, nil
+	case "reject":
+		return nil, v.s.RejectProposal(key, reason)
+	}
+	return nil, fmt.Errorf("action must be confirm or reject, not %q", action)
 }
 
 func (v *server) apiDeletePreference(w http.ResponseWriter, r *http.Request) {

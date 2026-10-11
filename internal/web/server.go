@@ -7,8 +7,10 @@ import (
 	"crypto/subtle"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -164,15 +166,35 @@ func Serve(s *store.Store, addr string, cfg Config) error {
 	return ServeContext(context.Background(), s, addr, cfg)
 }
 
+// Health is what GET /healthz answers, so scoutjobs doctor, update and serve can tell which
+// dashboard owns a port: its version, process, binary and data dir.
+type Health struct {
+	App     string `json:"app"`
+	Version string `json:"version"`
+	PID     int    `json:"pid"`
+	Exe     string `json:"exe"`
+	Home    string `json:"home"`
+}
+
 // ServeContext serves until ctx ends, then lets requests in flight finish and returns nil.
 func ServeContext(ctx context.Context, s *store.Store, addr string, cfg Config) error {
-	h, err := Handler(s, cfg)
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
-	hs := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second}
+	return ServeListener(ctx, l, s, cfg)
+}
+
+// ServeListener is ServeContext on a listener the caller opened, so it can report a busy port first.
+func ServeListener(ctx context.Context, l net.Listener, s *store.Store, cfg Config) error {
+	h, err := Handler(s, cfg)
+	if err != nil {
+		l.Close()
+		return err
+	}
+	hs := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
-	go func() { errc <- hs.ListenAndServe() }()
+	go func() { errc <- hs.Serve(l) }()
 	select {
 	case err := <-errc:
 		return err
@@ -220,12 +242,18 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	mux.HandleFunc("GET /learning", srv.learning)
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
+	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
 	mux.HandleFunc("GET /profile", srv.profile)
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
 	mux.HandleFunc("GET /board.js", static("templates/board.js", "text/javascript; charset=utf-8", false))
 	mux.HandleFunc("GET /app.js", static("templates/app.js", "text/javascript; charset=utf-8", false))
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		exe, _ := os.Executable()
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusOK, Health{App: "scoutjobs", Version: cfg.Version, PID: os.Getpid(), Exe: exe, Home: s.Home})
+	})
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
@@ -265,6 +293,9 @@ func Handler(s *store.Store, cfg Config) (http.Handler, error) {
 	api.HandleFunc("GET /api/preferences", srv.apiPreferences)
 	api.HandleFunc("PUT /api/preferences/{key}", srv.apiSetPreference)
 	api.HandleFunc("DELETE /api/preferences/{key}", srv.apiDeletePreference)
+	api.HandleFunc("GET /api/preferences/proposals", srv.apiProposals)
+	api.HandleFunc("PUT /api/preferences/proposals/{key}", srv.apiPropose)
+	api.HandleFunc("POST /api/preferences/proposals/{key}", srv.apiReviewProposal)
 	api.HandleFunc("GET /api/decisions", srv.apiDecisions)
 	api.HandleFunc("POST /api/decisions", srv.apiAddDecision)
 	api.HandleFunc("POST /api/search", srv.apiSearch)
@@ -779,7 +810,34 @@ func (v *server) setLearning(w http.ResponseWriter, r *http.Request) {
 func (v *server) preferences(w http.ResponseWriter, r *http.Request) {
 	prefs, _ := v.s.Preferences()
 	ds, _ := v.s.DecisionSummary(200)
-	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds})
+	all, _ := v.s.Proposals(true)
+	var pending, rejected []store.Proposal
+	for _, p := range all {
+		if p.Status == "pending" {
+			pending = append(pending, p)
+		} else {
+			rejected = append(rejected, p)
+		}
+	}
+	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds, "Pending": pending, "Rejected": rejected})
+}
+
+// reviewForm confirms, edits (confirm with the user's wording) or rejects one proposal.
+func (v *server) reviewForm(w http.ResponseWriter, r *http.Request) {
+	action := r.FormValue("action")
+	value := ""
+	if action == "edit" {
+		action, value = "confirm", r.FormValue("value")
+		if strings.TrimSpace(value) == "" {
+			fail(w, errors.New("write the value in your own words, or confirm the proposal as it is"))
+			return
+		}
+	}
+	if _, err := v.reviewProposal(r.FormValue("key"), action, value, r.FormValue("reason")); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
 }
 
 // profile shows profile.md, the cv/ folder and the CV check history. Files are read, never written, from here.

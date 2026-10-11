@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
 // update replaces the running binary with a release from GitHub: fetch the release, pick the
@@ -101,7 +103,11 @@ func runUpdate(rest []string, out io.Writer) error {
 		}
 		cmd := exec.CommandContext(ctx, "brew", "upgrade", "--cask", "scoutjobs")
 		cmd.Stdout, cmd.Stderr = out, out
-		return cmd.Run()
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+		fmt.Fprintln(out, dashboardAfterUpdate())
+		return nil
 	case "package":
 		return emit(out, *asJSON, res, func() {
 			fmt.Fprintf(out, "%s was installed by a package manager; %s is at %s\n", exe, rel.Tag, rel.URL)
@@ -143,7 +149,7 @@ func runUpdate(rest []string, out io.Writer) error {
 	res["installed"] = rel.Tag
 	return emit(out, *asJSON, res, func() {
 		fmt.Fprintf(out, "updated %s: %s -> %s\n", exe, Version, rel.Tag)
-		fmt.Fprintln(out, "a running dashboard (scoutjobs serve) restarts on the new version by itself")
+		fmt.Fprintln(out, dashboardAfterUpdate())
 	})
 }
 
@@ -335,4 +341,17 @@ func semverParts(v string) semver {
 		s.n[i], _ = strconv.Atoi(p)
 	}
 	return s
+}
+
+// dashboardAfterUpdate says what happens to a dashboard on the configured address.
+func dashboardAfterUpdate() string {
+	addr := LoadConfig(store.Home()).DashboardAddr
+	d := probeDashboard(addr)
+	switch {
+	case d.Health != nil:
+		return fmt.Sprintf("dashboard on http://%s (pid %d) restarts on the new version within a few seconds; open tabs offer a reload", addr, d.Health.PID)
+	case d.ScoutJobs:
+		return fmt.Sprintf("the dashboard on http://%s predates auto-restart: pkill -f \"scoutjobs serve\" && scoutjobs serve", addr)
+	}
+	return "a dashboard started later runs the new version; running ones restart on it by themselves"
 }

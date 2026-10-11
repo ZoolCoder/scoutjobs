@@ -6,13 +6,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
 )
 
 // Status vocabulary for jobs. Order matters for the pipeline board.
@@ -76,21 +78,103 @@ func Home() string {
 
 func Open() (*Store, error) {
 	home := Home()
+	path := filepath.Join(home, "scoutjobs.db")
 	if err := os.MkdirAll(home, 0o700); err != nil {
-		return nil, err
+		return nil, openError(home, path, err)
 	}
-	dsn := "file:" + filepath.Join(home, "scoutjobs.db") + "?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
+	dsn := "file:" + path + "?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
-		return nil, err
+		return nil, openError(home, path, err)
 	}
 	db.SetMaxOpenConns(1)
 	s := &Store{DB: db, Home: home}
 	if err := s.migrate(); err != nil {
 		db.Close()
-		return nil, err
+		return nil, openError(home, path, err)
 	}
 	return s, nil
+}
+
+// openError names the database and the data dir it came from, with a hint for the SQLite codes
+// people actually hit: a path that cannot be opened (14), a read-only file (8), a lock (5, 6).
+func openError(home, path string, err error) error {
+	src := "default"
+	if os.Getenv("SCOUTJOBS_HOME") != "" {
+		src = "SCOUTJOBS_HOME"
+	}
+	msg := fmt.Sprintf("open database %s (data dir %s, from %s): %v", path, home, src, err)
+	if h := openHint(home, path, err); h != "" {
+		msg += "\nhint: " + h
+	}
+	return errors.New(msg)
+}
+
+func openHint(home, path string, err error) string {
+	var se *sqlite.Error
+	code := 0
+	if errors.As(err, &se) {
+		code = se.Code() & 0xff
+	}
+	switch {
+	case code == 5 || code == 6:
+		return "another process holds a lock on the database; stop other scoutjobs commands or dashboards using " + home + " and retry"
+	case code == 8:
+		return path + " is read-only; check its owner and permissions (ls -l " + home + ")"
+	case code != 14 && !errors.Is(err, fs.ErrPermission):
+		return ""
+	}
+	if h := protectedHint(home); h != "" {
+		return h
+	}
+	if st, e := os.Stat(home); e != nil || !st.IsDir() {
+		return home + " is not a directory; set SCOUTJOBS_HOME to a folder or run scoutjobs init"
+	}
+	if f, e := os.CreateTemp(home, ".probe-*"); e != nil {
+		return "no write permission on " + home + "; SQLite needs it for the journal. Check its owner (ls -ld " + home + ")"
+	} else {
+		f.Close()
+		_ = os.Remove(f.Name())
+	}
+	for _, p := range []string{path, path + "-wal", path + "-shm"} {
+		if f, e := os.OpenFile(p, os.O_RDWR, 0); e != nil {
+			if errors.Is(e, fs.ErrPermission) {
+				return "no write permission on " + p + "; check its owner (ls -l " + home + "), e.g. files created by sudo"
+			}
+		} else {
+			f.Close()
+		}
+	}
+	return "SQLite cannot open " + path + "; check the path exists, is writable, and is not on a network or synced drive"
+}
+
+// protectedHint covers macOS privacy protection: Documents, Desktop, Downloads and cloud
+// folders open fine from a terminal that has access, but not from a dashboard started by an
+// app, launch agent or agent sandbox that lacks it.
+func protectedHint(home string) string {
+	if runtime.GOOS != "darwin" {
+		return ""
+	}
+	user, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	abs, err := filepath.Abs(home)
+	if err != nil {
+		return ""
+	}
+	for _, dir := range []string{"Documents", "Desktop", "Downloads", "Library/Mobile Documents", "Library/CloudStorage"} {
+		if within(abs, filepath.Join(user, dir)) {
+			return home + " is in ~/" + dir + ", which macOS only lets apps with Files and Folders or Full Disk Access open. " +
+				"If scoutjobs works in your terminal but not here, start serve from that terminal, grant the launching app access in System Settings > Privacy & Security, or move the data dir (e.g. ~/.scoutjobs)"
+		}
+	}
+	return ""
+}
+
+func within(path, dir string) bool {
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func (s *Store) Close() error { return s.DB.Close() }
@@ -150,6 +234,18 @@ CREATE TABLE IF NOT EXISTS preferences (
   evidence TEXT NOT NULL DEFAULT '',
   source TEXT NOT NULL DEFAULT 'learned',
   updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pref_proposals (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  confidence REAL NOT NULL DEFAULT 0.5,
+  evidence TEXT NOT NULL DEFAULT '',
+  support INTEGER NOT NULL DEFAULT 0,
+  against INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  note TEXT NOT NULL DEFAULT '',
+  proposed_at TEXT NOT NULL,
+  decided_at TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS interviews (
   id INTEGER PRIMARY KEY,
@@ -589,9 +685,15 @@ type Preference struct {
 	UpdatedAt  string  `json:"updated_at"`
 }
 
+// ErrStated refuses to let an inferred value replace one the user stated.
+var ErrStated = errors.New("stated by the user; learned values never overwrite it (set it with --source stated, or pref rm it first)")
+
 func (s *Store) SetPreference(p Preference) error {
 	if p.Source == "" {
 		p.Source = "learned"
+	}
+	if p.Source != "stated" && s.statedPreference(p.Key) {
+		return fmt.Errorf("%s: %w", p.Key, ErrStated)
 	}
 	if p.Confidence <= 0 {
 		p.Confidence = 0.5

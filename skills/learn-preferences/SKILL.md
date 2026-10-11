@@ -28,20 +28,30 @@ Confidence: 0.5 for 3 supporting decisions, 0.7 for 5, 0.9 for 8 or more, minus 
 
 Do not infer protected or irrelevant attributes (anything about people at the company, nationality, age, gender). Preferences are about the job: stack, remote, location, seniority, company size, industry, salary, on-call, process, role family, language.
 
-## Confirm
+## Propose
 
-Present a short table: key, proposed value, confidence, evidence (the counts or the two strongest quotes). Ask the user to accept, edit, or reject each. Full sentences here; this is a question.
-
-## Write
+Queue every candidate for review, with the numbers behind it. Skip a key the user stated (`pref list` shows `stated`); the CLI refuses it anyway.
 
 ```bash
-scoutjobs pref set stack_avoid "java, spring" --source learned --confidence 0.7 --evidence "5 skips mention Java; 0 applies"
-scoutjobs pref set company_size "50-500" --source learned --confidence 0.5 --evidence "3 withdrawals from 1000+ companies: 'too much process'"
+scoutjobs pref propose stack_avoid "java, spring" --support 5 --against 0 --confidence 0.7 --evidence "5 skips mention Java; 0 applies"
+scoutjobs pref propose company_size "50-500" --support 3 --confidence 0.5 --evidence "3 withdrawals from 1000+ companies: 'too much process'"
 ```
 
-If the user corrects a value in their own words, store it with `--source stated --confidence 1`. If they reject a proposal, do not store it, and note it in the session log so it is not proposed again next week unless new evidence appears.
+`--evidence` holds the counts and at most two short quotes from the user's reasons. A value the user rejected before is refused unless `--support` is higher than it was then; check `scoutjobs pref review --all --json` first.
 
-The CLI re-renders `preferences.md` on every `pref set`. Finish with `scoutjobs session log --kind review --topic "learn-preferences" --notes "<n> accepted, <m> rejected"`.
+## Confirm
+
+Present a short table: key, proposed value, current value if any, confidence, evidence. Ask the user to accept, edit, or reject each. Full sentences here; this is a question. The user can also answer later on the dashboard's Preferences page, under "Awaiting your review".
+
+Apply only what the user said:
+
+```bash
+scoutjobs pref confirm stack_avoid                          # accept: stored as learned
+scoutjobs pref confirm company_size --value "under 300"      # their own words: stored as stated, confidence 1
+scoutjobs pref reject stack_avoid --reason "skipped those for salary"
+```
+
+Unanswered proposals stay pending. Every confirm, edit and reject is in the Activity log, and the CLI re-renders `preferences.md`. Finish with `scoutjobs session log --kind review --topic "learn-preferences" --notes "<n> accepted, <m> rejected, <k> pending"`.
 
 ## Also tune the scorer
 

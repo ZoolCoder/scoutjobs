@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -20,27 +21,46 @@ import (
 // (brew, make install, scoutjobs update) replaces it, the server stops and the new binary takes
 // over in the same process, on the same address, so the dashboard never runs a stale version.
 func serveAndRestart(s *store.Store, addr string, restart bool, out io.Writer, cfg web.Config) error {
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return portBusy(addr, s.Home, err)
+	}
+	fmt.Fprintf(out, "ScoutJobs %s dashboard on http://%s  (data: %s)\n", Version, addr, s.Home)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if !restart || !canReexec {
-		return web.ServeContext(ctx, s, addr, cfg)
+	if !canReexec {
+		return web.ServeListener(ctx, l, s, cfg)
 	}
 	exe := selfPath()
 	srvCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	upgraded := make(chan string, 1)
+	reason := make(chan string, 1)
+	if restart {
+		go func() {
+			if v, ok := watchBinary(srvCtx, exe, 3*time.Second); ok {
+				reason <- fmt.Sprintf("binary upgraded (%s -> %s)", Version, v)
+				cancel()
+			}
+		}()
+	}
+	// kill -HUP <pid> restarts on whatever binary is installed now
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
 	go func() {
-		if v, ok := watchBinary(srvCtx, exe, 3*time.Second); ok {
-			upgraded <- v
+		select {
+		case <-hup:
+			reason <- "SIGHUP"
 			cancel()
+		case <-srvCtx.Done():
 		}
 	}()
-	if err := web.ServeContext(srvCtx, s, addr, cfg); err != nil {
+	if err := web.ServeListener(srvCtx, l, s, cfg); err != nil {
 		return err
 	}
 	select {
-	case v := <-upgraded:
-		fmt.Fprintf(out, "binary upgraded (%s -> %s), restarting the dashboard\n", Version, v)
+	case why := <-reason:
+		fmt.Fprintf(out, "%s, restarting the dashboard\n", why)
 		_ = s.Close()
 		return reexec(exe)
 	default:

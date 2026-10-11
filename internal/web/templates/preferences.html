@@ -1,13 +1,41 @@
 {{template "head" .}}
 {{with .Data}}
 {{$s := .Summary}}
+{{if .Pending}}
+<section class="panel review" aria-labelledby="review-h">
+<div class="panel-h"><h2 id="review-h">Awaiting your review</h2><span class="n">{{len .Pending}}</span><span class="act muted">proposed by <code>learn-preferences</code> from your decisions</span></div>
+<div class="proposals">
+{{range .Pending}}
+<article class="proposal">
+  <header><b>{{title .Key}}</b>{{if .Current}}<small class="muted">replaces “{{.Current}}”</small>{{else}}<small class="muted">new</small>{{end}}</header>
+  <p class="pvalue">{{.Value}}</p>
+  <div class="conf"><meter min="0" max="1" value="{{.Confidence}}"></meter><span class="mono">{{pct .Confidence}}</span></div>
+  <p class="small"><b>{{.Support}}</b> decision{{if ne .Support 1}}s{{end}} support it{{if .Against}} · <b>{{.Against}}</b> against{{end}}</p>
+  {{if .Evidence}}<blockquote class="small">{{.Evidence}}</blockquote>{{end}}
+  <div class="pactions">
+    <form method="post" action="/preferences/review"><input type="hidden" name="key" value="{{.Key}}"><button class="mini primary" name="action" value="confirm">Confirm</button></form>
+    <details class="pop"><summary class="mini">Edit</summary>
+      <form method="post" action="/preferences/review"><input type="hidden" name="key" value="{{.Key}}"><input type="hidden" name="action" value="edit">
+      <label>In your words<input name="value" value="{{.Value}}" required></label><button class="mini primary">Save as stated</button></form></details>
+    <details class="pop"><summary class="mini">Reject</summary>
+      <form method="post" action="/preferences/review"><input type="hidden" name="key" value="{{.Key}}"><input type="hidden" name="action" value="reject">
+      <label>Why not? <small class="muted">optional</small><input name="reason" placeholder="e.g. I skipped those for the salary, not the stack"></label><button class="mini out">Reject</button></form></details>
+  </div>
+</article>
+{{end}}
+</div>
+<p class="muted small">Confirm keeps it as learned. Edit stores your wording as stated. Reject stops it from coming back unless more decisions support it.</p>
+</section>
+{{end}}
 <div class="grid-2 wide-l">
 <section class="panel">
 <div class="panel-h"><h2>Learned preferences</h2><span class="n">{{len .Prefs}}</span><span class="act muted">set via <code>scoutjobs pref set</code></span></div>
 {{if .Prefs}}
 <table><thead><tr><th>Preference</th><th>Value</th><th>Source</th><th>Confidence</th><th>Updated</th></tr></thead><tbody>
 {{range .Prefs}}<tr><td><b>{{title .Key}}</b>{{if .Evidence}}<br><small class="muted">{{.Evidence}}</small>{{end}}</td><td>{{.Value}}</td><td><span class="badge {{.Source}}">{{.Source}}</span></td><td class="conf"><meter min="0" max="1" value="{{.Confidence}}"></meter><span class="mono">{{pct .Confidence}}</span></td><td class="mono">{{day .UpdatedAt}}</td></tr>{{end}}</tbody></table>
-<p class="muted small">Stated = you said it. Learned = inferred from your decisions, confirmed by you.</p>
+<p class="muted small">Stated = you said it; never overwritten by learning. Learned = inferred from your decisions, confirmed by you.</p>
+{{if .Rejected}}<details class="rejected"><summary class="muted small">{{len .Rejected}} rejected proposal{{if ne (len .Rejected) 1}}s{{end}}</summary>
+<ul>{{range .Rejected}}<li><b>{{title .Key}}</b> = {{.Value}} <small class="muted">{{day .DecidedAt}}{{if .Note}} · {{.Note}}{{end}}</small></li>{{end}}</ul></details>{{end}}
 {{else}}<p class="empty">Not enough decisions yet. Skip, apply and decline a few jobs, then run <code>learn-preferences</code>.</p>{{end}}
 </section>
 <section class="panel">

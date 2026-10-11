@@ -635,3 +635,20 @@ details.preview .pre{max-height:260px;overflow:auto;font-size:12.5px;margin:6px 
 .led .ver{display:inline-block;margin-top:5px;font:500 11px var(--mono,ui-monospace,monospace);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
 .led .ver:hover{color:var(--acc);border-color:var(--acc);text-decoration:none}
 .upgraded{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;background:var(--surface);border:1px solid var(--acc);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);font-size:13px}
+/* ---- preference review ---- */
+.review{border-color:var(--acc)}
+.proposals{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.proposal{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.proposal header{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.proposal .pvalue{margin:0;font-size:16px;font-weight:600}
+.proposal .conf{display:flex;align-items:center;gap:8px}
+.proposal .conf meter{flex:1}
+.proposal p.small{margin:0}
+.proposal blockquote{margin:0;padding:6px 10px;border-left:3px solid var(--line2);color:var(--muted)}
+.pactions{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap;margin-top:auto}
+.pactions details.pop{position:relative}
+.pactions details.pop summary{list-style:none;display:inline-flex;align-items:center;height:28px;padding:0 10px;font-size:12px;border:1px solid var(--line2);border-radius:8px;cursor:pointer}
+.pactions details.pop summary::-webkit-details-marker{display:none}
+.pactions details.pop[open] form{position:absolute;left:0;z-index:20;width:280px;display:flex;flex-direction:column;gap:8px;margin-top:6px;background:var(--surface);border:1px solid var(--line2);border-radius:12px;padding:12px;box-shadow:0 12px 32px rgba(0,0,0,.25)}
+.pactions label{display:flex;flex-direction:column;gap:4px;font-size:12px}
+details.rejected ul{margin:6px 0 0;padding-left:18px}

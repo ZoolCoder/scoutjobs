@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -256,5 +257,70 @@ func TestVersionBadgeAndEndpoint(t *testing.T) {
 	}
 	if rec := get(h, "/app.js"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "/version") {
 		t.Errorf("/app.js: %d", rec.Code)
+	}
+}
+
+func TestHealthz(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{Version: "0.3.2"})
+	var got Health
+	if err := json.Unmarshal(get(h, "/healthz").Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.App != "scoutjobs" || got.Version != "0.3.2" || got.Home != s.Home || got.PID != os.Getpid() {
+		t.Errorf("%+v", got)
+	}
+}
+
+func TestPreferenceReview(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{APIToken: "secret"})
+	if err := s.ProposePreference(store.Proposal{Key: "stack_avoid", Value: "java", Support: 5, Confidence: 0.7, Evidence: "5 skips mention Java"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ProposePreference(store.Proposal{Key: "on_call", Value: "avoid", Support: 3}); err != nil {
+		t.Fatal(err)
+	}
+	b := get(h, "/preferences").Body.String()
+	for _, want := range []string{"Awaiting your review", "5 skips mention Java", "<b>5</b> decisions support it", `value="confirm"`} {
+		if !strings.Contains(b, want) {
+			t.Errorf("review panel lacks %q", want)
+		}
+	}
+	if rec := post(h, "/preferences/review", url.Values{"key": {"stack_avoid"}, "action": {"edit"}, "value": {"java, spring"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("edit: %d %s", rec.Code, rec.Body)
+	}
+	if rec := post(h, "/preferences/review", url.Values{"key": {"on_call"}, "action": {"reject"}, "reason": {"fine with it"}}); rec.Code != http.StatusSeeOther {
+		t.Fatalf("reject: %d %s", rec.Code, rec.Body)
+	}
+	b = get(h, "/preferences").Body.String()
+	if strings.Contains(b, "Awaiting your review") || !strings.Contains(b, "1 rejected proposal") || !strings.Contains(b, "fine with it") {
+		t.Error("review panel did not update")
+	}
+	prefs, _ := s.Preferences()
+	got := map[string]store.Preference{}
+	for _, p := range prefs {
+		got[p.Key] = p
+	}
+	if p := got["stack_avoid"]; p.Value != "java, spring" || p.Source != "stated" {
+		t.Errorf("edited: %+v", p)
+	}
+	if _, ok := got["on_call"]; ok {
+		t.Error("a rejected proposal became a preference")
+	}
+
+	req := httptest.NewRequest("PUT", "/api/preferences/stack_avoid", strings.NewReader(`{"value":"go","source":"learned"}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 409 {
+		t.Errorf("learned PUT over stated: %d", rec.Code)
+	}
+	req = httptest.NewRequest("POST", "/api/preferences/proposals/nope", strings.NewReader(`{"action":"confirm"}`))
+	req.Header.Set("Authorization", "Bearer secret")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 404 {
+		t.Errorf("confirm unknown: %d", rec.Code)
 	}
 }
