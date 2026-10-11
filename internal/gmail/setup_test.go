@@ -1,6 +1,8 @@
 package gmail
 
 import (
+	"context"
+	"errors"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -60,7 +62,7 @@ func TestFindDownload(t *testing.T) {
 }
 
 func TestBeginAndCode(t *testing.T) {
-	c := &Client{ID: "cid", AuthURL: "https://auth.test/o"}
+	c := &Client{ID: "cid", Secret: "s", AuthURL: "https://auth.test/o"}
 	u, p, err := c.Begin("http://127.0.0.1:7070/gmail/callback")
 	if err != nil {
 		t.Fatal(err)
@@ -80,6 +82,26 @@ func TestBeginAndCode(t *testing.T) {
 	}
 	if _, _, err := (&Client{}).Begin("http://127.0.0.1/cb"); err == nil {
 		t.Error("began without a client id")
+	}
+}
+
+func TestMissingClientSecretStopsBeforeGoogle(t *testing.T) {
+	for _, c := range []*Client{{ID: "cid"}, {Secret: "s"}} {
+		_, _, err := c.Begin("http://127.0.0.1/cb")
+		var ce ConfigError
+		if !errors.As(err, &ce) || len(ce.Missing) != 1 {
+			t.Errorf("%+v: %v", c, err)
+		}
+		if _, err := c.Finish(context.Background(), Pending{}, "code"); !errors.As(err, &ce) {
+			t.Errorf("finish without a complete client: %v", err)
+		}
+	}
+	err := (&Client{ID: "cid", Secret: ""}).CheckConfig()
+	if err == nil || !strings.Contains(err.Error(), "secret is missing") || !strings.Contains(err.Error(), "gmail_client_secret") {
+		t.Errorf("message %v", err)
+	}
+	if err := (&Client{ID: "cid", Secret: "hunter2"}).CheckConfig(); err != nil {
+		t.Error(err)
 	}
 }
 

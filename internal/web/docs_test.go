@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/runner"
@@ -157,6 +158,10 @@ func TestPrepareAllAndAutoPrepare(t *testing.T) {
 	h.ServeHTTP(page, httptest.NewRequest("GET", "/jobs/1", nil))
 	if b := page.Body.String(); !strings.Contains(b, "data-run") || !strings.Contains(b, "<progress") {
 		t.Errorf("job page should show live progress: %s", b)
+	}
+	// the queue may not have started the run yet; it must not outlive the temp dir
+	for i := 0; i < 300 && (m.Latest(1) == nil || len(m.Waiting()) > 0); i++ {
+		time.Sleep(10 * time.Millisecond)
 	}
 	if run := m.Latest(1); run != nil {
 		m.Cancel(run.ID)

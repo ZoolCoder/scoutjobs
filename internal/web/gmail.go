@@ -98,10 +98,12 @@ func (v *server) gmailConnect(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		authURL, p, err = c.Begin("http://" + r.Host + "/gmail/callback")
 	}
+	feature := oauthFeature(r.FormValue("for"))
 	if err != nil {
-		http.Redirect(w, r, withParam("/inbox", "err", err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, withParam(feature.page, "err", feature.name+" was not connected: "+err.Error()), http.StatusSeeOther)
 		return
 	}
+	p.Feature = feature.key
 	v.gmail.put(p)
 	http.Redirect(w, r, authURL, http.StatusSeeOther)
 }
@@ -110,8 +112,9 @@ func (v *server) gmailCallback(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	p, ok := v.gmail.take(q.Get("state"))
 	c := v.gmailClient()
+	feature := oauthFeature(p.Feature)
 	if !ok || c == nil {
-		http.Redirect(w, r, withParam("/inbox", "err", "this Gmail sign-in expired or was not started here; press Connect Gmail again"), http.StatusSeeOther)
+		http.Redirect(w, r, withParam("/inbox", "err", "this Google sign-in expired or was not started here; press Connect again"), http.StatusSeeOther)
 		return
 	}
 	code, err := p.Code(q)
@@ -122,7 +125,15 @@ func (v *server) gmailCallback(w http.ResponseWriter, r *http.Request) {
 		t, err = c.Finish(ctx, p, code)
 	}
 	if err != nil {
-		http.Redirect(w, r, withParam("/inbox", "err", "Gmail was not connected: "+err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, withParam(feature.page, "err", feature.name+" was not connected: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if feature.key == "calendar" {
+		msg := "Google Calendar connected as " + t.Email + "."
+		if !gmail.HasScope(t.Scope, gmail.CalendarScope) && !gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
+			msg = "Google connected as " + t.Email + ", but Calendar was not allowed; reconnect and tick it."
+		}
+		http.Redirect(w, r, withParam("/calendar", "msg", msg), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, withParam("/inbox", "msg", "Gmail connected as "+t.Email+". Sync now reads replies to your applications"+calendarNote(t)+"."), http.StatusSeeOther)
@@ -140,6 +151,16 @@ func (v *server) gmailDisconnect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.Redirect(w, r, withParam("/inbox", "msg", "Gmail disconnected: access revoked at Google, token deleted"), http.StatusSeeOther)
+}
+
+// oauthTarget is the feature a Google sign-in was started for: its name in messages and its page.
+type oauthTarget struct{ key, name, page string }
+
+func oauthFeature(key string) oauthTarget {
+	if key == "calendar" {
+		return oauthTarget{"calendar", "Google Calendar", "/calendar"}
+	}
+	return oauthTarget{"gmail", "Gmail", "/inbox"}
 }
 
 func calendarNote(t gmail.Token) string {

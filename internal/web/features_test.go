@@ -330,7 +330,7 @@ func TestGmailConnectFromInbox(t *testing.T) {
 	s := testStore(t)
 	client := func() *gmail.Client {
 		c := gmail.LoadCredentials(s.Home)
-		return &gmail.Client{ID: c.ID, Home: s.Home, AuthURL: "https://auth.test/o"}
+		return &gmail.Client{ID: c.ID, Secret: c.Secret, Home: s.Home, AuthURL: "https://auth.test/o"}
 	}
 	h, _ := Handler(s, Config{Mail: MailHooks{Gmail: client}})
 	send := func(method, path, body, origin string) *httptest.ResponseRecorder {
@@ -370,5 +370,20 @@ func TestGmailConnectFromInbox(t *testing.T) {
 	}
 	if rec := send("GET", "/gmail/callback?state="+loc.Query().Get("state")+"&error=access_denied", "", ""); !strings.Contains(rec.Header().Get("Location"), "access_denied") {
 		t.Errorf("refusal: %s", rec.Header().Get("Location"))
+	}
+
+	// a Calendar reconnect reports on the Calendar page, under its own name
+	rec = send("POST", "/gmail/connect", "for=calendar", "")
+	loc, _ = url.Parse(rec.Header().Get("Location"))
+	back, _ := url.Parse(send("GET", "/gmail/callback?state="+loc.Query().Get("state")+"&error=access_denied", "", "").Header().Get("Location"))
+	if back.Path != "/calendar" || !strings.HasPrefix(back.Query().Get("err"), "Google Calendar was not connected") {
+		t.Errorf("calendar refusal: %s", back)
+	}
+
+	// without the secret nobody is sent to Google
+	_ = gmail.SaveCredentials(s.Home, gmail.Credentials{ID: "1-a.apps.googleusercontent.com"})
+	back, _ = url.Parse(send("POST", "/gmail/connect", "for=calendar", "").Header().Get("Location"))
+	if back.Path != "/calendar" || !strings.Contains(back.Query().Get("err"), "Google Calendar was not connected: the Google OAuth client secret is missing") {
+		t.Errorf("missing secret: %s", back)
 	}
 }

@@ -12,6 +12,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/zoolcoder/scoutjobs/internal/gmail"
+	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
 func run(t *testing.T, args ...string) string {
@@ -434,5 +437,23 @@ func TestDoctorKnowsEveryTemplateKey(t *testing.T) {
 		if m := key.FindStringSubmatch(line); m != nil && !configKeys[m[1]] {
 			t.Errorf("doctor would call %q unknown", m[1])
 		}
+	}
+}
+
+func TestGmailClientTakesTheImportedSecretForTheSameID(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	s, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	_ = gmail.SaveCredentials(s.Home, gmail.Credentials{ID: "1-a.apps.googleusercontent.com", Secret: "from-file"})
+	t.Setenv("SCOUTJOBS_GMAIL_CLIENT_SECRET", "")
+	if c := gmailClient(s, Config{GmailClientID: "1-a.apps.googleusercontent.com"}); c.Secret != "from-file" {
+		t.Errorf("same id: secret %q", c.Secret)
+	}
+	if c := gmailClient(s, Config{GmailClientID: "2-b.apps.googleusercontent.com"}); c.Secret != "" || c.CheckConfig() == nil {
+		t.Errorf("another id must not borrow the secret: %+v", c)
 	}
 }

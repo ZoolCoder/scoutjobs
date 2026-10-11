@@ -115,9 +115,9 @@
   {{if eq .GoogleCal "on"}}<form class="row" method="post" action="/calendar/sync"><input type="hidden" name="back" value="/calendar?view={{.View}}&amp;d={{.D}}"><button class="mini">Sync now</button>
   <span class="small muted">Interviews go to your Google Calendar; interviews found there come here. Every few minutes, both ways.</span></form>
   {{else if eq .GoogleCal "readonly"}}<div class="small"><p>Your Google Calendar shows here read-only. Reconnect and allow Calendar events to add your interviews to it and keep both in sync.</p>
-  <form method="post" action="/gmail/connect"><button class="mini primary">Reconnect Google</button></form></div>
+  <form method="post" action="/gmail/connect"><input type="hidden" name="for" value="calendar"><button class="mini primary">Reconnect Google</button></form></div>
   {{else if eq .GoogleCal "reconnect"}}<div class="small"><p>Sync your interviews with your Google Calendar. Enable the <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">Calendar API</a> in your Google Cloud project, then reconnect and allow Calendar.</p>
-  <form method="post" action="/gmail/connect"><button class="mini primary">Reconnect Google</button></form></div>
+  <form method="post" action="/gmail/connect"><input type="hidden" name="for" value="calendar"><button class="mini primary">Reconnect Google</button></form></div>
   {{else if eq .GoogleCal "setup"}}<p class="small muted">Connect Google on the <a href="/inbox">Inbox</a> page to sync your interviews with your Google Calendar.</p>{{end}}
   <p class="small muted">{{index .Counts "interview"}} interviews ahead.</p>
 </section>

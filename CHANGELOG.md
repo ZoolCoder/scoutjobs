@@ -7,6 +7,14 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Connecting Google without the OAuth client secret no longer fails at
+  Google's token endpoint with a Gmail error (#33). Connect checks the client
+  ID and secret first and names what is missing; a reconnect from the Calendar
+  page reports as Google Calendar and returns there; a config.yaml client ID
+  without a secret uses the imported client's secret; config.yaml edits apply
+  without restarting `serve`.
+
 ## [0.5.0] - 2026-10-11
 
 ### Added
