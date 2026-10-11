@@ -7,7 +7,23 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-11
+
 ### Added
+- Google Calendar sync both ways (`calendar sync`; the dashboard syncs every
+  few minutes): interviews scheduled in ScoutJobs are added without attendees,
+  so nobody is invited; calendar events that name a tracked company become
+  interviews; a move or a deletion follows on the other side. Only events
+  ScoutJobs created are ever written.
+- Main CV and cover letter on the Profile page, written by your agent; every
+  tailored resume and cover letter starts from them.
+- Documents panel per job: preview (Markdown, PDF, text), edit and download;
+  files that do not exist yet are not links.
+- Proposed e-mails per job: follow-up, interview thank-you, offer accept,
+  negotiate and decline. Saved or drafted in Gmail, never sent.
+- Prepare all and auto-prepare: a queue that prepares every open job above
+  your score floor, one at a time.
+- Live run progress on the job page; finished steps fold under Redo.
 - Job checklist: one list on the job page from fit to sent, with what is
   done, what needs a look, what blocks sending and the one next step.
 - Grouped navigation (Apply, Interview, You) with live counts of jobs being
@@ -188,7 +204,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.4.0
 [0.3.2]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.3.1
