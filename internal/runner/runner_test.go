@@ -356,13 +356,17 @@ func TestPrepStepIsAskedForByName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	past := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04") // over, outcome not logged yet
+	if _, err := rn.Store.AddInterview(store.Interview{JobID: j.ID, Stage: "screen", At: past}); err != nil {
+		t.Fatal(err)
+	}
 	got := run(t, rn, j, Request{Steps: []string{"prep"}})
 	if got.State != Done || states(got) != "prep=done" {
 		t.Fatalf("%s %s %s %v", got.State, got.Error, states(got), got.Log)
 	}
 	ivs, _ := rn.Store.Interviews(j.ID, false)
-	if len(ivs) != 1 || ivs[0].ID != id || ivs[0].Prep != "company,posting,questions" || ivs[0].PrepStatus != "in_progress" {
-		t.Fatalf("prep items not ticked: %+v", ivs)
+	if len(ivs) != 2 || ivs[1].ID != id || ivs[1].Prep != "company,posting,questions" || ivs[1].PrepStatus != "in_progress" || ivs[0].Prep != "" {
+		t.Fatalf("prep items not ticked on the coming interview: %+v", ivs)
 	}
 	if got = run(t, rn, j, Request{Steps: []string{"prep"}}); states(got) != "prep=skipped" {
 		t.Errorf("second run: %s", states(got))

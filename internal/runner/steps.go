@@ -81,15 +81,31 @@ func (rn *Runner) prepDone(j store.Job, dir string) (bool, string) {
 	return true, PrepName
 }
 
-// nextInterview is the job's earliest interview without an outcome.
+// nextInterview is the job's earliest interview still to come, else its latest one without an outcome.
+// Interview times are local wall time, so they compare as text with now in the same layout.
 func nextInterview(s *store.Store, jobID int64) (store.Interview, bool) {
 	ivs, _ := s.Interviews(jobID, true)
+	now := time.Now().Format("2006-01-02T15:04")
+	var past store.Interview
 	for _, iv := range ivs {
-		if iv.Outcome == "" {
+		if iv.Outcome != "" {
+			continue
+		}
+		if !before(iv.At, now) {
 			return iv, true
 		}
+		past = iv
 	}
-	return store.Interview{}, false
+	return past, past.ID != 0
+}
+
+// before reports whether wall time at, a date or a date and time, is already past now; a date-only
+// interview counts as to come for its whole day.
+func before(at, now string) bool {
+	if at == "" {
+		return false
+	}
+	return at < now[:min(len(at), len(now))]
 }
 
 // tickPrep marks the checklist items a prep pack covers on the job's next interview.
