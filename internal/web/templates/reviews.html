@@ -37,5 +37,16 @@
 </section>{{end}}
 </div>
 </div>
+{{with .Works}}{{if .Source}}<section class="panel" id="what-works">
+  <div class="panel-h"><h2>What works</h2><span class="act muted">how many applications got an answer, from every job you applied to</span></div>
+  {{with .Best}}<p class="callout">Your best source is <b>{{.Group}}</b>: {{.Rate}}% of {{.Applied}} applications got an answer.</p>{{else}}<p class="small muted">Apply to three or more jobs from one source to compare sources.</p>{{end}}
+  <div class="worksgrid">
+    <div><h3>By source</h3>{{template "worktable" .Source}}</div>
+    <div><h3>By fit</h3>{{template "worktable" .Fit}}</div>
+    <div><h3>By month applied</h3>{{template "worktable" .Month}}</div>
+  </div>
+</section>{{end}}{{end}}
 {{end}}
+{{define "worktable"}}<table class="review works"><thead><tr><th scope="col">Group</th><th scope="col">Applied</th><th scope="col">Answered</th><th scope="col">Interview</th><th scope="col">Offer</th></tr></thead>
+<tbody>{{range .}}<tr><td>{{.Group}}</td><td>{{.Applied}}</td><td><meter min="0" max="100" value="{{.Rate}}" aria-label="{{.Rate}}% answered"></meter> {{.Rate}}%</td><td>{{.Interview}}</td><td>{{.Offer}}</td></tr>{{end}}</tbody></table>{{end}}
 {{template "foot" .}}

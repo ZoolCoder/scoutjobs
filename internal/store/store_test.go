@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func open(t *testing.T) *Store {
 	t.Helper()
@@ -254,5 +257,44 @@ func TestSearchDailyAndLastRun(t *testing.T) {
 	}
 	if got, _ = s.SavedSearches(); !got[0].Daily || got[0].Queries != "golang" {
 		t.Fatalf("resave: %+v", got)
+	}
+}
+
+func TestFunnelGroupsAppliedJobs(t *testing.T) {
+	s := open(t)
+	add := func(company, source string, fit int64, path ...string) {
+		j, _, err := s.UpsertJob(Job{Company: company, Title: "Engineer", Source: source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = s.UpdateJob(j.ID, JobPatch{FitScore: &fit})
+		for _, st := range path {
+			_ = s.UpdateJob(j.ID, JobPatch{Status: &st})
+		}
+	}
+	add("A", "greenhouse", 80, "applied", "interview", "offer")
+	add("B", "greenhouse", 60, "applied", "rejected")
+	add("C", "greenhouse", 40, "applied")
+	add("D", "", -1, "applied", "no_response")
+	add("E", "lever", 90)
+	f, err := s.Funnel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Source) != 2 || f.Source[0] != (FunnelRow{"greenhouse", 3, 2, 1, 1}) || f.Source[1] != (FunnelRow{"manual", 1, 0, 0, 0}) {
+		t.Errorf("source = %+v", f.Source)
+	}
+	if b := f.Best(); b == nil || b.Group != "greenhouse" || b.Rate() != 66 {
+		t.Errorf("best = %+v", b)
+	}
+	var bands []string
+	for _, r := range f.Fit {
+		bands = append(bands, r.Group)
+	}
+	if strings.Join(bands, ",") != "75+,50–74,under 50,not scored" {
+		t.Errorf("fit bands = %v", bands)
+	}
+	if len(f.Month) != 1 || f.Month[0].Applied != 4 || len(f.Month[0].Group) != 7 {
+		t.Errorf("month = %+v", f.Month)
 	}
 }

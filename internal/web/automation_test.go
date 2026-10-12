@@ -240,3 +240,26 @@ func TestStoryBankPageAndJobMapping(t *testing.T) {
 		}
 	}
 }
+
+func TestWhatWorksPanelAndAPI(t *testing.T) {
+	s := testStore(t)
+	h := mustHandler(t, s, Config{})
+	if b := get(h, "/reviews").Body.String(); strings.Contains(b, "What works") {
+		t.Error("What works without applications")
+	}
+	for i, st := range []string{"interview", "rejected", "applied"} {
+		j, _, _ := s.UpsertJob(store.Job{Company: fmt.Sprintf("Co%d", i), Title: "Eng", Source: "lever"})
+		applied := "applied"
+		_ = s.UpdateJob(j.ID, store.JobPatch{Status: &applied})
+		_ = s.UpdateJob(j.ID, store.JobPatch{Status: &st})
+	}
+	b := get(h, "/reviews").Body.String()
+	for _, want := range []string{"What works", "Your best source is <b>lever</b>: 66%", "By month applied"} {
+		if !strings.Contains(b, want) {
+			t.Errorf("reviews lacks %q", want)
+		}
+	}
+	if rec := get(h, "/api/funnel"); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"group":"lever","applied":3,"responded":2`) {
+		t.Errorf("api: %d %s", rec.Code, rec.Body.String())
+	}
+}

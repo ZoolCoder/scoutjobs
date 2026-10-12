@@ -403,6 +403,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	api.HandleFunc("POST /api/jobs/{id}/status", srv.apiSetStatus)
 	api.HandleFunc("POST /api/jobs/{id}/note", srv.apiNote)
 	api.HandleFunc("GET /api/stats", srv.apiStats)
+	api.HandleFunc("GET /api/funnel", srv.apiFunnel)
 	api.HandleFunc("GET /api/brief", srv.apiBrief)
 	api.HandleFunc("GET /api/events", srv.apiEvents)
 	api.HandleFunc("GET /api/jobs/{id}/check", srv.apiCheck)
@@ -842,7 +843,8 @@ func (v *server) reviews(w http.ResponseWriter, r *http.Request) {
 	if len(up) > 3 {
 		up = up[:3]
 	}
-	v.render(w, r, "reviews.html", "reviews", map[string]any{"Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
+	works, _ := v.s.Funnel()
+	v.render(w, r, "reviews.html", "reviews", map[string]any{"Works": works, "Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
 		"Older": older, "Newer": newer, "Upcoming": up,
 		"Funnel": funnelOf(st), "Stats": st, "Target": v.cfg.WeeklyApplyTarget, "ThisWeek": v.s.WeeklyCounts("status", "%applied%", 1)})
 }
@@ -1334,6 +1336,15 @@ func (v *server) apiStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, st)
+}
+
+func (v *server) apiFunnel(w http.ResponseWriter, r *http.Request) {
+	f, err := v.s.Funnel()
+	if err != nil {
+		apiErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, f)
 }
 
 // apiBrief is the daily-briefing payload: what needs attention today, small enough for an automation step.
