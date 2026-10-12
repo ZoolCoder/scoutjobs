@@ -67,9 +67,18 @@ image::keywords.png[Keywords to add: one requirement the tailored CV does not wo
 
 *Keywords to add* lists the requirements the tailored resume does not say in the posting's words yet: the agreed wording from `fit-review.json` that is missing from `resume.md`, and the gaps of the latest CV check for this job. Each row shows where it came from and the line in `profile.md` that backs it. *Fix with AI* reruns the tailor and review steps with only the backed wordings added; a gap with no evidence in your profile is listed but never written into the CV.
 
-image::job-gates.png[Ready to send: one check still to fix, and why the job fits with evidence from profile.md,760]
+image::job-gates.png[Ready to send: a score of 60 out of 100 with two checks to fix, why the job fits with evidence from profile.md, and what to expect from this application,760]
 
-*Ready to send?* runs the same seven quality gates as `scoutjobs job check` on every page load: the documents exist and are not stubs, the fit review has no veto, every must-have is covered and its agreed wording is in the drafts, the draft-reviewer logged a `send` verdict after the last edit, nothing is duplicated, `resume.pdf` has a text layer, and the filenames look professional. A warning never blocks; a failure does, and the panel says what to do about each one:
+*Ready to send?* runs the same quality gates as `scoutjobs job check` on every page load: the documents exist and are not stubs, the fit review has no veto, every must-have is covered and its agreed wording is in the drafts, the draft-reviewer logged a `send` verdict after the last edit, nothing is duplicated, `resume.pdf` has a text layer, and the filenames look professional. Four more read the drafts against your own record:
+
+Every number traces:: each figure in the resume and cover letter (a percentage, an amount, a count of 10 or more) must appear in `profile.md`, a CV, a story or the posting. An untraced number is a claim you cannot back in the interview, so it fails.
+Written for this company:: the cover letter names the company and the job title or one of the posting's requirements; a letter that could go anywhere warns.
+Fits your must-haves:: the job breaks nothing you said you need (place, work mode, engagement, salary floor); a break warns.
+No other recent application:: another application to the same company in the last 90 days warns, since the recruiter sees both.
+
+The score next to the title is the share of checks passed, a warning counting half; any failure caps it at 60. A warning never blocks; a failure does, and the panel says what to do about each one. *Mark applied* is refused while a check fails (`POST /api/jobs/\{id}/status` answers `409`). If you sent it anyway, *I applied anyway* asks why and logs the reason as `check:override`. Every *Mark applied* logs the score, so *What works* can show whether ready applications get more answers.
+
+*What to expect*, under *Why this job fits*, gives the chance of an answer and of an interview for jobs like this one, from your own applications from the same source and fit band, with the likely range. It starts after 15 applications; before that it says how many there are so far.
 
 image::job-blocked.png[A drafted job: the review asked for fixes and the resume PDF is not made yet,1200]
 
@@ -111,11 +120,33 @@ image::story-new.png[New story: title, context, role, when, themes, numbers, cor
 
 On a job, the *Interviews* tab has *Stories for this job*: every must-have with the best story for it, or a flag when there is none. The prep pack uses the same map.
 
+== Interview prep
+
+A job's *Interviews* tab gathers what you know about the company, kept per company in `companies/<name>/` in the data folder so the next job there starts from it.
+
+image::question-bank.png[The question bank: seven questions with where each came from, rehearsed ticks and answer ratings, the mock interview buttons, and the company file,1200]
+
+Question bank:: The questions this company asks: from pasted reports (*reported*), your debriefs (*debrief*), the prep pack (*prep*) and the ones you add. Tick *Rehearsed* once you answered one out loud and rate your answer from 1 to 5; three rehearsed questions tick the *stories* item of your next interview.
+Company file:: *Company research* is what the AI assistant found on public sources (the company site, news, the engineering blog); *Research again with AI* refreshes it, and the prep pack reads it. *Your notes* holds what you pasted and your debriefs. *Paste reviews or interview reports* takes text you copied yourself, from Glassdoor, Blind or a friend: ScoutJobs never logs in to or fetches those sites. Every line that ends in a question mark goes to the question bank.
+Debrief:: Under a past interview, *Write a debrief* asks for the questions they asked (one per line), what went well and what to work on. The questions join the bank and the notes join the company file.
+
+*Start mock interview* picks up to five questions from the bank, the ones not rehearsed yet first, and opens a page to type your answers.
+
+image::mock.png[A written mock interview: the assistant's feedback with an overall 4 out of 5, then each answer with its rating and a note,1200]
+
+*Save answers* keeps them; *Save and score with AI* has the assistant rate each answer from 1 to 5 with a note on what to add, and write what to practise. The score is logged as a practice session on *Learning*, and the ratings go back to the bank.
+
+image::offer.png[A job at the offer stage: offer prep ready, with Write offer prep again,1200]
+
+When a job reaches *offer*, an *Offer* panel tops its page. *Prepare for the offer talk* has the assistant compare the offer with your preferences and the market and write `offer-prep.md`: what to ask for, and how. It never invents numbers, and nothing is accepted or sent for you.
+
 == Reviews
 
 The weekly reviews the `weekly-review` skill writes, and *What works*: from every job you applied to, how many got an answer, an interview and an offer, grouped by source, by fit band (75+, 50–74, under 50, unscored) and by month applied. A line on top names the source that answers most once it has three applications. `GET /api/funnel` and `scoutjobs stats --funnel` return the same numbers. Under *By source*, *Usual wait for an answer* gives the median days to the first answer for each source with three answers or more. Fit scores use the same table: a source that answers you at least 15 points above or below your average, over five applications or more, moves a job's fit by 5 points, and the job's reasons say so.
 
-image::what-works.png[What works: answer rate by source, by fit band and by month applied,1200]
+*Next 30 days* on top counts the applications still waiting for an answer and how many interviews they should bring from your record, with a likely range, and how many more applications bring one more interview. *By quality checks* groups the applications by the score they had when you marked them applied. `GET /api/forecast` returns the chances per source and the outlook.
+
+image::what-works.png[What works: the best source, the next 30 days outlook, and answer rates by source, fit band, month applied and quality checks,1200]
 
 == Automation
 

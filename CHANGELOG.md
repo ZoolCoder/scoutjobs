@@ -7,6 +7,37 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-12
+
+### Added
+- Ready to send score: the job page rates each application from 0 to 100.
+  New checks trace every number in the drafts to your profile, CV, stories or
+  the posting, warn about a generic cover letter, a job that breaks your
+  must-haves, and another application to the same company in 90 days.
+- *Mark applied* is refused while a check fails (the API answers `409`);
+  *I applied anyway* records why as `check:override`. The score is logged on
+  every submission.
+- Forecast: the chance of an answer and an interview for a job, from your
+  own applications by source and fit, with a likely range; on Reviews, the
+  interviews to expect in the next 30 days. `GET /api/forecast`. Starts after
+  15 applications.
+- *What works* groups applications by their quality score too.
+- Company file per company: AI research from public sources, and notes you
+  paste from review sites yourself. ScoutJobs never logs in to or scrapes
+  Glassdoor or similar sites. The prep pack reads the research.
+- Question bank per company, filled from pasted reports, debriefs and the
+  prep pack: tick what you rehearsed and rate your answers; three rehearsed
+  questions tick the *stories* prep item.
+- Debrief on past interviews: questions asked, what went well, what to work
+  on, saved on the interview, the question bank and the company notes.
+- Written mock interview: five questions from the bank, your typed answers,
+  and an optional AI score per answer logged as a practice session.
+- Offer panel on jobs at the offer stage: the assistant writes
+  `offer-prep.md` with what to ask for and how.
+
+### Changed
+- *What works* tables sit two per row so every column shows.
+
 ## [0.8.0] - 2026-10-12
 
 ### Added
@@ -368,7 +399,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...v0.6.0

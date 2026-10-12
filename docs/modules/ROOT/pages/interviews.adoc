@@ -41,6 +41,8 @@ With the Google Calendar connector, the `calendar-sync` skill does it both ways 
 
 A timed session with a persona (in Claude Code a dedicated interviewer subagent; elsewhere the main agent plays it until you say "done"), scored against the frameworks in `behavioral-frameworks`, `coding-frameworks` and `system-design-frameworks`, logged with `scoutjobs session log` so the Interviews page shows the trend.
 
+On the dashboard, a job's *Interviews* tab has a written mock: *Start mock interview* picks five questions from the company's question bank, unrehearsed ones first, you type the answers, and *Save and score with AI* rates each one and logs the session. See xref:dashboard.adoc#_interview_prep[Interview prep].
+
 == Debrief
 
 ----
@@ -48,6 +50,8 @@ A timed session with a persona (in Claude Code a dedicated interviewer subagent;
 ----
 
 Right after a real interview: the questions asked, what went well, what did not, the outcome, and a thank-you note draft saved as `debrief-<date>.md`. Questions you could not answer become learning items.
+
+On the dashboard, *Write a debrief* under a past interview saves the same three parts on the interview, adds the questions to the company's question bank and the notes to `companies/<name>/notes.md`, so the next interview there starts from them.
 
 == Learn
 
