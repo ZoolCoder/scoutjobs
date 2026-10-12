@@ -1,5 +1,6 @@
 * xref:index.adoc[Introduction]
 * xref:install.adoc[Install]
+* xref:getting-started.adoc[Your first job search]
 * xref:quickstart.adoc[Quickstart]
 * Using it
 ** xref:dashboard.adoc[Dashboard]

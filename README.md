@@ -8,7 +8,7 @@
 <p align="center">
 <a href="https://github.com/ZoolCoder/scoutjobs/releases/latest"><img src="https://img.shields.io/github/v/release/ZoolCoder/scoutjobs?label=release" alt="Latest release"></a>
 <a href="https://github.com/ZoolCoder/scoutjobs/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/ZoolCoder/scoutjobs/release.yml?label=build" alt="Build"></a>
-<a href="https://zoolcoder.github.io/scoutjobs/"><img src="https://img.shields.io/badge/docs-manual-0F766E" alt="User manual"></a>
+<a href="https://zoolcoder.github.io/scoutjobs/"><img src="https://img.shields.io/badge/docs-manual-7C3AED" alt="User manual"></a>
 <a href="LICENSE"><img src="https://img.shields.io/github/license/ZoolCoder/scoutjobs" alt="MIT"></a>
 <a href="https://github.com/ZoolCoder/scoutjobs/issues"><img src="https://img.shields.io/github/issues/ZoolCoder/scoutjobs" alt="Issues"></a>
 </p>
@@ -17,7 +17,7 @@ Your job search, on your machine. An open-source job-search operating system for
 
 - **Skills** (Agent Skills standard) for the whole loop: find jobs, score fit, check your CV, tailor resume and cover letter, track applications, prep and mock interviews, debrief, negotiate, upskill.
 - **A learning loop**: every skip, apply, withdraw and declined offer is logged with your reason. `learn-preferences` turns those into preferences you confirm, and the scorer and tailoring skills read them. It gets better the longer you use it.
-- **A dashboard**: a single Go binary, SQLite, no Node, no JavaScript, no external assets, bound to localhost. Overview with your next best move, pipeline board where every card opens the job and moves to the next stage with one click or a drag, a per-job "get selected" checklist (tailored CV, cover letter, ATS check), drafts you can edit in place, a "due this week" filter, an add-job form and a board search page, weekly reviews next to the live funnel, interviews, learning progress, preferences it learned, profile and CV health, activity log. Light by default, dark and auto available.
+- **A dashboard for people, not just developers**: a single Go binary, SQLite, no Node, one embedded script, no external assets, bound to localhost. Overview with your next best move, job search with plain-language match reasons, pipeline board where every card opens the job and moves to the next stage with one click or a drag, a per-job *Continue with AI* button that tailors your CV and cover letter and checks them before you send, an inbox that matches company replies to your jobs, a Connections page for your AI assistant, mail and calendar, drafts you can edit in place, a "due this week" filter, an add-job form and a board search page, weekly reviews next to the live funnel, interviews, learning progress, preferences it learned, profile and CV health, activity log. Light by default, dark and auto available.
 - **A built-in job search**: `scoutjobs search` queries public ATS boards (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR) by slug or careers URL, any RSS feed and remote aggregators (Remotive, RemoteOK, Arbeitnow, Jobicy, Himalayas, HN Who is hiring) without an API key, imports a single posting by URL (`job add --from`), deduplicates by posting URL and normalised title, converts salaries to your currency, and adds results to the pipeline.
 - **Apply by e-mail**: `scoutjobs email draft|send` builds the application from your cover letter and tailored resume and sends it through your own SMTP account. The CLI refuses without `--yes`, and the skill asks you first. Every job page also offers a `mailto:` link for your own mail app.
 - **A calendar like Google's**: day, week, month and schedule views of interviews, deadlines and follow-ups, click a slot to schedule, click an event to move it. Every event has *Add to Google Calendar* and an `.ics` download, and the whole calendar is a subscribable feed.
@@ -65,11 +65,33 @@ scoutjobs init           # creates ~/.scoutjobs with profile.md, preferences.md,
 scoutjobs serve          # dashboard at http://127.0.0.1:7070
 ```
 
-![The overview: next best move, the four numbers, pipeline health, upcoming interviews and drafts waiting](docs/modules/ROOT/images/overview.png)
-
 CLI only: `brew install --cask zoolcoder/scoutjobs/scoutjobs`, a `deb`, `rpm` or `apk` package, or a binary for macOS, Linux and Windows from [Releases](https://github.com/zoolcoder/scoutjobs/releases). `scoutjobs doctor` checks the install, `scoutjobs update` installs the next release (checksum verified; Homebrew and package installs are handed to their manager).
 
-Then in your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds your profile from a CV, records what you want). After that the daily loop is:
+![The overview: next best move, the four numbers, pipeline health, today's tasks, interviews, CV health, learning and activity](docs/modules/ROOT/images/overview.png)
+
+### Your first job search, in the dashboard
+
+No command line needed after `scoutjobs serve`. Each step is a page in the sidebar:
+
+1. **Profile & CV**: drop your resume in the CV folder, fill `profile.md` (or ask your assistant "set up scoutjobs" and paste your CV), then *Prepare with AI* writes the main resume and cover letter every job starts from.
+2. **Connections**: pick your AI assistant (Claude or Codex, on the subscription you already have), connect mail and calendar, choose the job boards. *Test connection* on each card.
+3. **Find jobs**: type the job and the place, or press a suggestion built from your profile. Results come best match first, with what fits and what does not in plain words. *+ Add to pipeline* on the good ones.
+
+   ![Search results: a score and label per job, what fits and what does not](docs/modules/ROOT/images/search-results.png)
+
+4. **Pipeline**: every job is a card from *New* to *Offer*. Click one to open it, drag it when something changes.
+5. **The job page**: *Continue with AI* tailors the resume and cover letter, reviews them and prepares the e-mail. Read the drafts, fix what *Ready to send?* flags, then send it yourself from your mail app or the company's site. Nothing is sent for you.
+6. **Inbox**: *Sync now* reads company replies, matches each to its job and turns interview invitations into interviews.
+
+   ![Inbox: replies grouped by day, each tagged with its kind and its job](docs/modules/ROOT/images/inbox.png)
+
+7. **Interviews and Calendar**: a prep checklist per interview, and *Sync now* puts them in your own calendar.
+
+The full walkthrough with a screenshot of every page: [Your first job search](https://zoolcoder.github.io/scoutjobs/scoutjobs/getting-started.html).
+
+### Or from your AI assistant
+
+In your agent: "set up scoutjobs" (runs the `scoutjobs-setup` skill: builds your profile from a CV, records what you want). After that the daily loop is:
 
 | You say | Skill | What happens |
 |---|---|---|
@@ -304,11 +326,13 @@ webhook_secret:         # optional; signs every POST (X-ScoutJobs-Signature, HMA
 
 `scoutjobs serve` is a second window onto the same `~/.scoutjobs` the CLI and the agents use: SQLite plus the application folders, rendered as plain HTML on every request, nothing cached and nothing stored in the browser but the theme. The agents write through the CLI; you watch the result here and edit drafts in place, and the agent reads your edit on its next turn.
 
-![The pipeline board: a column per stage, a fit gauge per card, a veto badge, drag and drop between stages](docs/modules/ROOT/images/pipeline.png)
+![The pipeline board: a column per stage, a fit ring per card, drag and drop between stages](docs/modules/ROOT/images/pipeline.png)
 
-The job page carries the "Get selected" kit (tailor, cover letter, ATS check, send), the files in the application folder, the seven quality gates from `scoutjobs job check` with what blocks sending, and the evidence table from `fit-review.json`:
+The job page has one button, *Continue with AI*: your assistant tailors the resume and cover letter, reviews them against your profile and prepares the e-mail, and a checklist shows each step. Below it the quality gates from `scoutjobs job check` with what blocks sending, and the evidence from `fit-review.json`:
 
-![Ready to send: the seven gates and the evidence table, one row per requirement with evidence, strength and the wording the CV may use](docs/modules/ROOT/images/job-gates.png)
+![One job: Continue with AI, the step checklist, the drafts and the job details](docs/modules/ROOT/images/job.png)
+
+![Ready to send: the quality gates and why the job fits, with evidence from your profile](docs/modules/ROOT/images/job-gates.png)
 
 Every page is described in the manual: [Dashboard](https://zoolcoder.github.io/scoutjobs/scoutjobs/dashboard.html).
 
@@ -350,14 +374,14 @@ make docs      # user manual into build/site (Antora, needs Node 22 and kroki.io
 claude plugin validate .
 ```
 
-Go 1.27 or newer. The only dependency is `modernc.org/sqlite` (pure Go, no cgo). Templates are stdlib `html/template`, embedded. Design tokens, logo (`design/logo/`, the mint magnifier with the four-point spark) and the per-page mockups live in `design/`.
+Go 1.27 or newer. The only dependency is `modernc.org/sqlite` (pure Go, no cgo). Templates are stdlib `html/template`, embedded. Design tokens, logo (`design/logo/`, the violet magnifier with the four-point spark) and the per-page mockups live in `design/`.
 
 ## Security and privacy
 
 - Job postings, company pages and API responses are untrusted input. Skills extract facts and never follow instructions found in them. Keep this rule if you write new skills.
 - Skills never create accounts, log in anywhere, or fill web forms. The one way an application leaves the machine is `scoutjobs email send --yes` from your own SMTP account, after the skill has shown you the full message and you said yes. Gmail needs an app password; put it in `SCOUTJOBS_SMTP_PASSWORD`, not in a file.
 - LinkedIn and Indeed forbid scraping; `job-search` uses public ATS APIs (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio), RSS feeds, Remotive and RemoteOK, plus whatever you paste.
-- The dashboard binds to `127.0.0.1`, ships no JavaScript and sends a strict Content-Security-Policy. The pages have no authentication; the JSON API can require a bearer token (`api_token`). Do not expose it to a network you do not trust.
+- The dashboard binds to `127.0.0.1`, serves its one script from the binary (no inline script, nothing from a CDN) and sends a strict Content-Security-Policy. The pages have no authentication; the JSON API can require a bearer token (`api_token`). Do not expose it to a network you do not trust.
 - The webhook is off until you set `webhook_url`. Nothing is sent anywhere by default.
 - `.gitignore` excludes databases and profile files. Never commit `~/.scoutjobs`.
 
