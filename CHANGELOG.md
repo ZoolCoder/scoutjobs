@@ -7,6 +7,8 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-12
+
 ### Added
 - Daily searches: press *Run daily* on a saved search and it runs once a day,
   adding up to 20 good matches to the pipeline. The overview says how many
@@ -366,7 +368,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.5.0
