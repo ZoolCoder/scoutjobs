@@ -10,6 +10,7 @@ Input:
 
 ```bash
 scoutjobs stats --json
+scoutjobs stats --funnel --json   # what works: answer, interview and offer counts by source, fit band, month applied
 scoutjobs job list --json --compact
 scoutjobs decision summary --json
 scoutjobs session list --limit 50 --json
@@ -20,6 +21,7 @@ scoutjobs learn list --json
 
 1. **Numbers**: applied this week vs target, interviews held, offers, response rate, average fit of applied jobs. Compare with last week's review file if it exists.
 2. **Funnel health**: where jobs got stuck. Many `ranked` not `drafted` = application friction, suggest batching. Many `applied` with no response and avg fit under 65 = aim higher on fit, lower on volume. Interviews failing at one stage = point `mock-interview` there.
+   **What works**: from the funnel, name the source and the fit band with the best answer rate (only groups with 3+ applications) and the one with the worst, with numbers; `days` is the median days to an answer. Suggest moving next week's applications toward the better one.
 3. **Close out**: list `stale` jobs and ask to mark them `no_response` in one go. List due follow-ups.
 4. **Learn**: run the `learn-preferences` skill now (it confirms with the user).
 5. **Skills**: learning hours this week, items done, `upskill` suggestion if a gap caused a rejection.

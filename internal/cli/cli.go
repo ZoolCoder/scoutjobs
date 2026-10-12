@@ -45,8 +45,9 @@ Usage: scoutjobs <command> [subcommand] [flags]
   contacts <job>|--company x who you know at a company (from the LinkedIn import)
   session log|list
   learn add|list|set
-  stats                      funnel, weekly numbers, follow-ups due
+  stats [--funnel]           funnel, weekly numbers, follow-ups due; --funnel: what works by source, fit, month
   brief [--compact]          everything the daily briefing needs (json)
+  daily [--json]             daily searches, follow-up drafts, prep packs: what serve does every hour (sends nothing)
   export                     full json dump
   serve [--addr 127.0.0.1:7070]   dashboard, calendar feed, JSON API, MCP over HTTP on /mcp (needs api_token)
                              restarts itself when the binary is upgraded (--no-restart to opt out; kill -HUP <pid> to force)
@@ -120,6 +121,8 @@ func Run(args []string, out io.Writer) error {
 		return runStats(s, rest, out)
 	case "brief":
 		return runBrief(s, rest, out)
+	case "daily":
+		return runDaily(s, cfg, rest, out)
 	case "export":
 		return runExport(s, out)
 	case "serve":
@@ -986,8 +989,12 @@ func runLearn(s *store.Store, rest []string, out io.Writer) error {
 func runStats(s *store.Store, rest []string, out io.Writer) error {
 	fs := flag.NewFlagSet("stats", flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "")
+	funnel := fs.Bool("funnel", false, "what works: answers, interviews and offers by source, fit band and month applied")
 	if err := fs.Parse(rest); err != nil {
 		return err
+	}
+	if *funnel {
+		return runFunnel(s, *asJSON, out)
 	}
 	cfg := LoadConfig(s.Home)
 	st, err := s.Stats(cfg.FollowUpDays, cfg.StaleDays)
@@ -1014,6 +1021,35 @@ func runStats(s *store.Store, rest []string, out io.Writer) error {
 			for _, j := range st.Stale {
 				fmt.Fprintf(out, "  #%d %s / %s (since %s)\n", j.ID, j.Company, j.Title, j.UpdatedAt[:10])
 			}
+		}
+	})
+}
+
+// runFunnel prints the What works tables of the Reviews page.
+func runFunnel(s *store.Store, asJSON bool, out io.Writer) error {
+	f, err := s.Funnel()
+	if err != nil {
+		return err
+	}
+	return emit(out, asJSON, f, func() {
+		for _, t := range []struct {
+			name string
+			rows []store.FunnelRow
+		}{{"source", f.Source}, {"fit", f.Fit}, {"month applied", f.Month}} {
+			if len(t.rows) == 0 {
+				continue
+			}
+			fmt.Fprintf(out, "%-14s %7s %7s %9s %5s %6s\n", "by "+t.name, "applied", "answer", "interview", "offer", "rate")
+			for _, r := range t.rows {
+				fmt.Fprintf(out, "%-14s %7d %7d %9d %5d %5d%%\n", r.Group, r.Applied, r.Responded, r.Interview, r.Offer, r.Rate())
+			}
+			fmt.Fprintln(out)
+		}
+		if b := f.Best(); b != nil {
+			fmt.Fprintf(out, "best source: %s answers %d%% of %d applications\n", b.Group, b.Rate(), b.Applied)
+		}
+		if len(f.Source) == 0 {
+			fmt.Fprintln(out, "no applications yet")
 		}
 	})
 }

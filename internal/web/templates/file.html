@@ -11,7 +11,7 @@
 <span class="now">{{$.Now}}</span>
 </header>
 <section class="panel">
-  <div class="panel-h"><h2>{{if .Edit}}Edit{{else}}Preview{{end}}</h2><span class="n">{{kb .Size}} · {{.Mod}}</span>{{if .Saved}}<span class="badge filled">saved</span>{{end}}{{if .Edit}}<span class="act muted">edit here, in your editor, or ask the agent to rewrite it</span>{{end}}</div>
+  <div class="panel-h"><h2>{{if .Edit}}Edit{{else}}Preview{{end}}</h2><span class="n">{{kb .Size}} · {{when .Mod}}</span>{{if .Saved}}<span class="badge filled">saved</span>{{end}}{{if .Edit}}<span class="act muted">edit here, in your editor, or ask the agent to rewrite it</span>{{end}}</div>
   {{if .Edit}}
   <form class="edit" method="post" action="{{.SaveURL}}" data-busy="Saving…">
     <textarea name="body" rows="24" spellcheck="true">{{.Body}}</textarea>

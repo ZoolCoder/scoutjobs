@@ -24,10 +24,14 @@
 </form>
 <div class="pipe-body">
 <div class="pipe-main">
+{{with .Msg}}<p class="callout">{{.}}</p>{{end}}
+{{if .Queue.Busy}}<div class="queuestrip" data-queue>{{template "queue-text" .Queue}}</div>{{end}}
 {{if eq $f.View "list"}}
+{{if .Batch}}<form id="batch" class="batchbar" method="post" action="/pipeline/prepare" data-busy="Queuing…"><input type="hidden" name="back" value="{{$.Path}}"><button class="mini go" type="submit">Prepare selected with AI</button><small class="muted">Tick new or ranked jobs. Your AI assistant tailors the CV and writes the cover letter for each, one at a time. Nothing is sent.</small></form>{{end}}
 <div class="panel tight listview"><table class="issues">
-  <thead><tr><th>Key</th><th>Job</th><th>Where</th><th>Status</th><th>Fit</th><th>Due</th><th>Updated</th><th></th></tr></thead>
+  <thead><tr>{{if .Batch}}<th><span class="sr-only">Select</span></th>{{end}}<th>Key</th><th>Job</th><th>Where</th><th>Status</th><th>Fit</th><th>Due</th><th>Updated</th><th></th></tr></thead>
   <tbody>{{range .Jobs}}<tr class="{{if eq .ID $sel}}sel{{end}}">
+    {{if $.Data.Batch}}<td class="pick">{{if preparable .}}<input type="checkbox" form="batch" name="job" value="{{.ID}}" aria-label="Prepare {{.Company}}">{{end}}</td>{{end}}
     <td class="mono key"><a href="{{$f.JobURL .ID}}" data-issue>SJ-{{.ID}}</a></td>
     <td><a class="row-job" href="{{$f.JobURL .ID}}" data-issue><span class="av h{{hue .Company}}">{{initial .Company}}</span><span><b>{{.Company}}</b><small>{{.Title}}</small></span></a></td>
     <td class="where">{{if eq .Remote "remote"}}remote{{if .Location}} · {{end}}{{end}}{{.Location}}</td>
@@ -35,7 +39,7 @@
     <td>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else}}{{template "gauge" .FitScore}}{{end}}</td>
     <td class="mono">{{.Deadline}}</td><td class="mono muted">{{date .UpdatedAt}}</td>
     <td>{{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}</td>
-  </tr>{{else}}<tr><td colspan="8" class="empty">No match here</td></tr>{{end}}</tbody>
+  </tr>{{else}}<tr><td colspan="{{if $.Data.Batch}}9{{else}}8{{end}}" class="empty">No match here</td></tr>{{end}}</tbody>
 </table>
 {{if gt .Pages 1}}<nav class="pager" aria-label="pages">{{if gt .Page 1}}<a class="btn mini" href="{{$f.PageURL (add .Page -1)}}">← Prev</a>{{end}}<span class="muted">Page {{.Page}} of {{.Pages}}</span>{{if lt .Page .Pages}}<a class="btn mini" href="{{$f.PageURL (add .Page 1)}}">Next →</a>{{end}}</nav>{{end}}
 </div>

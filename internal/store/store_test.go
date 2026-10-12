@@ -1,6 +1,11 @@
 package store
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+	"time"
+)
 
 func open(t *testing.T) *Store {
 	t.Helper()
@@ -229,5 +234,96 @@ func TestPreferencesAndMail(t *testing.T) {
 	}
 	if !s.MailSeen("<r@b>") {
 		t.Error("recorded inbox mail not seen")
+	}
+}
+
+func TestSearchDailyAndLastRun(t *testing.T) {
+	s := open(t)
+	id, err := s.SaveSearch(SavedSearch{Name: "go remote", Queries: "go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSearchDaily(id, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MarkSearchRun(id, "2026-10-12T08:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.SavedSearches()
+	if len(got) != 1 || !got[0].Daily || got[0].LastRun != "2026-10-12T08:00:00Z" {
+		t.Fatalf("%+v", got)
+	}
+	// saving the search again keeps the daily switch
+	if _, err := s.SaveSearch(SavedSearch{Name: "go remote", Queries: "golang"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.SavedSearches(); !got[0].Daily || got[0].Queries != "golang" {
+		t.Fatalf("resave: %+v", got)
+	}
+}
+
+func TestFunnelAnswerDays(t *testing.T) {
+	s := open(t)
+	for i, wait := range []int{2, 9, 4, 30} {
+		j, _, err := s.UpsertJob(Job{Company: fmt.Sprintf("C%d", i), Title: "Engineer", Source: "lever", Status: "rejected"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		applied := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+		for _, e := range [][2]string{{"new -> applied", applied.Format(time.RFC3339)}, {"applied -> rejected", applied.AddDate(0, 0, wait).Format(time.RFC3339)}} {
+			if _, err := s.DB.Exec(`INSERT INTO events(job_id, kind, note, at) VALUES(?, 'status', ?, ?)`, j.ID, e[0], e[1]); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	f, err := s.Funnel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d, ok := f.AnswerDays("lever"); !ok || d != 9 {
+		t.Errorf("lever answers in %d days (%v), want the median 9", d, ok)
+	}
+	if _, ok := f.AnswerDays("greenhouse"); ok {
+		t.Error("a source with no answers has no typical wait")
+	}
+}
+
+func TestFunnelGroupsAppliedJobs(t *testing.T) {
+	s := open(t)
+	add := func(company, source string, fit int64, path ...string) {
+		j, _, err := s.UpsertJob(Job{Company: company, Title: "Engineer", Source: source})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = s.UpdateJob(j.ID, JobPatch{FitScore: &fit})
+		for _, st := range path {
+			_ = s.UpdateJob(j.ID, JobPatch{Status: &st})
+		}
+	}
+	add("A", "greenhouse", 80, "applied", "interview", "offer")
+	add("B", "greenhouse", 60, "applied", "rejected")
+	add("C", "greenhouse", 40, "applied")
+	add("D", "", -1, "applied", "no_response")
+	add("E", "lever", 90)
+	f, err := s.Funnel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := func(r FunnelRow) [5]any { return [5]any{r.Group, r.Applied, r.Responded, r.Interview, r.Offer} }
+	if len(f.Source) != 2 || counts(f.Source[0]) != [5]any{"greenhouse", 3, 2, 1, 1} || counts(f.Source[1]) != [5]any{"manual", 1, 0, 0, 0} {
+		t.Errorf("source = %+v", f.Source)
+	}
+	if b := f.Best(); b == nil || b.Group != "greenhouse" || b.Rate() != 66 {
+		t.Errorf("best = %+v", b)
+	}
+	var bands []string
+	for _, r := range f.Fit {
+		bands = append(bands, r.Group)
+	}
+	if strings.Join(bands, ",") != "75+,50–74,under 50,unscored" {
+		t.Errorf("fit bands = %v", bands)
+	}
+	if len(f.Month) != 1 || f.Month[0].Applied != 4 || len(f.Month[0].Group) != 7 {
+		t.Errorf("month = %+v", f.Month)
 	}
 }

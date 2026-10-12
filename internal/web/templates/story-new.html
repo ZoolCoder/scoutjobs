@@ -1,0 +1,22 @@
+{{template "head" .}}
+{{with .Data}}
+<section class="panel narrow">
+<div class="panel-h"><h2>New story</h2><span class="act muted">one experience, told as situation, task, action and result</span></div>
+{{with .Err}}<p class="callout bad">{{.}}</p>{{end}}
+<form method="post" action="/stories" class="fields" data-busy="Saving…">
+  <label class="span-2">Title<input name="title" required maxlength="200" autofocus placeholder="Cut checkout latency by 60%"></label>
+  <label>Company and context<input name="context" maxlength="200" placeholder="Acme, B2B payments"></label>
+  <label>Your role<input name="role" maxlength="120" placeholder="Senior engineer"></label>
+  <label>When<input name="timeline" maxlength="60" placeholder="2024-03 to 2024-09"></label>
+  <label>Themes<input name="themes" maxlength="300" placeholder="performance, ownership, postgres"><small class="muted">Comma separated. Jobs whose must-haves use these words get this story.</small></label>
+  <label class="span-2">Numbers<textarea name="metrics" rows="2" placeholder="p99 from 900 ms to 350 ms&#10;0 incidents in 6 months"></textarea><small class="muted">One per line.</small></label>
+  <label class="span-2">Core facts<textarea name="facts" rows="3" placeholder="Scope, team, stack, headline numbers: what every telling of the story relies on."></textarea></label>
+  <label class="span-2">Situation<textarea name="situation" rows="2"></textarea></label>
+  <label class="span-2">Task<textarea name="task" rows="2"></textarea></label>
+  <label class="span-2">Action<textarea name="action" rows="4" placeholder="What you did, in the first person."></textarea></label>
+  <label class="span-2">Result<textarea name="result" rows="2"></textarea></label>
+  <div class="row span-2"><button class="primary" type="submit">Save story</button><a class="btn" href="/stories">Cancel</a><small class="muted">Saved to <code>stories/</code> in your data folder. Your AI assistant can add more variants later.</small></div>
+</form>
+</section>
+{{end}}
+{{template "foot" .}}

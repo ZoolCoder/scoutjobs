@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -153,6 +155,9 @@ type pipeData struct {
 	Due     bool
 	Page    int // list view paging
 	Pages   int
+	Batch   bool // the list view can queue the ticked jobs for the AI assistant
+	Queue   queueState
+	Msg     string // the outcome of the last batch
 }
 
 func (v *server) pipeline(w http.ResponseWriter, r *http.Request) {
@@ -227,6 +232,7 @@ func (v *server) pipeline(w http.ResponseWriter, r *http.Request) {
 			d.Sel = v.panel(j, f.JobURL(id), f.URL())
 		}
 	}
+	d.Batch, d.Queue, d.Msg = v.cfg.Runner != nil, v.queueState(), q.Get("msg")
 	v.render(w, r, "pipeline.html", "pipeline", d)
 }
 
@@ -392,4 +398,88 @@ func (v *server) panel(j store.Job, backURL, closeURL string) *jobPanel {
 		p.Contacts = len(cs)
 	}
 	return p
+}
+
+// preparable is a job the batch queue may prepare: still open, not ruled out, nothing sent yet.
+func preparable(j store.Job) bool {
+	return (j.Status == "new" || j.Status == "ranked") && j.Veto == ""
+}
+
+// preparePicked queues the jobs ticked on the pipeline list for the AI assistant, one at a time.
+func (v *server) preparePicked(w http.ResponseWriter, r *http.Request) {
+	if v.cfg.Runner == nil || sameOrigin(r) != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	_ = r.ParseForm()
+	var jobs []store.Job
+	for _, id := range r.Form["job"] {
+		n, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			continue
+		}
+		if j, err := v.s.JobByID(n); err == nil && preparable(j) {
+			jobs = append(jobs, j)
+		}
+	}
+	dest := back(r, "/pipeline?view=list")
+	if len(jobs) == 0 {
+		http.Redirect(w, r, withParam(dest, "msg", "Tick at least one new or ranked job to prepare."), http.StatusSeeOther)
+		return
+	}
+	steps, _ := runner.Parse("all")
+	n := v.cfg.Runner.Queue(jobs, runner.Request{Steps: steps})
+	http.Redirect(w, r, withParam(dest, "msg", fmt.Sprintf("%d %s queued; your agent prepares them one at a time. Nothing is sent.", n, plural(n, "job", "jobs"))), http.StatusSeeOther)
+}
+
+// queueState is what the AI assistant is preparing now and what waits, for the strip above the list.
+type queueState struct {
+	Running []string   `json:"running"`
+	Waiting int        `json:"waiting"`
+	Next    []queueJob `json:"next"` // the waiting jobs, in order
+}
+
+type queueJob struct {
+	ID      int64  `json:"id"`
+	Company string `json:"company"`
+}
+
+func (q queueState) Busy() bool { return len(q.Running) > 0 || q.Waiting > 0 }
+
+func (v *server) queueState() queueState {
+	var q queueState
+	if v.cfg.Runner == nil {
+		return q
+	}
+	for _, id := range v.cfg.Runner.Running() {
+		if j, err := v.s.JobByID(id); err == nil {
+			q.Running = append(q.Running, j.Company)
+		}
+	}
+	sort.Strings(q.Running)
+	for _, id := range v.cfg.Runner.Waiting() {
+		if j, err := v.s.JobByID(id); err == nil {
+			q.Next = append(q.Next, queueJob{j.ID, j.Company})
+		}
+	}
+	q.Waiting = len(q.Next)
+	return q
+}
+
+// unqueue takes a job out of the AI assistant's queue before it starts.
+func (v *server) unqueue(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if v.cfg.Runner == nil || sameOrigin(r) != nil || err != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	msg := "That job had already started or left the queue."
+	if v.cfg.Runner.Unqueue(id) {
+		msg = "Taken out of the queue."
+	}
+	http.Redirect(w, r, withParam(back(r, "/pipeline?view=list"), "msg", msg), http.StatusSeeOther)
+}
+
+func (v *server) queueJSON(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, v.queueState())
 }

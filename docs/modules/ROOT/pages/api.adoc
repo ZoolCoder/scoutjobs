@@ -11,6 +11,7 @@ The server started by `scoutjobs serve` answers `/api/*` with JSON. With `api_to
 
 | GET | `/api/brief` | | today: applied this week vs target, follow-ups due, stale, upcoming interviews, new and drafted jobs
 | GET | `/api/stats` | | funnel and rates, same as `scoutjobs stats --json`
+| GET | `/api/funnel` | | answer, interview and offer counts for applied jobs by source, fit band and month applied (`source`, `fit`, `month`)
 | GET | `/api/jobs` | `?status=new&q=stripe&open=1&limit=20` | job rows
 | POST | `/api/jobs` | `{"company","title","url","location","remote","source","posted_at","tags","salary_min","salary_max","currency","notes"}` | 201 created, 200 existing (same company and normalised title, or the same posting URL, returns the tracked row)
 | GET | `/api/jobs/\{id}` | | job, events, interviews, and `provenance`: the SHA-256 of every file the draft review (`review.files`), each export (`exports`) and the ATS score (`ats.files`) covered, with `review_changed` and `ats_changed` listing the files changed since and `resume_pdf` (`current`, `outdated` or `own`); with a Word cover letter template, `cover` holds the last build (template, files, pages, `state` and `problems`) and `cover_changed` what changed since

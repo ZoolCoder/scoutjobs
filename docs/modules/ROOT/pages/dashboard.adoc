@@ -23,7 +23,23 @@ Because every page is a plain `GET` and every action a `POST` with a redirect, t
 
 == Overview
 
-The page opens with *Next best move*: one card the server picks from the state of the pipeline, in this order: the strongest draft waiting to be sent, a follow-up past its date, an interview to prepare, a CV that has never been checked, otherwise new jobs to find and score. The four numbers next to it are open jobs, applications this week against `weekly_apply_target`, upcoming interviews and the response rate over everything applied. *Pipeline health* is the funnel, *Applications per week* the last eight weeks as bars, and *Today* the tasks due now with a button each. The bottom row shows upcoming interviews and drafts waiting, CV health, the top learning gaps and the latest activity.
+The page opens with *Next best move*: one card the server picks from the state of the pipeline, in this order: the strongest draft waiting to be sent, a follow-up past its date, an interview to prepare, a CV that has never been checked, otherwise new jobs to find and score. The four numbers next to it are open jobs, applications this week against `weekly_apply_target`, upcoming interviews and the response rate over everything applied. *Pipeline health* is the funnel, *Applications per week* the last eight weeks as bars labelled by the Monday that starts each week (the last one is *now*; hover a bar for its count), and *Today* the tasks due now with a button each. An interview whose time has passed without an outcome tops *Today* as "How did the Stripe system design interview go?" with *Log outcome*, so the pipeline moves on. Two rows come from the automation (see <<_automation>>): *N new jobs from your daily searches* links to the pipeline sorted by fit, and *Review follow-up to Globex* opens a follow-up e-mail ScoutJobs already drafted for a quiet application, so you only read and send it; *Review thank-you to Acme* does the same after an interview. *Hooli has likely moved on* flags an application that has been quiet for twice as long as that source usually takes to answer (at least two weeks), with a *No response* button. The bottom row shows upcoming interviews and drafts waiting, CV health, the top learning gaps and the latest activity, written in plain words (*Status changed*, *Job added*) rather than event codes.
+
+Dates read the way you would say them: *today 10:00*, *yesterday 16:00*, *13 Oct* within this year and *2 Mar 2025* before it. The same wording is used on the overview, the inbox day headings, the job page and the file lists.
+
+== Navigation
+
+image::sidebar-folded.png[The sidebar folded to icons, with the Pipeline tooltip showing,1200]
+
+The sidebar groups the pages by what you are doing: *Apply* (Find jobs, Pipeline, Inbox), *Interview* (Interviews, Calendar, Learning) and *You* (Profile & CV, Connections, Preferences, Reviews, Activity). The button next to the logo folds it to a rail of icons and back; the choice is kept in a cookie. Folded, each icon shows its name in a tooltip on hover or keyboard focus, and the badges (upcoming interviews) stay visible. Tooltips across the dashboard are the same accessible kind: they appear on focus as well as hover, are read out by screen readers, and close with `Esc`.
+
+=== Command palette and shortcuts
+
+image::palette.png[The command palette: typing st lists the Stories page, the Stripe job and the matching actions,1200]
+
+Press `Ctrl K` (`⌘K` on a Mac), or *Jump to…* at the top of the sidebar, to search every page, every job by company, title, `SJ-` number or stage, and a few actions: *Add job*, *Sync mail* and *Run daily searches and drafts now*. Type a few letters in any order of the words, move with the arrow keys, `Enter` opens, `Esc` closes and puts the focus back where it was. The jobs come from `/palette.json`, the same page-level data the pipeline shows.
+
+Without the palette, `g` then a letter jumps to a page: `g o` overview, `g p` pipeline, `g i` inbox, `g c` calendar, `g s` find jobs. On the pipeline `/` focuses the search box and `f` toggles full screen. `?` lists every shortcut. None of them fire while you type in a field.
 
 == Pipeline
 
@@ -31,7 +47,9 @@ image::pipeline.png[The pipeline board: one column per open stage, a fit ring pe
 
 One column per stage, left to right in the order a job moves. Each card carries the fit gauge (green from 75, amber from 50, red below), where and how remote the job is, the deadline or last update, the source board, and the buttons for the stages that usually come next. A job with a veto shows the `veto` badge instead of a gauge, so a hard failure never hides behind a good number.
 
-Drag a card onto another column to move it; the closing stages that have no column yet (hired, rejected, no response, withdrawn, offer declined, skipped) appear as drop targets under the board while you drag, so they do not take space the rest of the time. The *Due this week* toggle keeps only jobs with a deadline inside seven days or a follow-up due, and the search box filters on company, title and tags as you type. *Add job* opens the same form as `scoutjobs job add`, with *Fill from a posting URL* for the boards the search knows. The dark theme uses the same layout with its own contrast-checked tokens:
+Drag a card onto another column to move it; the closing stages that have no column yet (hired, rejected, no response, withdrawn, offer declined, skipped) appear as drop targets under the board while you drag, so they do not take space the rest of the time. The *Due this week* toggle keeps only jobs with a deadline inside seven days or a follow-up due, and the search box filters on company, title and tags as you type. *Add job* opens the same form as `scoutjobs job add`, with *Fill from a posting URL* for the boards the search knows.
+
+In the *List* view each new or ranked job without a veto has a checkbox. Tick a few and press *Prepare selected with AI*: they join the AI assistant's queue and run one after another through the same steps as *Continue with AI*. A strip on top of the pipeline says what is running and how many wait, and updates by itself; the × on a waiting job takes it out of the queue before it starts. The dark theme uses the same layout with its own contrast-checked tokens:
 
 image::pipeline-dark.png[The same board in the dark theme,1200]
 
@@ -44,6 +62,10 @@ The job page is where an application gets made. The stage line under the title s
 The checklist on the right shows each step: green when done, amber when it needs a look, red when it blocks, with *Preview*, *Edit drafts* or *Details* next to it. A result is marked *stale* when a file it covered changed since, and the next run offers that step again. Opening the page records the agent results a stopped run left behind, so the last run's steps show as *now recovered* or *now stale*. With a Word cover letter template, the Documents panel lists `cover-letter.docx` and `cover-letter.pdf` with the template check; the Cover letter step is done only when that check passes.
 
 *Drafts* holds the resume, the cover letter and the e-mail, each with *Preview* and *Edit*; *Mail app* opens your own mail program with the e-mail filled in. The right column holds the facts the agents also read (company, role, place, salary, source, skills) and *Application*, with buttons for the stages that usually come next. *Emails*, *Interviews*, *Files* and *Activity* tabs show everything else about the job.
+
+image::keywords.png[Keywords to add: one requirement the tailored CV does not word yet, with the backing line from profile.md and Fix with AI,760]
+
+*Keywords to add* lists the requirements the tailored resume does not say in the posting's words yet: the agreed wording from `fit-review.json` that is missing from `resume.md`, and the gaps of the latest CV check for this job. Each row shows where it came from and the line in `profile.md` that backs it. *Fix with AI* reruns the tailor and review steps with only the backed wordings added; a gap with no evidence in your profile is listed but never written into the CV.
 
 image::job-gates.png[Ready to send: one check still to fix, and why the job fits with evidence from profile.md,760]
 
@@ -78,6 +100,29 @@ image::inbox.png[Inbox: replies grouped by day, each tagged with its kind and th
 Replies from companies, matched to your applications and grouped by day. Each one carries its kind (interview, offer, request, rejected, acknowledgement), the job it belongs to and where it came from; the chips on top filter by kind. *Open in Gmail*, *Reply in Gmail* and *All mail for this job* link to the thread.
 
 *Sync now* reads new mail the way Connections says: through your own Google client, an IMAP mailbox, or the AI assistant's mail connector. With the assistant, the page is covered by a *Syncing your mail* window with a progress bar, the step it is on (searching, reading, matching, logging the replies) and the time it has taken; *Cancel* stops it and keeps what was already logged. A reply that names an interview time becomes an interview on that job, with its length; an offer or a rejection proposes the stage change. Mail you sent yourself is skipped.
+
+== Stories
+
+image::stories.png[The story bank: three stories with their metrics, themes and the jobs each one answers,1200]
+
+Your interview stories, one STAR story per file in `stories/` in the data folder, with front matter for `title`, `themes` and `metrics`. Each one lists the open jobs whose must-have requirements it answers, matched on the words of the requirement against the story's themes, title and facts; below the list, how many must-haves have no story yet. *New story* writes one from a form: title, context, role, when, themes, numbers, core facts and the four STAR parts. Click a story's title to read it, and *Edit* to change the Markdown with its front matter. The `interview-prep` skill and the `behavioral-story-extractor` agent write new stories for you too, and add variants.
+
+On a job, the *Interviews* tab has *Stories for this job*: every must-have with the best story for it, or a flag when there is none. The prep pack uses the same map.
+
+== Reviews
+
+The weekly reviews the `weekly-review` skill writes, and *What works*: from every job you applied to, how many got an answer, an interview and an offer, grouped by source, by fit band (75+, 50–74, under 50, unscored) and by month applied. A line on top names the source that answers most once it has three applications. `GET /api/funnel` and `scoutjobs stats --funnel` return the same numbers. Under *By source*, *Usual wait for an answer* gives the median days to the first answer for each source with three answers or more. Fit scores use the same table: a source that answers you at least 15 points above or below your average, over five applications or more, moves a job's fit by 5 points, and the job's reasons say so.
+
+image::what-works.png[What works: answer rate by source, by fit band and by month applied,1200]
+
+== Automation
+
+*Preferences* has an *Automation* panel with the chores ScoutJobs does every hour while `scoutjobs serve` runs, or when you run `scoutjobs daily` from cron, launchd or n8n. Running it twice does nothing the second time. It never sends an e-mail or an application.
+
+Daily searches:: A saved search with *Run daily* on (press it on the chip under *Find jobs*) runs once a day and adds up to 20 new matches with a score of 45 or more and no broken must-have, as `new` jobs with the posting saved.
+Draft follow-ups:: When an application goes quiet past its follow-up date, or an interview is over, ScoutJobs writes the follow-up or thank-you e-mail from its template, for you to review on the job's *Emails* tab. No AI tokens.
+Interview prep packs:: With an AI assistant connected, each interview in the coming week without a pack gets one queued: research on the company, the stories to tell and a prep sheet. *Build prep pack* on an interview does the same by hand. Once the pack is written the calendar event and the *Interviews* page say *Prep pack ready* with a link to the prep sheet and a *Rebuild prep pack* button; while the assistant works on it they say so.
+Notify me:: Browser notifications, off until you turn them on and allow them: new jobs from the daily searches, drafted e-mails and finished or failed AI runs, checked every two minutes while a dashboard tab is open.
 
 == Connections
 
@@ -114,7 +159,10 @@ Job sources:: The job boards *Find jobs* searches, each with an on/off switch, a
 | The same sources as `scoutjobs search`: queries, boards (`greenhouse:stripe`, a careers URL such as `https://jobs.lever.co/netlify`, `rss:https://...`) and the remote aggregators including the Hacker News "Who is hiring" thread, prefilled from `search_queries`, `search_boards` and `search_remote`. Results list company, title, place, source and date with *+ Add to pipeline* each, or *Add all to pipeline* tracks every hit as `new`; a posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
 
 | Interviews
-| The next interview with its prep checklist, past interviews waiting for an outcome, and later ones.
+| The next interview with its prep checklist and *Build prep pack*, past interviews waiting for an outcome, and later ones.
+
+| Stories
+| The story bank and which open jobs each story answers; see <<_stories>>.
 
 | Calendar
 | Interviews, application deadlines and follow-ups due, laid out like Google Calendar: day, week, month and schedule views, colour by stage, an all-day row for deadlines and date-only interviews, and a red line at the current time. Click an empty slot or *Create* to schedule an interview for a tracked job; click an event to see it, move it, change its length or place, set prep status and outcome. Each event has *Add to Google Calendar* (Google's own event form, filled in) and *Download .ics*. The side panel lists the calendars with *Sync now* when the assistant's connector is set; see xref:interviews.adoc#_calendar[Calendar].
@@ -123,13 +171,13 @@ Job sources:: The job boards *Find jobs* searches, each with an on/off switch, a
 | Skill gaps found by `upskill`, ranked, with hours tracked.
 
 | Preferences
-| What you stated and what `learn-preferences` learned, with confidence and the decisions behind each.
+| What you stated and what `learn-preferences` learned, with confidence and the decisions behind each, and the *Automation* switches.
 
 | Profile & CV
 | `profile.md`, the files in `cv/`, the latest CV check with both scores and the gap list, and the history of checks.
 
 | Reviews
-| The files `weekly-review` writes to `reviews/<YYYY-WW>.md`, newest first, next to the funnel as it stands now, applied this week against target, follow-ups due and stale count.
+| The files `weekly-review` writes to `reviews/<YYYY-WW>.md`, newest first, next to the funnel as it stands now, applied this week against target, follow-ups due and stale count, and *What works* by source, fit and month.
 
 | Activity
 | Every event: job added, status change, note, decision, CV check, e-mail draft or sent, file written through the API.

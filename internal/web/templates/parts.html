@@ -73,6 +73,12 @@
 {{define "ico-shrink"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>{{end}}
 {{define "ico-rows"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>{{end}}
 
+{{define "queue-text"}}<span data-queue-text role="status">{{if .Running}}Preparing {{join .Running ", "}}{{else}}Starting the next job{{end}}{{if .Waiting}} · {{.Waiting}} waiting{{end}}</span> · <a href="/activity">Activity</a>
+{{if .Next}}<span class="queuenext" data-queue-next>{{range .Next}}<form method="post" action="/pipeline/queue/{{.ID}}/remove"><button class="chipx" type="submit" aria-label="Take {{.Company}} out of the queue">{{.Company}} <span aria-hidden="true">×</span></button></form>{{end}}</span>{{end}}{{end}}
+{{define "prep-pack"}}{{if .Ready}}<p class="preppack"><span class="badge ready">Prep pack ready</span><small class="muted">written {{.When}}</small><a href="/jobs/{{.JobID}}/files/interview-prep.md">Open prep sheet</a></p>{{end}}
+{{if .Building}}<p class="preppack"><span class="badge in_progress">Working</span><small class="muted">Your AI assistant is working on this job now. <a href="/jobs/{{.JobID}}">Follow it</a></small></p>
+{{else if .Runner}}<form class="preppack" method="post" action="/jobs/{{.JobID}}/run" data-busy="Starting your agent…"><input type="hidden" name="redo" value="prep"><button class="mini go" type="submit">{{if .Ready}}Rebuild prep pack{{else}}Build prep pack{{end}}</button><small class="muted">Your AI assistant researches the company and writes likely questions and the stories to tell, into the job's files. Costs agent tokens.</small></form>
+{{else if not .Ready}}<p class="small muted">Run <code class="cmd">/scoutjobs:interview {{.JobID}}</code> in your agent to build the prep pack.</p>{{end}}{{end}}
 {{define "prep-check"}}{{$i := .I}}<form class="prepcheck" method="post" action="/interviews/{{$i.ID}}"><input type="hidden" name="back" value="{{.Back}}"><input type="hidden" name="prep_form" value="1">
   {{range prepItems}}<label class="check"><input type="checkbox" name="prep" value="{{.Key}}" {{if $i.PrepDone .Key}}checked{{end}}> {{.Label}}</label>{{end}}
   <button class="mini primary">Save prep</button></form>{{end}}

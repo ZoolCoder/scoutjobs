@@ -505,3 +505,239 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && host) hide(); });
   window.addEventListener('scroll', function () { if (host) hide(); }, true);
 })();
+
+// Pipeline queue strip: follow the AI assistant through the queued jobs until it is done.
+(function () {
+  var strip = document.querySelector('[data-queue]');
+  if (!strip) return;
+  var timer = setInterval(function () {
+    fetch('/pipeline/queue', { cache: 'no-store', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (q) {
+      var running = q.running || [];
+      if (!running.length && !q.waiting) {
+        clearInterval(timer);
+        strip.textContent = 'Your assistant finished the queue. Reload to see the drafts.';
+        return;
+      }
+      var text = strip.querySelector('[data-queue-text]');
+      if (text) text.textContent = (running.length ? 'Preparing ' + running.join(', ') : 'Starting the next job') + (q.waiting ? ' · ' + q.waiting + ' waiting' : '');
+      var left = {};
+      (q.next || []).forEach(function (j) { left[j.id] = true; });
+      strip.querySelectorAll('[data-queue-next] form').forEach(function (f) {
+        var id = f.getAttribute('action').split('/')[3];
+        if (!left[id]) f.remove();
+      });
+    }).catch(function () {});
+  }, 4000);
+})();
+
+// Command palette (Ctrl/Cmd-K), g-then-key page jumps and the ? shortcut list.
+(function () {
+  var dlg = document.getElementById('palette');
+  var help = document.getElementById('keys');
+  if (!dlg || !dlg.showModal) return;
+  var input = dlg.querySelector('input');
+  var list = dlg.querySelector('ul');
+  var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  document.querySelectorAll('[data-palkey]').forEach(function (k) { k.textContent = mac ? '⌘K' : 'Ctrl K'; });
+
+  var pages = [];
+  document.querySelectorAll('.side nav a[href]').forEach(function (a) {
+    var c = a.cloneNode(true);
+    c.querySelectorAll('.nb').forEach(function (n) { n.remove(); });
+    pages.push({ label: c.textContent.trim(), hint: 'Page', href: a.getAttribute('href') });
+  });
+  var actions = [
+    { label: 'Add job', hint: 'Action', href: '/jobs/new' },
+    { label: 'Sync mail', hint: 'Action · reads your inbox', post: '/inbox/sync' },
+    { label: 'Run daily searches and drafts now', hint: 'Action · sends nothing', post: '/settings/automation/run' }
+  ];
+  var jobs = null;
+  var shown = [];
+  var active = 0;
+  var opener = null;
+
+  function loadJobs() {
+    if (jobs) return;
+    jobs = [];
+    fetch('/palette.json', { cache: 'no-store', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      jobs = (d || []).map(function (j) { return { label: j.company + ' · ' + j.title, hint: 'SJ-' + j.id + ' · ' + j.status.replace(/_/g, ' '), href: '/jobs/' + j.id }; });
+      render();
+    }).catch(function () {});
+  }
+
+  // score: every query letter in order; earlier, word-start and back-to-back hits rank higher. null is no match.
+  function score(text, q) {
+    text = text.toLowerCase();
+    var s = 0, at = -1;
+    for (var i = 0; i < q.length; i++) {
+      var k = text.indexOf(q[i], at + 1);
+      if (k < 0) return null;
+      s += (k === at + 1 ? 3 : 0) + (k === 0 || text[k - 1] === ' ' ? 2 : 0) - Math.min(k - at, 10) / 10;
+      at = k;
+    }
+    return s;
+  }
+
+  function render() {
+    var q = input.value.trim().toLowerCase();
+    var all = actions.concat(pages, jobs || []);
+    if (!q) {
+      shown = actions.concat(pages);
+    } else {
+      shown = all.map(function (it) {
+        var s = score(it.label, q), h = score(it.hint, q);
+        return { it: it, s: s !== null ? s : h !== null ? h - 100 : null };  // a hint-only hit (status, SJ-id) ranks below any label hit
+      })
+        .filter(function (x) { return x.s !== null; })
+        .sort(function (a, b) { return b.s - a.s; })
+        .slice(0, 12).map(function (x) { return x.it; });
+    }
+    active = 0;
+    list.textContent = '';
+    shown.forEach(function (it, i) {
+      var li = document.createElement('li');
+      li.id = 'pal-' + i;
+      li.setAttribute('role', 'option');
+      var b = document.createElement('b');
+      b.textContent = it.label;
+      var sm = document.createElement('small');
+      sm.textContent = it.hint;
+      li.appendChild(b);
+      li.appendChild(sm);
+      li.addEventListener('mousedown', function (e) { e.preventDefault(); go(it); });
+      list.appendChild(li);
+    });
+    if (!shown.length) {
+      var none = document.createElement('li');
+      none.className = 'none';
+      none.textContent = 'Nothing matches';
+      list.appendChild(none);
+    }
+    mark();
+  }
+
+  function mark() {
+    list.querySelectorAll('[role=option]').forEach(function (li, i) {
+      li.setAttribute('aria-selected', i === active ? 'true' : 'false');
+      if (i === active) li.scrollIntoView({ block: 'nearest' });
+    });
+    if (shown.length) input.setAttribute('aria-activedescendant', 'pal-' + active);
+    else input.removeAttribute('aria-activedescendant');
+  }
+
+  function go(it) {
+    if (it.post) {
+      var f = document.createElement('form');
+      f.method = 'post';
+      f.action = it.post;
+      document.body.appendChild(f);
+      f.submit();
+      return;
+    }
+    location.href = it.href;
+  }
+
+  function open() {
+    if (dlg.open) return;
+    opener = document.activeElement;
+    input.value = '';
+    loadJobs();
+    render();
+    dlg.showModal();
+    input.focus();
+  }
+
+  [dlg, help].forEach(function (d) {
+    d.addEventListener('close', function () { if (opener && opener.focus) opener.focus(); });
+    d.addEventListener('click', function (e) { if (e.target === d) d.close(); });
+    // close on Esc ourselves: Chrome skips the built-in cancel for a dialog opened without a user gesture
+    d.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); d.close(); } });
+  });
+  input.addEventListener('input', render);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!shown.length) return;
+      active = (active + (e.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length;
+      mark();
+    } else if (e.key === 'Enter' && shown[active]) {
+      e.preventDefault();
+      go(shown[active]);
+    } else if (e.key === '?' && !input.value) {
+      e.preventDefault();
+      dlg.close();
+      help.showModal();
+    }
+  });
+  document.querySelectorAll('[data-palette]').forEach(function (b) { b.addEventListener('click', open); });
+
+  var jumps = { o: '/', p: '/pipeline', i: '/inbox', c: '/calendar', s: '/search' };
+  var gAt = 0;
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      if (help.open) help.close();
+      if (dlg.open) dlg.close(); else open();
+      return;
+    }
+    var el = document.activeElement;
+    var typing = el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+    if (typing || e.metaKey || e.ctrlKey || e.altKey || dlg.open || help.open) return;
+    if (e.key === '?') {
+      e.preventDefault();
+      opener = el;
+      help.showModal();
+    } else if (e.key === 'g') {
+      gAt = Date.now();
+    } else if (gAt && Date.now() - gAt < 1200 && jumps[e.key]) {
+      gAt = 0;
+      location.href = jumps[e.key];
+    } else {
+      gAt = 0;
+    }
+  });
+})();
+
+// Browser notifications: off until turned on in Preferences, then polled while a dashboard tab is open.
+(function () {
+  if (!('Notification' in window)) return;
+  var KEY = 'scoutjobs-notify', AFTER = 'scoutjobs-notify-after';
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function put(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function on() { return get(KEY) === '1' && Notification.permission === 'granted'; }
+
+  var row = document.querySelector('[data-notify-row]');
+  var btn = document.querySelector('[data-notify]');
+  function paint() {
+    if (!btn) return;
+    row.hidden = false;
+    btn.setAttribute('aria-pressed', on() ? 'true' : 'false');
+    btn.textContent = on() ? 'Turn off' : 'Turn on';
+    btn.disabled = Notification.permission === 'denied';
+    if (btn.disabled) document.querySelector('[data-notify-hint]').textContent = 'Notifications are blocked for this site in your browser settings.';
+  }
+  if (btn) {
+    paint();
+    btn.addEventListener('click', function () {
+      if (on()) { put(KEY, null); put(AFTER, null); paint(); return; }
+      Notification.requestPermission().then(function (p) {
+        if (p === 'granted') { put(KEY, '1'); poll(); }
+        paint();
+      });
+    });
+  }
+
+  function poll() {
+    if (!on()) return;
+    var after = get(AFTER) || '';
+    fetch('/notify.json?after=' + encodeURIComponent(after), { cache: 'no-store', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (after) (d.items || []).forEach(function (n) {
+        var note = new Notification(n.title, { body: n.body || '', tag: 'scoutjobs-' + n.href });
+        note.onclick = function () { window.focus(); location.href = n.href; note.close(); };
+      });
+      if (d.last) put(AFTER, String(d.last));
+    }).catch(function () {});
+  }
+  poll();
+  setInterval(poll, 120000);
+})();

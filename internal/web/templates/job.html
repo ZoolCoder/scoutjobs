@@ -39,7 +39,7 @@
   <div class="dcards">
   {{range .Cards}}{{$d := .Main}}{{$step := .Step}}<article class="dcard{{if not $d.Exists}} missing{{end}}">
     <div class="dhead">{{template "ico-doc"}}<b>{{.Label}}</b></div>
-    {{if $d.Exists}}<small class="muted">Updated {{$d.Mod}}</small>
+    {{if $d.Exists}}<small class="muted">Updated {{when $d.Mod}}</small>
     <div class="dacts"><a class="btn mini" href="/jobs/{{$j.ID}}/files/{{$d.Name}}">Preview</a><a class="btn mini" href="/jobs/{{$j.ID}}/files/{{$d.Name}}?edit=1">Edit</a></div>
     {{else}}<small class="muted">Not written yet</small>
     <div class="dacts">{{with $.Data.RunP}}{{if and .Agents (not .Active)}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run" data-busy="Starting…"><input type="hidden" name="step" value="{{$step}}"><button class="mini go" type="submit">Write with AI</button></form>{{end}}{{end}}</div>{{end}}
@@ -56,6 +56,13 @@
   {{with .CoverBuild}}{{with .Cover}}<p class="small cover-build"><span class="badge {{if $.Data.CoverBuild.CoverChanged}}stale{{else}}{{.State}}{{end}}">{{if $.Data.CoverBuild.CoverChanged}}stale{{else}}template {{.State}}{{end}}</span> Cover letter built from <code>{{base .Template}}</code> {{date .At}}{{if .Rendered}}, {{.Pages}} of {{.TemplatePages}} {{if eq .TemplatePages 1}}page{{else}}pages{{end}}{{end}}. {{.Summary}}{{if $.Data.CoverBuild.CoverChanged}} Changed since: {{join $.Data.CoverBuild.CoverChanged ", "}}; ask the assistant to write it again.{{end}}</p>
   {{if .Problems}}<ul class="gates-left">{{range .Problems}}<li>{{.}}</li>{{end}}</ul>{{end}}{{end}}{{end}}
 </section>
+{{with .Keywords}}<section class="panel" id="keywords">
+  <div class="panel-h"><h2>Keywords to add</h2><span class="n">{{len .}}</span><span class="act muted">what your tailored CV does not say yet</span></div>
+  <ul class="kwlist">{{range .}}<li class="{{if .Addable}}add{{else}}hold{{end}}"><div><b>{{if .Wording}}{{.Wording}}{{else}}{{.Requirement}}{{end}}</b>
+    <small>{{if .Addable}}For “{{.Requirement}}” · backed by {{.Evidence}}{{else if eq .Source "CV check"}}From the last CV check · add it yourself only if it is true{{else}}No evidence in your profile · never added for you{{end}}</small></div></li>{{end}}</ul>
+  {{if $.Data.RunP}}{{if and $.Data.RunP.Agents (not $.Data.RunP.Active) (kwaddable .)}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/keywords" data-busy="Starting your agent…"><button class="mini go" type="submit">Fix with AI</button></form>
+  <small class="muted">Rewrites the tailored CV with the backed wording only, then reviews it again. Nothing is sent.</small>{{end}}{{end}}
+</section>{{end}}
 <div class="grid-2 jobpair">
 <section class="panel" id="gates">
   <div class="panel-h"><h2>Ready to send?</h2>{{if .Gates.OK}}<span class="badge done">All good</span>{{else}}<span class="n">{{.Gates.Failed}} to fix</span>{{end}}</div>
@@ -132,6 +139,10 @@
   {{$up := 0}}{{range .Interviews}}{{if ge .At $today}}{{$up = 1}}{{template "ivcard" (prepArgs . $.Data.Self)}}{{end}}{{end}}
   {{if not $up}}<p class="empty">Nothing scheduled<small>Add the interview when the company gets back to you. Each one gets a short prep checklist.</small></p>{{end}}
 </section>
+{{with .StoryMap}}<section class="panel" id="stories">
+  <div class="panel-h"><h2>Stories for this job</h2><a class="act btn mini" href="/stories">Story bank</a></div>
+  <ul class="kwlist">{{range .}}<li class="{{if .Story}}add{{else}}hold{{end}}"><div><b>{{.Requirement}}</b><small>{{with .Story}}Tell “{{.Title}}”{{with .Metrics}} · {{index . 0}}{{end}}{{else}}No story yet · capture one with <code>/scoutjobs:interview</code>{{end}}</small></div></li>{{end}}</ul>
+</section>{{end}}
 {{$past := 0}}{{range .Interviews}}{{if lt .At $today}}{{$past = 1}}{{end}}{{end}}
 {{if $past}}<section class="panel">
   <div class="panel-h"><h2>Past interviews</h2></div>
@@ -140,7 +151,7 @@
 {{else if eq $tab "files"}}
 {{range .FileGroups}}{{if .Files}}<section class="panel">
   <div class="panel-h"><h2>{{.Title}}</h2><span class="n">{{len .Files}}</span></div>
-  <ul class="filelist">{{range .Files}}<li>{{template "ico-doc"}}<span><b>{{.Label}}</b><small class="muted">{{with .Note}}{{.}} · {{end}}updated {{.Mod}}</small></span>
+  <ul class="filelist">{{range .Files}}<li>{{template "ico-doc"}}<span><b>{{.Label}}</b><small class="muted">{{with .Note}}{{.}} · {{end}}updated {{when .Mod}}</small></span>
     <span class="facts-acts">{{if .Preview}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}">Preview</a>{{end}}{{if .Editable}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}?edit=1">Edit</a>{{end}}{{if .Download}}<a class="btn mini" href="/jobs/{{$j.ID}}/download/{{.Name}}">Download</a>{{end}}</span></li>{{end}}</ul>
 </section>{{end}}{{end}}
 {{if not .Files}}<section class="panel"><div class="panel-h"><h2>Files</h2></div><p class="empty">No files yet<small>The assistant saves the drafts here when it prepares this application. <a href="/jobs/{{$j.ID}}">Start on Overview</a>.</small></p></section>{{end}}

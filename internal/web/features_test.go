@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
-	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -211,40 +210,6 @@ func TestSavedSearchesAndFilters(t *testing.T) {
 	if saved, _ = s.SavedSearches(); len(saved) != 0 {
 		t.Errorf("after delete %+v", saved)
 	}
-}
-
-func TestResultFilterKeep(t *testing.T) {
-	now := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
-	f := filterFromValues(url.Values{"remote_only": {"1"}, "days": {"7"}, "min_salary": {"80000"}, "exclude": {"PHP, intern"}})
-	cases := []struct {
-		p    search.Posting
-		keep bool
-	}{
-		{search.Posting{Title: "Go Dev", Remote: "remote"}, true},
-		{search.Posting{Title: "Go Dev", Remote: "onsite"}, false},
-		{search.Posting{Title: "Senior PHP Dev", Remote: "remote"}, false},
-		{search.Posting{Title: "Go Dev", Remote: "remote", PostedAt: "2026-09-01"}, false},
-		{search.Posting{Title: "Go Dev", Remote: "remote", PostedAt: "2026-10-09T08:00:00Z"}, true},
-		{search.Posting{Title: "Go Dev", Remote: "remote", SalaryMax: 60000}, false},
-		{search.Posting{Title: "Go Dev", Remote: "remote", SalaryMax: 90000}, true},
-	}
-	for _, c := range cases {
-		if got := f.keep(c.p, now); got != c.keep {
-			t.Errorf("%+v: keep %v, want %v", c.p, got, c.keep)
-		}
-	}
-	if enc := f.encode(); filterFromValues(mustQuery(t, enc)) != f {
-		t.Errorf("round trip %q", enc)
-	}
-}
-
-func mustQuery(t *testing.T, s string) url.Values {
-	t.Helper()
-	q, err := url.ParseQuery(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return q
 }
 
 func TestVersionBadgeAndEndpoint(t *testing.T) {

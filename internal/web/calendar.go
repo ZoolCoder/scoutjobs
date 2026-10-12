@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -92,6 +95,7 @@ type calDetail struct {
 	Open      string // Google Calendar's own page for an event read from it
 	Track     string // the new-interview form, filled from that event
 	Synced    bool   // linked to an event in Google Calendar, which follows its edits
+	Pack      prepPack
 }
 
 type calNew struct {
@@ -487,6 +491,9 @@ func monthGrid(first time.Time, all []calEvent, today time.Time) [][]calDay {
 
 func (v *server) detail(r *http.Request, e calEvent, j store.Job) *calDetail {
 	d := &calDetail{Event: e, Job: j, Interview: e.iv}
+	if e.iv != nil {
+		d.Pack = v.prepPack(j)
+	}
 	if g := e.google; g != nil {
 		d.Open = g.Link
 		d.Track = "/calendar?view=week&d=" + e.Date + "&new=" + e.Date
@@ -725,4 +732,25 @@ func formAt(r *http.Request) (string, error) {
 		return "", fmt.Errorf("time must be HH:MM")
 	}
 	return d + "T" + t, nil
+}
+
+// prepPack is the state of a job's interview prep pack: written yet, being written, or can be started.
+type prepPack struct {
+	JobID           int64
+	Ready, Building bool
+	Runner          bool // an AI assistant is set up to build it
+	When            string
+}
+
+func (v *server) prepPack(j store.Job) prepPack {
+	p := prepPack{JobID: j.ID, Runner: v.cfg.Runner != nil}
+	if fi, err := os.Stat(filepath.Join(apply.Dir(v.s, j), "interview-prep.md")); err == nil {
+		p.Ready, p.When = true, friendlyWhen(fi.ModTime().Format("2006-01-02T15:04"), time.Now())
+	}
+	if p.Runner {
+		if run := v.cfg.Runner.Latest(j.ID); run != nil && run.Snapshot().State == runner.Running {
+			p.Building = true
+		}
+	}
+	return p
 }

@@ -211,6 +211,22 @@ func statusSince(events []store.Event, status, fallback string) time.Time {
 	return at
 }
 
+// PendingProposal reports whether a saved proposal of the kind waits for the user: no mail went
+// either way since it was written.
+func PendingProposal(s *store.Store, j store.Job, kind string) bool {
+	st, err := os.Stat(filepath.Join(Dir(s, j), DraftFile(kind)))
+	if err != nil {
+		return false
+	}
+	mails, _ := s.Mails(j.ID, 50)
+	for _, m := range mails {
+		if mailTime(m).After(st.ModTime()) {
+			return false
+		}
+	}
+	return true
+}
+
 func mailTime(m store.Mail) time.Time {
 	for _, v := range []string{m.Date, m.At} {
 		if at, err := time.Parse(time.RFC3339, v); err == nil {

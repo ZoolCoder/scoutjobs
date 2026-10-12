@@ -48,6 +48,13 @@ var Steps = []Step{
 	{"draft", "E-mail draft", "", ""},
 }
 
+// ExtraSteps run only when asked for by name; "all" leaves them out.
+var ExtraSteps = []Step{
+	{"prep", "Interview prep pack", "interview-prep", "Prepare for the next interview of job #{id} that has no outcome yet (see `scoutjobs interview list`), following the interview-prep skill unattended: write research.md, stories.md and interview-prep.md in the application folder. In stories.md, pick for each must-have of fit-review.json the story in stories/ whose themes, title and core facts fit it best. Do not run the story-extraction interview or a mock interview: where no story in stories/ fits a likely question, list the question under `## Gaps to cover before the day`."},
+}
+
+func allSteps() []Step { return append(append([]Step{}, Steps...), ExtraSteps...) }
+
 // Parse turns "tailor,cover" into steps; "" or "safe" selects every step.
 func Parse(list string) ([]string, error) {
 	list = strings.TrimSpace(list)
@@ -70,7 +77,7 @@ func Parse(list string) ([]string, error) {
 }
 
 func step(name string) (Step, bool) {
-	for _, s := range Steps {
+	for _, s := range allSteps() {
 		if s.Name == name {
 			return s, true
 		}
@@ -80,7 +87,7 @@ func step(name string) (Step, bool) {
 
 func names() string {
 	var n []string
-	for _, s := range Steps {
+	for _, s := range allSteps() {
 		n = append(n, s.Name)
 	}
 	return strings.Join(n, ",")
@@ -144,9 +151,10 @@ func (s Status) Current() string {
 // Run is one preparation of one job. Its status changes while it runs; read it through Snapshot.
 type Run struct {
 	Status
-	mu   sync.Mutex
-	echo io.Writer
-	done chan struct{}
+	mu    sync.Mutex
+	echo  io.Writer
+	done  chan struct{}
+	extra map[string]string // Request.Extra
 }
 
 func newRun(id string, jobID int64, dry bool) *Run {
@@ -196,6 +204,8 @@ type Request struct {
 	// KeepGoing goes on past a "fix" review verdict. Quality gates never stop preparation:
 	// they block sending only, and `email send --skip-checks` stays the one way past them.
 	KeepGoing bool `json:"keep_going"`
+	// Extra adds instructions to a step's task, by step name, e.g. the keywords the tailor step must work in.
+	Extra map[string]string `json:"extra,omitempty"`
 }
 
 // Runner holds what every run needs.
@@ -220,7 +230,7 @@ func (rn *Runner) Plan(j store.Job, req Request) (*Run, Agent, error) {
 		req.Steps, _ = Parse("")
 	}
 	run := newRun(fmt.Sprintf("%d-%d", j.ID, time.Now().UnixMilli()), j.ID, req.DryRun)
-	run.Keep = req.KeepGoing
+	run.Keep, run.extra = req.KeepGoing, req.Extra
 	if !req.DryRun {
 		for _, note := range rn.Reconcile(j) {
 			run.logf("%s", note)
@@ -231,7 +241,7 @@ func (rn *Runner) Plan(j store.Job, req Request) (*Run, Agent, error) {
 	for _, n := range req.Steps {
 		want[n] = true
 	}
-	for _, s := range Steps {
+	for _, s := range allSteps() {
 		if !want[s.Name] {
 			continue
 		}
@@ -384,7 +394,7 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 	since := time.Now()
 	stop := make(chan struct{})
 	go rn.watch(run, j, group, since, stop)
-	err := rn.agent(ctx, run, ag, dir, Prompt(j, dir, rn.Exe, rn.withSources(dir, steps)))
+	err := rn.agent(ctx, run, ag, dir, Prompt(j, dir, rn.Exe, withExtra(rn.withSources(dir, steps), run.extra)))
 	close(stop)
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -424,6 +434,9 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 		}
 		run.set(i, Done, why)
 		_ = rn.Store.AddEvent(j.ID, "run:"+s.Name, ag.Name+": "+why)
+		if s.Name == "prep" {
+			rn.tickPrep(j)
+		}
 	}
 	return nil
 }
@@ -542,6 +555,16 @@ func (rn *Runner) wordCoverTask() string {
 		"Save " + apply.SlotsName + " in the application folder: one JSON object from slot name to plain text, one paragraph per slot, no Markdown, in the voice and length of the template. Slots: " + strings.Join(slots, "; ") + ". " +
 		"Leave a name or postal address empty unless posting.md or the job states it; never guess a recipient, an address, availability, salary, work authorisation or a language level. " +
 		"Then run `scoutjobs cv cover {id}`: it fills the template into cover-letter.docx, cover-letter.md and cover-letter.pdf and lists every problem; fix the slots and run it again until it reports pass or warn. Do not write those three files yourself."
+}
+
+// withExtra appends the request's extra instructions to the tasks they name.
+func withExtra(steps []Step, extra map[string]string) []Step {
+	for i, s := range steps {
+		if x := extra[s.Name]; x != "" {
+			steps[i].Task += " " + x
+		}
+	}
+	return steps
 }
 
 // withSources points the tailor and cover steps at the CV and cover letter named in config.yaml,

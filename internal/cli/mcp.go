@@ -40,6 +40,8 @@ var jobRef = req("job", "string", "job id, or company/title", "")
 var mcpTools = []mcpTool{
 	{"brief", "Today's picture: applied this week vs target, follow-ups due, stale jobs, upcoming interviews, new and drafted jobs.", []string{"brief", "--compact"}, nil, false},
 	{"stats", "Funnel, weekly numbers, response rate, follow-ups due.", []string{"stats"}, nil, true},
+	{"funnel", "What works: for the jobs applied to, how many got an answer, an interview and an offer, grouped by source, by fit band and by month applied.", []string{"stats", "--funnel"}, nil, true},
+	{"daily", "Run the daily chores now: saved searches marked daily that are due, follow-up and thank-you drafts when that switch is on, interview prep packs when that switch is on. Idempotent; nothing is sent.", []string{"daily"}, nil, true},
 	{"doctor", "Install health: PATH, data dir, config keys, mail secrets, linked skills, dashboard.", []string{"doctor"}, nil, true},
 	{"job_list", "Tracked jobs, newest first.", []string{"job", "list", "--compact"}, []mcpProp{
 		p("status", "string", "filter by status (new, ranked, drafted, applied, interview, offer, hired, rejected, skipped, withdrawn, no_response)", "status"),
@@ -147,6 +149,9 @@ func mcpDenied(args []string) bool {
 	switch args[0] {
 	case "serve", "mcp", "update":
 		return true
+	case "daily":
+		// it starts agent runs, which must not nest
+		return os.Getenv("SCOUTJOBS_RUNNER") != ""
 	case "gmail":
 		// an unattended job run gets no Google access at all
 		return os.Getenv("SCOUTJOBS_RUNNER") != "" || len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")

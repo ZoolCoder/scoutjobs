@@ -41,6 +41,8 @@ var eventTitles = map[string]string{
 	"run:check":                "Assistant checked the drafts",
 	"run:ats":                  "Assistant ran an ATS check",
 	"run:export":               "Assistant exported your CV",
+	"run:prep":                 "Assistant built a prep pack",
+	"digest":                   "Daily search",
 	"run:done":                 "Assistant finished",
 	"run:failed":               "Assistant run failed",
 	"learning":                 "Learning logged",
@@ -51,7 +53,7 @@ var eventTitles = map[string]string{
 func eventGroup(kind string) string {
 	k, _, _ := strings.Cut(kind, ":")
 	switch k {
-	case "added", "scored", "fit", "decision":
+	case "added", "scored", "fit", "decision", "digest":
 		return "jobs"
 	case "status":
 		return "status"

@@ -247,6 +247,20 @@ func (m *Manager) Waiting() []int64 {
 	return out
 }
 
+// Unqueue takes a job out of the queue before it starts; false when it was not waiting.
+func (m *Manager) Unqueue(jobID int64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, q := range m.queue {
+		if q.job.ID == jobID {
+			m.queue = append(m.queue[:i], m.queue[i+1:]...)
+			delete(m.queued, jobID)
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Manager) drain() {
 	for {
 		m.mu.Lock()
@@ -266,6 +280,19 @@ func (m *Manager) drain() {
 		}
 		run.Wait()
 	}
+}
+
+// Running returns the ids of the jobs an agent is preparing now.
+func (m *Manager) Running() []int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []int64
+	for id, r := range m.latest {
+		if id != 0 && r.Snapshot().State == Running {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // Busy counts the jobs being prepared now plus those waiting in the queue, for the navigation.

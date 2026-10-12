@@ -16,21 +16,56 @@ import (
 
 // Profile is what a posting is measured against, read from profile.md and the preferences.
 type Profile struct {
-	Roles           []string `json:"roles,omitempty"` // "backend engineer", "go engineer"
-	Level           string   `json:"level,omitempty"`
-	Remote          string   `json:"remote,omitempty"` // remote, hybrid, onsite, or empty
-	Places          []string `json:"places,omitempty"` // where the user wants to work, as written
-	Eligible        []string `json:"eligible,omitempty"`
-	Strong          []string `json:"strong,omitempty"`
-	Working         []string `json:"working,omitempty"`
-	Learning        []string `json:"learning,omitempty"`
-	Avoid           []string `json:"avoid,omitempty"`       // skills the user avoids
-	AvoidTypes      []string `json:"avoid_types,omitempty"` // employment types ruled out
-	AvoidOnCall     bool     `json:"avoid_on_call,omitempty"`
-	OnsiteBreaker   bool     `json:"onsite_breaker,omitempty"` // on-site work is a deal-breaker
-	SalaryFloor     int64    `json:"salary_floor,omitempty"`
-	SalaryCurrency  string   `json:"salary_currency,omitempty"`
+	Roles          []string `json:"roles,omitempty"` // "backend engineer", "go engineer"
+	Level          string   `json:"level,omitempty"`
+	Remote         string   `json:"remote,omitempty"` // remote, hybrid, onsite, or empty
+	Places         []string `json:"places,omitempty"` // where the user wants to work, as written
+	Eligible       []string `json:"eligible,omitempty"`
+	Strong         []string `json:"strong,omitempty"`
+	Working        []string `json:"working,omitempty"`
+	Learning       []string `json:"learning,omitempty"`
+	Avoid          []string `json:"avoid,omitempty"`       // skills the user avoids
+	AvoidTypes     []string `json:"avoid_types,omitempty"` // employment types ruled out
+	AvoidOnCall    bool     `json:"avoid_on_call,omitempty"`
+	OnsiteBreaker  bool     `json:"onsite_breaker,omitempty"` // on-site work is a deal-breaker
+	SalaryFloor    int64    `json:"salary_floor,omitempty"`
+	SalaryCurrency string   `json:"salary_currency,omitempty"`
+	// Answers is the answer rate of each source that clearly beats or trails the rest, from the user's own applications.
+	Answers         map[string]SourceRate `json:"-"`
 	locationWritten string
+}
+
+// SourceRate is how often one source answered the user, against how often all sources did.
+type SourceRate struct {
+	Rate, Overall, Applied int
+}
+
+const (
+	// sourceMin is how many applications a source needs before its answer rate counts.
+	sourceMin = 5
+	// sourceGap is how many points a source's answer rate must differ from the overall rate to count.
+	sourceGap = 15
+	// sourceWeight is what a clearly better or worse source adds to or takes off a score.
+	sourceWeight = 5
+)
+
+// SourceRates picks the sources whose answer rate differs clearly from the overall rate.
+func SourceRates(f store.Funnel) map[string]SourceRate {
+	applied, answered := 0, 0
+	for _, r := range f.Source {
+		applied, answered = applied+r.Applied, answered+r.Responded
+	}
+	if applied == 0 {
+		return nil
+	}
+	overall := answered * 100 / applied
+	out := map[string]SourceRate{}
+	for _, r := range f.Source {
+		if d := r.Rate() - overall; r.Applied >= sourceMin && (d >= sourceGap || d <= -sourceGap) {
+			out[strings.ToLower(r.Group)] = SourceRate{r.Rate(), overall, r.Applied}
+		}
+	}
+	return out
 }
 
 // Empty is true when the profile gives nothing to match on.
@@ -51,7 +86,11 @@ func (p Profile) Wants() []string {
 func Load(s *store.Store) Profile {
 	b, _ := os.ReadFile(filepath.Join(s.Home, "profile.md"))
 	prefs, _ := s.Preferences()
-	return Parse(string(b), prefs)
+	p := Parse(string(b), prefs)
+	if f, err := s.Funnel(); err == nil {
+		p.Answers = SourceRates(f)
+	}
+	return p
 }
 
 // Parse reads the "- Key: value" lines of profile.md, then lets stated or confident preferences add
@@ -347,6 +386,15 @@ func (pr Profile) Score(p search.Posting) Result {
 			r.Hard = append(r.Hard, fmt.Sprintf("pays up to %d, your floor is %d", p.SalaryMax, pr.SalaryFloor))
 		} else if p.SalaryMin >= pr.SalaryFloor {
 			r.Why = append(r.Why, "pays above your floor")
+		}
+	}
+	if a, ok := pr.Answers[strings.ToLower(strings.TrimSpace(p.Source))]; ok {
+		if a.Rate > a.Overall {
+			score += sourceWeight
+			r.Why = append(r.Why, fmt.Sprintf("%s answered %d%% of your %d applications", p.Source, a.Rate, a.Applied))
+		} else {
+			score -= sourceWeight
+			r.Miss = append(r.Miss, fmt.Sprintf("%s answered %d%% of your %d applications, %d%% overall", p.Source, a.Rate, a.Applied, a.Overall))
 		}
 	}
 	r.Score = int(math.Round(math.Max(0, math.Min(100, score))))

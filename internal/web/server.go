@@ -202,15 +202,17 @@ var funcs = template.FuncMap{
 		}
 		return parts
 	},
-	"gaps":      cvGaps,
-	"statuses":  func() []string { return store.Statuses },
-	"next":      func(st string) []string { return store.NextStatuses[st] },
-	"initial":   initial,
-	"hue":       hue,
-	"today":     func() string { return time.Now().Format("2006-01-02") },
-	"add":       func(a, b int) int { return a + b },
-	"colcap":    func() int { return colCap },
-	"prepItems": func() []store.PrepItem { return store.PrepItems },
+	"gaps":       cvGaps,
+	"statuses":   func() []string { return store.Statuses },
+	"next":       func(st string) []string { return store.NextStatuses[st] },
+	"initial":    initial,
+	"hue":        hue,
+	"today":      func() string { return time.Now().Format("2006-01-02") },
+	"add":        func(a, b int) int { return a + b },
+	"colcap":     func() int { return colCap },
+	"prepItems":  func() []store.PrepItem { return store.PrepItems },
+	"preparable": preparable,
+	"kwaddable":  func(gaps []apply.KeywordGap) bool { return apply.KeywordTask(gaps) != "" },
 	"prepArgs": func(i store.Interview, back string) map[string]any {
 		return map[string]any{"I": i, "Back": back}
 	},
@@ -273,6 +275,7 @@ func ServeListener(ctx context.Context, l net.Listener, s *store.Store, cfg Conf
 	if cfg.Runner != nil {
 		go srv.autoPrepareLoop(ctx, 10*time.Minute)
 	}
+	go srv.autopilotLoop(ctx, time.Hour)
 	hs := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
 	go func() { errc <- hs.Serve(l) }()
@@ -309,6 +312,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /search", srv.searchPage)
 	mux.HandleFunc("POST /search", srv.runSearch)
 	mux.HandleFunc("POST /search/saved/{id}/delete", srv.deleteSearch)
+	mux.HandleFunc("POST /search/saved/{id}/daily", srv.dailySearch)
 	mux.HandleFunc("GET /jobs/{id}", srv.job)
 	mux.HandleFunc("GET /jobs/{id}/files/{name}", srv.jobFile)
 	mux.HandleFunc("POST /jobs/{id}/files/{name}", srv.saveFile)
@@ -321,11 +325,15 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/run", srv.startRun)
 	mux.HandleFunc("POST /jobs/{id}/run/cancel", srv.cancelRun)
 	mux.HandleFunc("GET /jobs/{id}/run", srv.runState)
+	mux.HandleFunc("POST /jobs/{id}/keywords", srv.fixKeywords)
 	mux.HandleFunc("POST /jobs/{id}/gmail-draft", srv.gmailDraft)
 	mux.HandleFunc("GET /jobs/{id}/download/{name}", srv.jobDownload)
 	mux.HandleFunc("GET /jobs/{id}/view/{name}", srv.jobView)
 	mux.HandleFunc("POST /jobs/{id}/emails/{kind}", srv.saveEmail)
 	mux.HandleFunc("POST /jobs/prepare-all", srv.prepareAll)
+	mux.HandleFunc("POST /pipeline/prepare", srv.preparePicked)
+	mux.HandleFunc("GET /pipeline/queue", srv.queueJSON)
+	mux.HandleFunc("POST /pipeline/queue/{id}/remove", srv.unqueue)
 	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
 	mux.HandleFunc("GET /gmail/detect", srv.gmailDetect)
 	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
@@ -346,6 +354,11 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /calendar.ics", srv.calendarFeed)
 	mux.HandleFunc("GET /calendar/event/{key}", srv.calendarEvent)
 	mux.HandleFunc("GET /learning", srv.learning)
+	mux.HandleFunc("GET /stories", srv.stories)
+	mux.HandleFunc("GET /stories/new", srv.newStory)
+	mux.HandleFunc("POST /stories", srv.createStory)
+	mux.HandleFunc("GET /stories/{name}", srv.storyFile)
+	mux.HandleFunc("POST /stories/{name}", srv.saveStory)
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
 	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
@@ -360,6 +373,8 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /profile/prepare/cancel", srv.cancelMaster)
 	mux.HandleFunc("GET /profile/prepare", srv.masterState)
 	mux.HandleFunc("POST /settings/auto-prepare", srv.setAutoPrepare)
+	mux.HandleFunc("POST /settings/automation", srv.setAutomation)
+	mux.HandleFunc("POST /settings/automation/run", srv.runAutomation)
 	mux.HandleFunc("GET /connections", srv.connections)
 	mux.HandleFunc("POST /connections/agent", srv.setDefaultAgent)
 	mux.HandleFunc("POST /connections/calendar", srv.setCalendarVia)
@@ -378,6 +393,8 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 		w.Header().Set("Cache-Control", "no-store")
 		writeJSON(w, http.StatusOK, Health{App: "scoutjobs", Version: cfg.Version, PID: os.Getpid(), Exe: exe, Home: s.Home})
 	})
+	mux.HandleFunc("GET /palette.json", srv.paletteJSON)
+	mux.HandleFunc("GET /notify.json", srv.notifyJSON)
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
@@ -393,6 +410,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	api.HandleFunc("POST /api/jobs/{id}/status", srv.apiSetStatus)
 	api.HandleFunc("POST /api/jobs/{id}/note", srv.apiNote)
 	api.HandleFunc("GET /api/stats", srv.apiStats)
+	api.HandleFunc("GET /api/funnel", srv.apiFunnel)
 	api.HandleFunc("GET /api/brief", srv.apiBrief)
 	api.HandleFunc("GET /api/events", srv.apiEvents)
 	api.HandleFunc("GET /api/jobs/{id}/check", srv.apiCheck)
@@ -498,6 +516,7 @@ var subtitles = map[string]string{
 	"interviews":  "Prepare for what is coming, record how it went.",
 	"calendar":    "Interviews, deadlines and follow-ups. Subscribe from Google Calendar or add one event at a time.",
 	"learning":    "Close the gaps your target roles keep asking for.",
+	"stories":     "Your interview stories and the requirements they answer.",
 	"preferences": "What ScoutJobs learned from your decisions, and why.",
 	"profile":     "The source of truth behind every CV claim.",
 	"activity":    "Everything ScoutJobs recorded, newest first.",
@@ -701,7 +720,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Kind": r.URL.Query().Get("kind"), "EvGroups": eventGroupsOf(events), "Interviews": ivs, "Dir": dir, "Files": files, "FileGroups": fileGroups(dir, files), "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
-		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
+		"Checklist": jobChecklist(j, kit, gates, events, dir), "Keywords": apply.KeywordGaps(dir, v.cvGaps(j.ID)), "StoryMap": v.storyMap(dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
 		"Cards": docCards(docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf")), "Points": fitPoints(review, 6), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
 		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(),
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
@@ -831,7 +850,8 @@ func (v *server) reviews(w http.ResponseWriter, r *http.Request) {
 	if len(up) > 3 {
 		up = up[:3]
 	}
-	v.render(w, r, "reviews.html", "reviews", map[string]any{"Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
+	works, _ := v.s.Funnel()
+	v.render(w, r, "reviews.html", "reviews", map[string]any{"Works": works, "Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
 		"Older": older, "Newer": newer, "Upcoming": up,
 		"Funnel": funnelOf(st), "Stats": st, "Target": v.cfg.WeeklyApplyTarget, "ThisWeek": v.s.WeeklyCounts("status", "%applied%", 1)})
 }
@@ -920,7 +940,13 @@ func (v *server) interviews(w http.ResponseWriter, r *http.Request) {
 			past = append(past, i)
 		}
 	}
-	v.render(w, r, "interviews.html", "interviews", map[string]any{"Upcoming": up, "NeedsOutcome": open, "Past": past, "Outcomes": []string{"passed", "failed", "pending", "cancelled"}})
+	data := map[string]any{"Upcoming": up, "NeedsOutcome": open, "Past": past, "Outcomes": []string{"passed", "failed", "pending", "cancelled"}}
+	if len(up) > 0 {
+		if j, err := v.s.JobByID(up[0].JobID); err == nil {
+			data["Pack"] = v.prepPack(j)
+		}
+	}
+	v.render(w, r, "interviews.html", "interviews", data)
 }
 
 func (v *server) setInterview(w http.ResponseWriter, r *http.Request) {
@@ -1016,7 +1042,8 @@ func (v *server) preferences(w http.ResponseWriter, r *http.Request) {
 			rejected = append(rejected, p)
 		}
 	}
-	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds, "Pending": pending, "Rejected": rejected})
+	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds, "Pending": pending, "Rejected": rejected, "Auto": v.automation(),
+		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err")})
 }
 
 // reviewForm confirms, edits (confirm with the user's wording) or rejects one proposal.
@@ -1322,6 +1349,15 @@ func (v *server) apiStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, st)
+}
+
+func (v *server) apiFunnel(w http.ResponseWriter, r *http.Request) {
+	f, err := v.s.Funnel()
+	if err != nil {
+		apiErr(w, 500, err)
+		return
+	}
+	writeJSON(w, 200, f)
 }
 
 // apiBrief is the daily-briefing payload: what needs attention today, small enough for an automation step.

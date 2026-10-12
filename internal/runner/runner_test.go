@@ -339,3 +339,48 @@ func TestRunSavesThePostingBeforeTheAgentReadsIt(t *testing.T) {
 		t.Errorf("a saved posting is kept: %q, fetched %d times", b, fetched)
 	}
 }
+
+const prepAgent = `#!/bin/sh
+cat > prompt.txt
+grep -q "Step 1, interview prep pack" prompt.txt && printf '# Prep\n' > interview-prep.md
+echo "wrote the prep"
+`
+
+func TestPrepStepIsAskedForByName(t *testing.T) {
+	all, _ := Parse("all")
+	if strings.Contains(strings.Join(all, ","), "prep") {
+		t.Fatalf("all includes prep: %v", all)
+	}
+	rn, j := setup(t, prepAgent)
+	id, err := rn.Store.AddInterview(store.Interview{JobID: j.ID, Stage: "hr", At: "2099-01-02T10:00"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	past := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04") // over, outcome not logged yet
+	if _, err := rn.Store.AddInterview(store.Interview{JobID: j.ID, Stage: "screen", At: past}); err != nil {
+		t.Fatal(err)
+	}
+	got := run(t, rn, j, Request{Steps: []string{"prep"}})
+	if got.State != Done || states(got) != "prep=done" {
+		t.Fatalf("%s %s %s %v", got.State, got.Error, states(got), got.Log)
+	}
+	ivs, _ := rn.Store.Interviews(j.ID, false)
+	if len(ivs) != 2 || ivs[1].ID != id || ivs[1].Prep != "company,posting,questions" || ivs[1].PrepStatus != "in_progress" || ivs[0].Prep != "" {
+		t.Fatalf("prep items not ticked on the coming interview: %+v", ivs)
+	}
+	if got = run(t, rn, j, Request{Steps: []string{"prep"}}); states(got) != "prep=skipped" {
+		t.Errorf("second run: %s", states(got))
+	}
+}
+
+func TestExtraReachesTheStepTask(t *testing.T) {
+	rn, j := setup(t, fakeAgent)
+	got := run(t, rn, j, Request{Steps: []string{"tailor"}, Extra: map[string]string{"tailor": "Work in: event streaming with Kafka.", "cover": "never shown"}})
+	if got.State != Done {
+		t.Fatalf("%s %s", got.State, got.Error)
+	}
+	prompt, _ := os.ReadFile(filepath.Join(apply.Dir(rn.Store, j), "prompt.txt"))
+	if !strings.Contains(string(prompt), "Work in: event streaming with Kafka.") || strings.Contains(string(prompt), "never shown") {
+		t.Errorf("prompt:\n%.600s", prompt)
+	}
+}

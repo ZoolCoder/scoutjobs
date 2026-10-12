@@ -6,7 +6,8 @@
 <div class="nextrow">
   <span class="cal lg"><small>{{mon $i.At}}</small><b>{{dom $i.At}}</b></span>
   <div><h3>{{$i.Company}}<small>{{title $i.Stage}}</small></h3><p class="mono">{{when $i.At}}{{if $i.Format}} · {{$i.Format}}{{end}}{{if $i.Interviewer}} · with {{$i.Interviewer}}{{end}}</p>
-  <p class="small muted">Prep {{$i.PrepCount}}/6. Run <code class="cmd">/scoutjobs:interview {{$i.JobID}}</code> for the prep pack.</p></div>
+  <p class="small muted">Prep {{$i.PrepCount}}/6.</p>
+  {{template "prep-pack" $.Data.Pack}}</div>
   <a class="btn primary" href="/pipeline?job={{$i.JobID}}">Open job</a>
 </div>
 {{template "prep-check" (prepArgs $i "/interviews")}}
