@@ -75,6 +75,42 @@ func day(s string) string {
 	return s
 }
 
+// friendlyDay is day for people: "today", "yesterday", "11 Oct", or "3 Mar 2025" outside this year.
+func friendlyDay(s string, now time.Time) string {
+	d, err := time.ParseInLocation("2006-01-02", day(s), now.Location())
+	if err != nil {
+		return s
+	}
+	y, m, dd := now.Date()
+	today := time.Date(y, m, dd, 0, 0, 0, 0, now.Location())
+	switch {
+	case d.Equal(today):
+		return "today"
+	case d.Equal(today.AddDate(0, 0, -1)):
+		return "yesterday"
+	case d.Year() == y:
+		return d.Format("2 Jan")
+	}
+	return d.Format("2 Jan 2006")
+}
+
+// mondayOf is the Monday that starts t's week, the way store.WeeklyCounts groups them.
+func mondayOf(t time.Time) time.Time {
+	wd := int(t.Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	return t.AddDate(0, 0, 1-wd)
+}
+
+// friendlyWhen is friendlyDay with the time of day when s has one: "today 16:00".
+func friendlyWhen(s string, now time.Time) string {
+	if len(s) >= 16 && (s[10] == 'T' || s[10] == ' ') {
+		return friendlyDay(s, now) + " " + s[11:16]
+	}
+	return friendlyDay(s, now)
+}
+
 var funcs = template.FuncMap{
 	"kb": func(n int64) string {
 		switch {
@@ -104,6 +140,7 @@ var funcs = template.FuncMap{
 		return ""
 	},
 	"day": day,
+	"date": func(s string) string { return friendlyDay(s, time.Now()) },
 	"host": func(u string) string {
 		if p, err := url.Parse(u); err == nil && p.Host != "" {
 			return strings.TrimPrefix(p.Host, "www.")
@@ -143,12 +180,7 @@ var funcs = template.FuncMap{
 		return ""
 	},
 	"ago": ago,
-	"when": func(s string) string {
-		if len(s) >= 16 && s[10] == 'T' {
-			return s[:10] + " " + s[11:16]
-		}
-		return s
-	},
+	"when": func(s string) string { return friendlyWhen(s, time.Now()) },
 	"fit": func(n int64) string {
 		if n < 0 {
 			return "–"
@@ -555,7 +587,8 @@ func funnelOf(st store.Stats) []funnelRow {
 
 type weekBar struct {
 	Count int64
-	Pct   int // 0-100 in steps of 5, rendered as a CSS height class
+	Pct   int    // 0-100 in steps of 5, rendered as a CSS height class
+	Label string // the Monday the week starts, "now" for the last bar
 }
 
 func (v *server) overview(w http.ResponseWriter, r *http.Request) {
@@ -576,8 +609,13 @@ func (v *server) overview(w http.ResponseWriter, r *http.Request) {
 		wmax = 1
 	}
 	var weekly []weekBar
-	for _, c := range counts {
-		weekly = append(weekly, weekBar{c, int(c*100/wmax) / 5 * 5})
+	monday := mondayOf(time.Now().UTC())
+	for i, c := range counts {
+		label := "now"
+		if back := len(counts) - 1 - i; back > 0 {
+			label = monday.AddDate(0, 0, -7*back).Format("2 Jan")
+		}
+		weekly = append(weekly, weekBar{c, int(c*100/wmax) / 5 * 5, label})
 	}
 	d := overviewData{Stats: st, Funnel: funnel, Weekly: weekly, Target: v.cfg.WeeklyApplyTarget}
 	d.Upcoming, _ = v.s.Interviews(0, true)

@@ -24,7 +24,7 @@
 <section class="panel">
 <div class="panel-h"><h2>Practice</h2><span class="n">{{len .Sessions}}</span></div>
 {{if .Sessions}}<ul class="irows">{{range .Sessions}}<li class="prow">
-  <div class="who"><b>{{title .Kind}}</b>{{with .Topic}} <span class="muted">{{.}}</span>{{end}}<small>{{day .At}}{{with .Notes}} · {{.}}{{end}}</small></div>
+  <div class="who"><b>{{title .Kind}}</b>{{with .Topic}} <span class="muted">{{.}}</span>{{end}}<small>{{date .At}}{{with .Notes}} · {{.}}{{end}}</small></div>
   {{if ge .Score 0}}<span class="fit{{if lt .Score 70}} mid{{end}}">{{.Score}}</span>{{end}}
 </li>{{end}}</ul>
 {{else}}<p class="empty">No practice yet. <code>/scoutjobs:mock</code> runs a mock interview.</p>{{end}}

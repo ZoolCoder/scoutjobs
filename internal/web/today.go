@@ -35,7 +35,7 @@ func (v *server) today(st store.Stats, upcoming []store.Interview) []todo {
 			continue
 		}
 		out = append(out, todo{Kind: "interview", Title: fmt.Sprintf("Prepare for %s · %s", i.Company, strings.ReplaceAll(i.Stage, "_", " ")),
-			Detail: fmt.Sprintf("%s · prep %d/%d", strings.Replace(i.At, "T", " ", 1), i.PrepCount(), len(store.PrepItems)),
+			Detail: fmt.Sprintf("%s · prep %d/%d", friendlyWhen(i.At, time.Now()), i.PrepCount(), len(store.PrepItems)),
 			Href:   fmt.Sprintf("/calendar?view=week&d=%s&ev=i%d", day(i.At), i.ID),
 			Links:  []todoLink{{"Open prep checklist", fmt.Sprintf("/calendar?view=week&d=%s&ev=i%d", day(i.At), i.ID), false}}})
 	}

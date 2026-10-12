@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
+<meta name="description" content="ScoutJobs: your local job search dashboard.">
 <title>ScoutJobs · {{.Title}}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
@@ -13,7 +14,7 @@
 <div class="shell{{if .Mini}} mini{{end}}">
 <aside class="side">
   <div class="sidetop">
-  <a class="brand" href="/" title="ScoutJobs">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
+  <a class="brand" href="/" title="ScoutJobs home" aria-label="ScoutJobs home">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
   <button class="sidefold" type="button" data-fold aria-label="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}" aria-expanded="{{if .Mini}}false{{else}}true{{end}}" title="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 10l-2 2 2 2"/></svg></button>
   </div>
   <nav aria-label="main">
@@ -75,9 +76,9 @@
 </form>
 {{end}}
 
-{{define "gauge"}}<span class="gauge g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="fit {{fit .}}"><b>{{fit .}}</b></span>{{end}}
+{{define "gauge"}}<span class="gauge g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="Fit score {{fit .}} out of 100"><b>{{fit .}}</b></span>{{end}}
 {{define "cal"}}<span class="cal"><small>{{mon .}}</small><b>{{dom .}}</b></span>{{end}}
-{{define "gauge-lg"}}<span class="gauge lg g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="score {{fit .}}"><b>{{fit .}}</b></span>{{end}}
+{{define "gauge-lg"}}<span class="gauge lg g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="Match score {{fit .}} out of 100"><b>{{fit .}}</b></span>{{end}}
 
 {{define "mark"}}<svg class="mark" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="42" cy="42" r="30"/><path d="M64 64 L88 88"/><path d="M42 24 C44 36 48 40 60 42 C48 44 44 48 42 60 C40 48 36 44 24 42 C36 40 40 36 42 24 Z" fill="currentColor" stroke="none"/></svg>{{end}}
 {{define "ico-search"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>{{end}}

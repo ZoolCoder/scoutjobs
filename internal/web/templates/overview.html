@@ -10,7 +10,7 @@
 {{else if .Stats.DueFollowUps}}{{$j := index .Stats.DueFollowUps 0}}
 <section class="next c4">
   {{template "gauge-lg" $j.FitScore}}
-  <div><span class="next-k">Next best move</span><h2>Follow up with {{$j.Company}}</h2><p>{{$j.Title}} · quiet since {{day $j.UpdatedAt}}</p></div>
+  <div><span class="next-k">Next best move</span><h2>Follow up with {{$j.Company}}</h2><p>{{$j.Title}} · quiet since {{date $j.UpdatedAt}}</p></div>
   <a class="btn primary" href="/jobs/{{$j.ID}}">Open job</a>
 </section>
 {{else if .Upcoming}}{{$i := index .Upcoming 0}}
@@ -54,7 +54,7 @@
 
 <section class="panel c3">
   <div class="panel-h"><h2>Applications per week</h2><span class="act muted">target {{.Target}}</span></div>
-  <ul class="weeks">{{range $i, $w := .Weekly}}<li><i class="h{{$w.Pct}}" title="{{$w.Count}}"></i><span>W{{$i}}</span></li>{{end}}</ul>
+  <ul class="weeks">{{range $w := .Weekly}}<li title="{{$w.Count}} applied · {{if eq $w.Label "now"}}this week{{else}}week of {{$w.Label}}{{end}}"><i class="h{{$w.Pct}}"></i><span>{{$w.Label}}</span></li>{{end}}</ul>
 </section>
 
 <section class="panel c6 today">
@@ -75,7 +75,7 @@
   </ul>
   {{else}}<p class="empty">No interviews scheduled. They appear here once you add one to a job.</p>{{end}}
   {{if .TodoJobs}}<h3>Drafts waiting <span class="n">{{len .TodoJobs}}</span></h3>
-  <ul class="rows">{{range .TodoJobs}}<li><span></span><span><a href="/jobs/{{.ID}}">{{.Company}}</a> · {{.Title}}<small>edited {{day .UpdatedAt}}</small></span>{{template "gauge" .FitScore}}</li>{{end}}</ul>{{end}}
+  <ul class="rows">{{range .TodoJobs}}<li><span></span><span><a href="/jobs/{{.ID}}">{{.Company}}</a> · {{.Title}}<small>edited {{date .UpdatedAt}}</small></span>{{template "gauge" .FitScore}}</li>{{end}}</ul>{{end}}
 </section>
 
 <section class="panel c3">
@@ -83,9 +83,9 @@
   {{with .Checks}}{{range .}}
   <div class="cv">
     <div class="score">{{template "gauge-lg" .ATSScore}}<small>ATS score</small></div>
-    <div class="file"><span class="ic">{{template "ico-doc"}}</span><span><b>{{.File}}</b><small>content {{fit .Score}} · checked {{day .At}}</small></span></div>
+    <div class="file"><span class="ic">{{template "ico-doc"}}</span><span><b>{{.File}}</b><small>content {{fit .Score}} · checked {{date .At}}</small></span></div>
   </div>
-  <p class="callout">{{.Summary}}</p>
+  <p class="callout"><span class="clamp" title="{{.Summary}}">{{.Summary}}</span></p>
   {{if .Gaps}}<p class="gaps">{{range split .Gaps}}<span class="chip">{{.}}</span>{{end}}</p>{{end}}
   {{end}}
   {{else}}<p class="empty">Not checked yet. Say “check my CV” or run <code>/scoutjobs:cv</code>.</p>{{end}}

@@ -2,7 +2,7 @@
 
 {{define "mail-list"}}{{if .}}<ul class="mails">{{range .}}<li class="{{.Dir}}">
   <span class="mdir" title="{{if eq .Dir "in"}}received{{else}}sent{{end}}">{{if eq .Dir "in"}}←{{else}}→{{end}}</span>
-  <div><div class="mhead"><b>{{if eq .Dir "in"}}{{.From}}{{else}}You{{end}}</b>{{if .Kind}}<span class="badge k-{{.Kind}}">{{.Kind}}</span>{{end}}<span class="mono muted">{{day .Date}}</span></div>
+  <div><div class="mhead"><b>{{if eq .Dir "in"}}{{.From}}{{else}}You{{end}}</b>{{if .Kind}}<span class="badge k-{{.Kind}}">{{.Kind}}</span>{{end}}<span class="mono muted">{{date .Date}}</span></div>
   <div class="msubj">{{.Subject}}</div>{{if .Snippet}}<div class="msnip muted">{{.Snippet}}</div>{{end}}
   <div class="mact">{{if .Open}}<a href="{{.Open}}" rel="noopener noreferrer" target="_blank">Open in Gmail</a>{{end}}{{if .Reply}}<a href="{{.Reply}}" rel="noopener noreferrer" target="_blank">Reply</a>{{end}}</div></div>
 </li>{{end}}</ul>{{end}}{{end}}
@@ -53,7 +53,7 @@
       {{if $j.Source}}<dt>Source</dt><dd>{{$j.Source}}</dd>{{end}}
       {{if .Contacts}}<dt>People</dt><dd><a href="/jobs/{{$j.ID}}">{{.Contacts}} you know here</a></dd>{{end}}
       {{if $j.Tags}}<dt>Tags</dt><dd>{{range split $j.Tags}}<span class="chip">{{.}}</span> {{end}}</dd>{{end}}
-      <dt>Added</dt><dd>{{day $j.CreatedAt}}</dd>
+      <dt>Added</dt><dd>{{date $j.CreatedAt}}</dd>
     </dl></section>
     <section><h3>Application kit <span class="n">{{.KitDone}}/4</span></h3>
     <ul class="kitmini">{{range .Kit}}<li class="{{if .Done}}done{{end}}">{{.Label}}</li>{{end}}</ul>

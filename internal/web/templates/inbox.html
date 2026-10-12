@@ -2,7 +2,7 @@
 {{with .Data}}{{$kind := .Kind}}
 <div class="inbox-top">
   <div class="src">{{if eq .Source "agent"}}<span class="badge done agentname">{{.Account}}</span> reads your mail <a class="btn mini" href="/connections#mail">Change</a>{{else if eq .Source "gmail"}}<span class="badge done">Google</span> {{.Account}}{{with .Google}}<span class="grants">{{if .Mail}}<span>mail</span>{{end}}{{if .Drafts}}<span>drafts</span>{{end}}{{if .CalendarWrite}}<span>calendar</span>{{end}}</span>{{end}} <form class="inline" method="post" action="/gmail/disconnect"><button class="mini">Disconnect</button></form>{{else if eq .Source "imap"}}<span class="badge done">IMAP</span> {{.Account}}{{else}}<span class="badge todo">no inbox connected</span>{{end}}</div>
-  <span class="chips"><a {{if not $kind}}class="on" {{end}}href="/inbox">All</a>{{range .Kinds}}<a {{if eq . $kind}}class="on" {{end}}href="/inbox?kind={{.}}">{{.}}</a>{{end}}</span>
+  <span class="chips"><a {{if not $kind}}class="on" aria-current="true" {{end}}href="/inbox">All</a>{{range .Kinds}}<a {{if eq . $kind}}class="on" aria-current="true" {{end}}href="/inbox?kind={{.}}">{{.}}</a>{{end}}</span>
   {{if .CanSync}}<form method="post" action="/inbox/sync"><input type="hidden" name="back" value="/inbox"><button class="primary"{{with .AI}}{{if .Active}} disabled{{end}}{{end}}>Sync now</button></form>{{end}}
 </div>
 {{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
@@ -104,7 +104,7 @@
 </div>
 </section>{{end}}
 {{if .Days}}
-{{range .Days}}<section class="panel"><div class="panel-h"><h2>{{if .Day}}{{when .Day}}{{else}}Undated{{end}}</h2><span class="n">{{len .Rows}}</span></div>
+{{range .Days}}<section class="panel"><div class="panel-h"><h2 class="dayh">{{if .Day}}{{when .Day}}{{else}}Undated{{end}}</h2><span class="n">{{len .Rows}}</span></div>
 <ul class="mails wide">{{range .Rows}}<li class="{{.Dir}}">
   <span class="mdir" title="{{if eq .Dir "in"}}received{{else}}sent{{end}}">{{if eq .Dir "in"}}←{{else}}→{{end}}</span>
   <div><div class="mhead"><b>{{if eq .Dir "in"}}{{.From}}{{else}}You{{end}}</b>{{if .Kind}}<span class="badge k-{{.Kind}}">{{.Kind}}</span>{{end}}<a class="chip acc" href="/pipeline?job={{.JobID}}">{{.Company}} · {{.Title}}</a>{{if .Source}}<span class="chip dim">{{.Source}}</span>{{end}}</div>

@@ -49,7 +49,7 @@
 </li>{{end}}</ul>
 <p class="muted small">Learned from the jobs you skip and apply to. Anything you set or change yourself is never overwritten.</p>
 {{if .Rejected}}<details class="rejected"><summary class="muted small">{{len .Rejected}} rejected proposal{{if ne (len .Rejected) 1}}s{{end}}</summary>
-<ul>{{range .Rejected}}<li><b>{{title .Key}}</b> = {{.Value}} <small class="muted">{{day .DecidedAt}}{{if .Note}} · {{.Note}}{{end}}</small></li>{{end}}</ul></details>{{end}}
+<ul>{{range .Rejected}}<li><b>{{title .Key}}</b> = {{.Value}} <small class="muted">{{date .DecidedAt}}{{if .Note}} · {{.Note}}{{end}}</small></li>{{end}}</ul></details>{{end}}
 {{else}}<p class="empty">Nothing learned yet. Skip or apply to a few jobs, or add what you want yourself.</p>{{end}}
 </section>
 <div class="stack">

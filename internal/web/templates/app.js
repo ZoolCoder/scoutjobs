@@ -392,7 +392,7 @@ document.querySelectorAll('[data-test]').forEach(function (btn) {
   if (!btn || !shell) return;
   function titles(mini) {
     document.querySelectorAll('.side nav a').forEach(function (a) {
-      if (mini) a.title = a.textContent.trim(); else a.removeAttribute('title');
+      if (mini) { a.dataset.tip = a.textContent.trim(); a.dataset.tipPos = 'right'; } else a.removeAttribute('data-tip');
     });
   }
   titles(shell.classList.contains('mini'));
@@ -401,7 +401,7 @@ document.querySelectorAll('[data-test]').forEach(function (btn) {
     var label = mini ? 'Expand menu' : 'Collapse menu';
     btn.setAttribute('aria-expanded', String(!mini));
     btn.setAttribute('aria-label', label);
-    btn.title = label;
+    btn.dataset.tip = label;
     titles(mini);
     document.cookie = 'side=' + (mini ? 'mini' : 'full') + '; path=/; max-age=31536000; samesite=lax';
   });
@@ -417,3 +417,91 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
     btn.textContent = open ? 'Hide details' : 'Show all details';
   });
 });
+
+// Tooltips: the templates write plain title attributes, so the hint is there without the script.
+// This swaps them for a tooltip that also opens on keyboard focus, stays while the pointer is on it,
+// closes with Escape, and is announced as the control's description.
+(function () {
+  var tip = document.createElement('div');
+  tip.id = 'tip';
+  tip.className = 'tip';
+  tip.setAttribute('role', 'tooltip');
+  tip.hidden = true;
+  document.body.appendChild(tip);
+  var host = null, timer = 0;
+  var interactive = 'a[href],button,input,select,textarea,summary,[tabindex]';
+
+  function adopt(root) {
+    root.querySelectorAll('[title]:not(iframe):not(svg *)').forEach(function (el) {
+      var text = el.getAttribute('title').trim();
+      el.removeAttribute('title');
+      if (!text) return;
+      el.dataset.tip = text;
+      // The title was this control's only name (an icon link or button): keep it as the label.
+      if (el.matches(interactive) && !el.getAttribute('aria-label') && !el.innerText.trim()) el.setAttribute('aria-label', text);
+      // A plain span cannot take focus, so screen readers get the hint as hidden text instead.
+      if (!el.matches(interactive) && el.textContent.indexOf(text) < 0) {
+        var sr = document.createElement('span');
+        sr.className = 'sr-only';
+        sr.textContent = ' (' + text + ')';
+        el.appendChild(sr);
+      }
+    });
+  }
+
+  function place() {
+    var r = host.getBoundingClientRect(), t = tip.getBoundingClientRect(), gap = 8;
+    var vw = document.documentElement.clientWidth, x, y;
+    if (host.dataset.tipPos === 'right') {
+      x = r.right + gap; y = r.top + (r.height - t.height) / 2;
+    } else {
+      x = r.left + (r.width - t.width) / 2; y = r.top - t.height - gap;
+      if (y < 4) y = r.bottom + gap;
+    }
+    x = Math.max(4, Math.min(x, vw - t.width - 4));
+    tip.style.left = Math.round(x) + 'px';
+    tip.style.top = Math.round(y) + 'px';
+  }
+
+  function show(el) {
+    clearTimeout(timer);
+    if (host && host !== el) hide();
+    host = el;
+    tip.textContent = el.dataset.tip;
+    tip.hidden = false;
+    place();
+    if (el.getAttribute('aria-label') !== el.dataset.tip && el.textContent.trim() !== el.dataset.tip) {
+      el.setAttribute('aria-describedby', 'tip');
+    }
+  }
+
+  function hide() {
+    clearTimeout(timer);
+    if (host && host.getAttribute('aria-describedby') === 'tip') host.removeAttribute('aria-describedby');
+    host = null;
+    tip.hidden = true;
+  }
+
+  function later(fn, ms) { clearTimeout(timer); timer = setTimeout(fn, ms); }
+  function target(e) { return e.target.closest && e.target.closest('[data-tip]'); }
+
+  adopt(document);
+  document.addEventListener('mouseover', function (e) {
+    if (tip.contains(e.target)) { clearTimeout(timer); return; }
+    var el = target(e);
+    if (el && el !== host) later(function () { show(el); }, 350);
+    else if (el) clearTimeout(timer);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var to = e.relatedTarget;
+    if (to && (tip.contains(to) || (host && host.contains(to)))) return;
+    if (host || target(e)) later(hide, 120);
+  });
+  document.addEventListener('focusin', function (e) {
+    var el = target(e);
+    if (el && e.target.matches(':focus-visible')) show(el); else if (host) hide();
+  });
+  document.addEventListener('focusout', function () { if (host) hide(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && host) hide(); });
+  window.addEventListener('scroll', function () { if (host) hide(); }, true);
+})();

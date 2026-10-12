@@ -16,7 +16,7 @@
 <section class="panel">
 <div class="panel-h"><h2>How did it go?</h2><span class="n">{{len .NeedsOutcome}}</span><span class="act muted">past interviews without an outcome</span></div>
 <ul class="outcomes">{{range .NeedsOutcome}}<li>
-  <span class="mono">{{day .At}}</span><a href="/pipeline?job={{.JobID}}"><b>{{.Company}}</b> <small class="muted">{{title .Stage}} · {{.Title}}</small></a>
+  <span class="mono">{{date .At}}</span><a href="/pipeline?job={{.JobID}}"><b>{{.Company}}</b> <small class="muted">{{title .Stage}} · {{.Title}}</small></a>
   <form method="post" action="/interviews/{{.ID}}" class="seg-btns"><input type="hidden" name="back" value="/interviews">{{range $oc}}<button name="outcome" value="{{.}}" class="mini">{{title .}}</button>{{end}}</form>
 </li>{{end}}</ul>
 </section>
@@ -44,7 +44,7 @@
 {{if .Past}}
 <table>
 <thead><tr><th>When</th><th>Company</th><th>Stage</th><th>Outcome</th><th>What you learned</th></tr></thead><tbody>
-{{range .Past}}<tr><td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td><span class="badge {{.Outcome}}">{{title .Outcome}}</span></td>
+{{range .Past}}<tr><td class="mono">{{date .At}}<br><span class="muted">{{hm .At}}</span></td><td><a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small></td><td>{{title .Stage}}</td><td><span class="badge {{.Outcome}}">{{title .Outcome}}</span></td>
 <td><form method="post" action="/interviews/{{.ID}}" class="inline wide"><input type="hidden" name="back" value="/interviews"><input name="feedback" value="{{.Feedback}}" placeholder="What did you learn?"><button class="mini primary">Save</button></form></td></tr>{{end}}
 </tbody></table>
 {{end}}

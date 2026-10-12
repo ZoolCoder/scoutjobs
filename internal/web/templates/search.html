@@ -53,7 +53,7 @@
   <span class="avatar" aria-hidden="true">{{initial .Company}}</span>
   <div class="rbody">
     <h3>{{if .URL}}<a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Title}}</a>{{else}}{{.Title}}{{end}}</h3>
-    <p class="rmeta"><b>{{.Company}}</b>{{if or .Location .Remote}}<span>{{.Location}}{{if and .Remote .Location}} · {{end}}{{title .Remote}}</span>{{end}}{{if .SalaryMax}}<span>{{.SalaryMin}}–{{.SalaryMax}} {{.Currency}}</span>{{end}}<span class="muted">{{if .PostedAt}}{{day .PostedAt}} · {{end}}via {{.Source}}</span></p>
+    <p class="rmeta"><b>{{.Company}}</b>{{if or .Location .Remote}}<span>{{.Location}}{{if and .Remote .Location}} · {{end}}{{title .Remote}}</span>{{end}}{{if .SalaryMax}}<span>{{.SalaryMin}}–{{.SalaryMax}} {{.Currency}}</span>{{end}}<span class="muted">{{if .PostedAt}}{{date .PostedAt}} · {{end}}via {{.Source}}</span></p>
     {{if .TagList}}<div class="tags">{{range $i, $t := .TagList}}{{if lt $i 8}}<span class="chip">{{$t}}</span>{{end}}{{end}}{{if gt (len .TagList) 8}}<span class="chip dim">…</span>{{end}}</div>{{end}}
     {{with .Match}}{{range .Hard}}<small class="why bad">✕ {{.}}</small>{{end}}{{if .Why}}<small class="why">✓ {{join .Why " · "}}</small>{{end}}{{if .Miss}}<small class="why muted">– {{join .Miss " · "}}</small>{{end}}{{end}}
     {{if .Description}}<details class="preview"><summary>Preview</summary><p class="pre">{{.Description}}</p></details>{{end}}

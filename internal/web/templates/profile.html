@@ -42,7 +42,7 @@
   {{with index .Checks 0}}
   <div class="cv">
     <div class="score">{{template "gauge-lg" .ATSScore}}<small>ATS score</small></div>
-    <div><div class="file"><span><b>{{.File}}</b><small>content {{fit .Score}} · checked {{day .At}}{{if .JobID}} · <a href="/jobs/{{.JobID}}">vs job #{{.JobID}}</a>{{end}}</small></span></div>
+    <div><div class="file"><span><b>{{.File}}</b><small>content {{fit .Score}} · checked {{date .At}}{{if .JobID}} · <a href="/jobs/{{.JobID}}">vs job #{{.JobID}}</a>{{end}}</small></span></div>
     <p class="cvsum">{{.Summary}}</p>
     {{with gaps .Gaps}}<details class="cvgaps"><summary>{{len .}} suggested fixes</summary><ul>{{range .}}<li>{{.}}</li>{{end}}</ul></details>{{end}}</div>
   </div>

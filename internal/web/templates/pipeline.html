@@ -6,16 +6,16 @@
   {{if $f.Due}}<input type="hidden" name="due" value="1">{{end}}{{if $f.Remote}}<input type="hidden" name="remote" value="1">{{end}}{{if $f.Fit}}<input type="hidden" name="fit" value="{{$f.Fit}}">{{end}}{{if eq $f.View "list"}}<input type="hidden" name="view" value="list">{{end}}{{if $f.Full}}<input type="hidden" name="full" value="1">{{end}}{{if $f.Dense}}<input type="hidden" name="dense" value="1">{{end}}{{if $f.Closed}}<input type="hidden" name="closed" value="1">{{end}}
   <span class="muted tcount">{{.Count}} jobs{{if $f.Active}} · <a href="/pipeline">clear</a>{{end}}</span>
   <span class="seg"><a {{if eq $f.View "board"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "board"}}">Board</a><a {{if eq $f.View "list"}}class="on" aria-current="true" {{end}}href="{{$f.ViewURL "list"}}">List</a></span>
-  <a class="btn icon{{if $f.Dense}} on{{end}}" href="{{$f.DenseURL}}" title="{{if $f.Dense}}Comfortable cards{{else}}Compact cards{{end}}" aria-label="Compact cards" aria-pressed="{{if $f.Dense}}true{{else}}false{{end}}">{{template "ico-rows"}}</a>
-  <a class="btn icon{{if $f.Full}} on{{end}}" href="{{$f.FullURL}}" data-full title="{{if $f.Full}}Exit full screen{{else}}Full screen{{end}} ( f )" aria-label="Full screen" aria-pressed="{{if $f.Full}}true{{else}}false{{end}}">{{if $f.Full}}{{template "ico-shrink"}}{{else}}{{template "ico-expand"}}{{end}}</a>
+  <a class="btn icon{{if $f.Dense}} on{{end}}" href="{{$f.DenseURL}}" title="{{if $f.Dense}}Comfortable cards{{else}}Compact cards{{end}}" aria-label="{{if $f.Dense}}Comfortable cards{{else}}Compact cards{{end}}">{{template "ico-rows"}}</a>
+  <a class="btn icon{{if $f.Full}} on{{end}}" href="{{$f.FullURL}}" data-full title="{{if $f.Full}}Exit full screen{{else}}Full screen{{end}} ( f )" aria-label="{{if $f.Full}}Exit full screen{{else}}Full screen{{end}}">{{if $f.Full}}{{template "ico-shrink"}}{{else}}{{template "ico-expand"}}{{end}}</a>
   <a class="btn primary" href="/jobs/new">Add job</a>
   <span class="tbreak"></span>
   <label class="tloc">{{template "ico-pin"}}<input name="loc" value="{{$f.Loc}}" placeholder="Location" aria-label="Location: city, country or region"></label>
   <span class="chips">
-    {{if $f.Due}}<a class="on" href="{{$f.DueURL}}">Due this week ×</a>{{else}}<a href="{{$f.DueURL}}">Due this week</a>{{end}}
-    <a {{if $f.Fit}}class="on" {{end}}href="{{$f.FitURL}}">Fit 70+{{if $f.Fit}} ×{{end}}</a>
-    <a {{if $f.Remote}}class="on" {{end}}href="{{$f.RemoteURL}}">Remote{{if $f.Remote}} ×{{end}}</a>
-    {{if ne $f.View "list"}}<a {{if $f.Closed}}class="on" {{end}}href="{{$f.ClosedURL}}">Closed stages{{if $f.Closed}} ×{{end}}</a>{{end}}
+    {{if $f.Due}}<a class="on" aria-current="true" href="{{$f.DueURL}}" title="Remove this filter">Due this week <span aria-hidden="true">×</span></a>{{else}}<a href="{{$f.DueURL}}" title="Only jobs with a deadline or follow-up in the next 7 days">Due this week</a>{{end}}
+    <a {{if $f.Fit}}class="on" aria-current="true" title="Remove this filter" {{else}}title="Only jobs that fit you 70 out of 100 or better" {{end}}href="{{$f.FitURL}}">Fit 70+{{if $f.Fit}} <span aria-hidden="true">×</span>{{end}}</a>
+    <a {{if $f.Remote}}class="on" aria-current="true" title="Remove this filter" {{else}}title="Only remote jobs" {{end}}href="{{$f.RemoteURL}}">Remote{{if $f.Remote}} <span aria-hidden="true">×</span>{{end}}</a>
+    {{if ne $f.View "list"}}<a {{if $f.Closed}}class="on" aria-current="true" title="Fold closed stages again" {{else}}title="Open the finished stages (hired, rejected, withdrawn, skipped…) as full columns" {{end}}href="{{$f.ClosedURL}}">Closed stages{{if $f.Closed}} <span aria-hidden="true">×</span>{{end}}</a>{{end}}
   </span>
   <select name="src" aria-label="source" class="auto"><option value="">All sources</option>{{range .Sources}}<option value="{{.}}" {{if eq . $f.Src}}selected{{end}}>{{.}}</option>{{end}}</select>
   {{if or .Tags $f.Tag}}<select name="tag" aria-label="tag" class="auto"><option value="">All tags</option>{{if $f.Tag}}<option value="{{$f.Tag}}" selected>{{$f.Tag}}</option>{{end}}{{range .Tags}}{{if ne . $f.Tag}}<option value="{{.}}">{{.}}</option>{{end}}{{end}}</select>{{end}}
@@ -33,7 +33,7 @@
     <td class="where">{{if eq .Remote "remote"}}remote{{if .Location}} · {{end}}{{end}}{{.Location}}</td>
     <td><span class="badge {{.Status}}">{{title .Status}}</span></td>
     <td>{{if .Veto}}<span class="badge bad" title="{{.Veto}}">veto</span>{{else}}{{template "gauge" .FitScore}}{{end}}</td>
-    <td class="mono">{{.Deadline}}</td><td class="mono muted">{{day .UpdatedAt}}</td>
+    <td class="mono">{{.Deadline}}</td><td class="mono muted">{{date .UpdatedAt}}</td>
     <td>{{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}</td>
   </tr>{{else}}<tr><td colspan="8" class="empty">No match here</td></tr>{{end}}</tbody>
 </table>
@@ -55,7 +55,7 @@
       {{if .Deadline}}<span class="chip warn" title="deadline">{{template "ico-clock"}}{{.Deadline}}</span>{{end}}
       {{if or .Location (eq .Remote "remote")}}<span class="chip loc" title="{{.Remote}}{{if .Location}} · {{.Location}}{{end}}">{{template "ico-pin"}}{{if eq .Remote "remote"}}remote{{if .Location}} · {{end}}{{end}}{{.Location}}</span>{{end}}
       {{with index $.Data.MailN .ID}}<span class="chip" title="{{.}} messages">{{template "ico-mail"}}{{.}}</span>{{end}}
-      <span class="age muted" title="updated {{day .UpdatedAt}}">{{day .UpdatedAt}}</span></div>
+      <span class="age muted" title="Last change {{date .UpdatedAt}}">{{date .UpdatedAt}}</span></div>
   </article>
   {{else}}<p class="empty">{{if $f.Active}}No match here{{else}}None yet{{end}}</p>{{end}}
   {{if .Expanded}}<a class="more" href="{{$f.MoreURL .Status}}">Show first {{colcap}}</a>{{else if gt .Total (len .Jobs)}}<a class="more" href="{{$f.MoreURL .Status}}">Show all {{.Total}}</a>{{end}}

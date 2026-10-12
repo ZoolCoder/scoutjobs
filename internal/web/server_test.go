@@ -127,7 +127,7 @@ func TestDraftEditDueAndReviews(t *testing.T) {
 		t.Errorf("edit event missing")
 	}
 	// due filter: job 1 has no deadline and is "new", so nothing is due; a deadline this week puts it back
-	if rec := get("/pipeline?due=1"); !strings.Contains(rec.Body.String(), "No match here") || !strings.Contains(rec.Body.String(), "Due this week ×") {
+	if rec := get("/pipeline?due=1"); !strings.Contains(rec.Body.String(), "No match here") || !strings.Contains(rec.Body.String(), `Due this week <span aria-hidden="true">×</span>`) {
 		t.Errorf("due filter should hide job 1: %s", rec.Body.String())
 	}
 	dl := time.Now().AddDate(0, 0, 3).Format("2006-01-02")
@@ -566,7 +566,7 @@ func TestPipelineAtScale(t *testing.T) {
 	if !strings.Contains(list, "Page 2 of 2") || strings.Count(list, `class="row-job"`) != 11 || !strings.Contains(list, `href="/pipeline?view=list">← Prev</a>`) {
 		t.Error("list page 2 should hold the last 11 jobs and a Prev link")
 	}
-	if !strings.Contains(get("/pipeline?view=list&page=2&src=manual"), `href="/pipeline?due=1&amp;src=manual&amp;view=list">Due this week</a>`) {
+	if !strings.Contains(get("/pipeline?view=list&page=2&src=manual"), `href="/pipeline?due=1&amp;src=manual&amp;view=list" title="Only jobs with a deadline or follow-up in the next 7 days">Due this week</a>`) {
 		t.Error("filter links should drop the page")
 	}
 }
@@ -621,5 +621,30 @@ func TestActivityPlainWords(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/activity?kind=status", nil))
 	if strings.Contains(rec.Body.String(), "Assistant tailored your CV") {
 		t.Errorf("status filter shows assistant events")
+	}
+}
+
+func TestFriendlyDay(t *testing.T) {
+	now := time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)
+	for in, want := range map[string]string{
+		"2026-10-12T09:00:00Z": "today",
+		"2026-10-11":           "yesterday",
+		"2026-03-04 08:00":     "4 Mar",
+		"2025-12-31":           "31 Dec 2025",
+		"soon":                 "soon",
+	} {
+		if got := friendlyDay(in, now); got != want {
+			t.Errorf("friendlyDay(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestFriendlyWhen(t *testing.T) {
+	now := time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)
+	if got := friendlyWhen("2026-10-12T16:00:00Z", now); got != "today 16:00" {
+		t.Errorf("got %q", got)
+	}
+	if got := friendlyWhen("2026-10-01", now); got != "1 Oct" {
+		t.Errorf("got %q", got)
 	}
 }
