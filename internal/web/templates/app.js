@@ -563,13 +563,13 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
     }).catch(function () {});
   }
 
-  // score: every query letter in order; earlier, word-start and back-to-back hits rank higher. -1 is no match.
+  // score: every query letter in order; earlier, word-start and back-to-back hits rank higher. null is no match.
   function score(text, q) {
     text = text.toLowerCase();
     var s = 0, at = -1;
     for (var i = 0; i < q.length; i++) {
       var k = text.indexOf(q[i], at + 1);
-      if (k < 0) return -1;
+      if (k < 0) return null;
       s += (k === at + 1 ? 3 : 0) + (k === 0 || text[k - 1] === ' ' ? 2 : 0) - Math.min(k - at, 10) / 10;
       at = k;
     }
@@ -582,8 +582,11 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
     if (!q) {
       shown = actions.concat(pages);
     } else {
-      shown = all.map(function (it) { return { it: it, s: score(it.label + ' ' + it.hint, q) }; })
-        .filter(function (x) { return x.s >= 0; })
+      shown = all.map(function (it) {
+        var s = score(it.label, q), h = score(it.hint, q);
+        return { it: it, s: s !== null ? s : h !== null ? h - 100 : null };  // a hint-only hit (status, SJ-id) ranks below any label hit
+      })
+        .filter(function (x) { return x.s !== null; })
         .sort(function (a, b) { return b.s - a.s; })
         .slice(0, 12).map(function (x) { return x.it; });
     }

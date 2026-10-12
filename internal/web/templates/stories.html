@@ -4,7 +4,7 @@
 <div class="panel-h"><h2>Story bank</h2><span class="n">{{len .Stories}}</span><span class="act muted">your interview stories, matched to the jobs you are chasing</span></div>
 {{if .Stories}}<ul class="irows storylist">{{range .Stories}}<li>
   <div class="who"><b>{{.Title}}</b>{{with .Context}} <span class="muted">{{.}}</span>{{end}}
-  <small>{{with .Role}}{{.}}{{end}}{{with .Timeline}} · {{.}}{{end}}{{with .Metrics}} · {{join . "; "}}{{end}}</small>
+  {{with .Meta}}<small>{{.}}</small>{{end}}
   {{with .Themes}}<span class="themes">{{range .}}<span>{{.}}</span>{{end}}</span>{{end}}
   <small class="used">{{if .Jobs}}Used for: {{range $i, $j := .Jobs}}{{if $i}}, {{end}}<a href="/jobs/{{$j.ID}}?tab=interviews#stories">{{$j.Company}}</a>{{end}}{{else}}No open job asks for this yet{{end}}</small></div>
 </li>{{end}}</ul>

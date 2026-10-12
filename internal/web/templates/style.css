@@ -591,7 +591,11 @@ form.gmail-client button{justify-self:start}
 @media (max-width:720px){.tsearch{max-width:none}.modal-wrap{padding:0}.issue{max-height:100vh;height:100%;border-radius:0}.issue-main{padding:16px}}
 .worksgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .worksgrid h3{font-size:13px;margin:0 0 6px}
-table.works meter{width:56px;vertical-align:middle}
+table.works meter{display:inline-block;width:40px;margin-right:6px;vertical-align:middle}
+table.works{width:100%;font-size:13px}
+table.works th,table.works td{padding:6px 5px}
+table.works th{letter-spacing:.02em}
+table.works td:first-child,table.works td:nth-child(3){white-space:nowrap}
 #what-works{margin-top:16px}
 
 .storylist .themes{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}

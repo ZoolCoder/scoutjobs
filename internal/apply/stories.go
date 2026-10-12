@@ -20,6 +20,17 @@ type Story struct {
 	File     string
 }
 
+// Meta is the one-line summary under a story's title: role, timeline and metrics, whichever are set.
+func (st Story) Meta() string {
+	var parts []string
+	for _, p := range []string{st.Role, st.Timeline, strings.Join(st.Metrics, "; ")} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return strings.Join(parts, " · ")
+}
+
 // Stories reads the story bank, sorted by title.
 func Stories(home string) []Story {
 	paths, _ := filepath.Glob(filepath.Join(home, "stories", "*.md"))

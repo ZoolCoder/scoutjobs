@@ -30,7 +30,7 @@ type Funnel struct {
 }
 
 // FitBands are the fit groups, in display order.
-var FitBands = []string{"75+", "50–74", "under 50", "not scored"}
+var FitBands = []string{"75+", "50–74", "under 50", "unscored"}
 
 // funnelMonths caps the month table to the most recent months.
 const funnelMonths = 6
@@ -122,7 +122,7 @@ func flatten(m map[string]*FunnelRow) []FunnelRow {
 func fitBand(score int64) string {
 	switch {
 	case score < 0:
-		return "not scored"
+		return "unscored"
 	case score < 50:
 		return "under 50"
 	case score < 75:

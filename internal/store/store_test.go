@@ -291,7 +291,7 @@ func TestFunnelGroupsAppliedJobs(t *testing.T) {
 	for _, r := range f.Fit {
 		bands = append(bands, r.Group)
 	}
-	if strings.Join(bands, ",") != "75+,50–74,under 50,not scored" {
+	if strings.Join(bands, ",") != "75+,50–74,under 50,unscored" {
 		t.Errorf("fit bands = %v", bands)
 	}
 	if len(f.Month) != 1 || f.Month[0].Applied != 4 || len(f.Month[0].Group) != 7 {
