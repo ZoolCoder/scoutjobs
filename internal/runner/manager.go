@@ -155,7 +155,7 @@ func (m *Manager) StartMail(t MailTask, agent string) (*Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	if mb, _ := ReadyConnectors(conns); len(mb) == 0 { // signed in since the last look?
+	if mb, cal := ReadyConnectors(conns); len(mb) == 0 || t.Kind == "calendar" && len(cal) == 0 { // signed in since the last look?
 		if conns, err = m.Connectors(context.Background(), ag, true); err != nil {
 			return nil, err
 		}

@@ -178,7 +178,7 @@
   }, 3000);
 })();
 
-// Inbox › Connect: show which mail and calendar connectors each AI agent can reach.
+// Inbox › Connect and Connections: show which mail and calendar connectors each AI agent can reach.
 (function () {
   var rows = document.querySelectorAll('[data-mail-check]');
   if (!rows.length) return;
@@ -205,7 +205,7 @@
     }).catch(function () { out.textContent = 'could not ask the agent'; });
   };
   rows.forEach(function (row) {
-    check(row, false);
+    if (!('lazy' in row.dataset)) check(row, false); // on Connections, only when Test is pressed
     var again = row.querySelector('[data-recheck]');
     if (again) again.addEventListener('click', function () { check(row, true); });
   });

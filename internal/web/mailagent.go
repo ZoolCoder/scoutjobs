@@ -61,11 +61,11 @@ func (v *server) useAgent(w http.ResponseWriter, r *http.Request) {
 		err = errors.Join(v.s.SetSetting(runner.MailAgent, ag.Name), v.s.SetSetting(runner.MailVia, "agent"))
 	}
 	if err != nil {
-		http.Redirect(w, r, withParam("/inbox", "err", err.Error())+"#connect", http.StatusSeeOther)
+		http.Redirect(w, r, withParam(back(r, "/inbox"), "err", err.Error())+"#connect", http.StatusSeeOther)
 		return
 	}
 	msg := fmt.Sprintf("%s now reads your mail for ScoutJobs. Press Sync now to bring in the replies.", agentTitle(ag.Name))
-	http.Redirect(w, r, withParam("/inbox", "msg", msg), http.StatusSeeOther)
+	http.Redirect(w, r, withParam(back(r, "/inbox"), "msg", msg), http.StatusSeeOther)
 }
 
 // stopAgent goes back to the Google client or IMAP, when set up, or to no inbox.
@@ -78,7 +78,7 @@ func (v *server) stopAgent(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	http.Redirect(w, r, withParam("/inbox", "msg", "Your AI agent no longer reads your mail for ScoutJobs.")+"#connect", http.StatusSeeOther)
+	http.Redirect(w, r, withParam(back(r, "/inbox"), "msg", "Your AI agent no longer reads your mail for ScoutJobs.")+"#connect", http.StatusSeeOther)
 }
 
 // agentCheck reports the mail and calendar connectors an agent can reach, for the Inbox to show.

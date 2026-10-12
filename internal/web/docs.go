@@ -139,9 +139,7 @@ func (v *server) masterPanel() masterPanel {
 		p.Disabled = true
 		return p
 	}
-	for _, a := range m.Agents() {
-		p.Agents = append(p.Agents, a.Name)
-	}
+	p.Agents = v.agentNames()
 	if r := m.Latest(runner.MasterID); r != nil {
 		snap := r.Snapshot()
 		if n := len(snap.Log); n > 60 {

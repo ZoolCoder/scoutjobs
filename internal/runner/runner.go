@@ -257,8 +257,15 @@ func (rn *Runner) Plan(j store.Job, req Request) (*Run, Agent, error) {
 	return run, ag, nil
 }
 
-// pick resolves the agent asked for, else the one config.yaml prefers, else the first installed.
+// DefaultAgent is the setting that names the agent the user picked on the Connections page.
+const DefaultAgent = "agent"
+
+// pick resolves the agent asked for, else the one picked on the Connections page, else the one
+// config.yaml prefers, else the first installed.
 func (rn *Runner) pick(name string) (Agent, error) {
+	if name == "" && rn.Store != nil {
+		name = rn.Store.Setting(DefaultAgent)
+	}
 	if name == "" {
 		name = rn.Agent
 	}

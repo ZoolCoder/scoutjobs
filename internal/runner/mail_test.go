@@ -115,3 +115,21 @@ func TestPlanMailNeedsAMailbox(t *testing.T) {
 		t.Errorf("plan: %+v %v", run, err)
 	}
 }
+
+func TestPlanMailCalendar(t *testing.T) {
+	gmail := Connector{Name: "claude.ai Gmail", Ready: true}
+	if _, err := PlanMail(MailTask{Kind: "calendar"}, Agent{Name: "claude"}, []Connector{gmail}); err == nil || !strings.Contains(err.Error(), "Google Calendar") {
+		t.Errorf("no calendar: %v", err)
+	}
+	cal := Connector{Name: "claude.ai Google Calendar", Calendar: true, Ready: true}
+	run, err := PlanMail(MailTask{Kind: "calendar"}, Agent{Name: "claude"}, []Connector{cal})
+	if err != nil || run.Steps[0].Name != "mail-calendar" || run.Steps[0].Label != "Sync the calendar" {
+		t.Errorf("plan: %+v %v", run, err)
+	}
+	p := MailPrompt(MailTask{Kind: "calendar", Since: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)}, nil, []Connector{cal})
+	for _, want := range []string{"2026-10-12", "interview_list", "interview_add", `"Interview: <company>"`, "never change or delete a calendar event"} {
+		if !strings.Contains(p, want) {
+			t.Errorf("prompt lacks %q", want)
+		}
+	}
+}

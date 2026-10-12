@@ -43,9 +43,7 @@ func (v *server) runPanel(j store.Job) *runPanel {
 			p.Todo = append(p.Todo, st)
 		}
 	}
-	for _, a := range m.Agents() {
-		p.Agents = append(p.Agents, a.Name)
-	}
+	p.Agents = v.agentNames()
 	if r := m.Latest(j.ID); r != nil {
 		snap := r.Snapshot()
 		if n := len(snap.Log); n > 60 {

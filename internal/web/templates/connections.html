@@ -1,0 +1,70 @@
+{{template "head" .}}
+{{with .Data}}{{$d := .}}
+{{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
+<div class="conngrid">
+
+<section class="panel conncard" id="ai">
+  <div class="connhead"><span class="connico">{{template "ico-spark"}}</span>
+    <div><h2>AI assistant</h2><p class="muted">The AI app on this computer that writes your tailored resumes, cover letters and e-mails.</p></div>
+    {{if .Agents}}<span class="badge done">Connected</span>{{else}}<span class="badge todo">Not set up</span>{{end}}</div>
+  {{if .Agents}}<ul class="connopts">{{range .Agents}}<li{{if eq . $d.Default}} class="on"{{end}}>
+    <form method="post" action="/connections/agent"><input type="hidden" name="agent" value="{{.}}"><button class="opt"{{if eq . $d.Default}} aria-pressed="true"{{end}}><i class="radio" aria-hidden="true"></i>
+      <span><b class="agentname">{{if eq . "custom"}}Custom command{{else}}{{.}}{{end}}</b><small>{{if eq . "claude"}}Uses your Claude subscription on this computer.{{else if eq . "codex"}}Uses your ChatGPT or Codex subscription on this computer.{{else}}The agent_command from config.yaml.{{end}}</small></span></button></form>
+    {{if eq . $d.Default}}<span class="badge done">In use</span>{{end}}</li>{{end}}</ul>
+  <p class="small muted">Another AI app? Set <code>agent_command</code> in <code>config.yaml</code> and it shows up here.</p>
+  {{else}}<p class="callout">No AI app found. Install <a href="https://claude.com/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or Codex, then reload this page.</p>{{end}}
+</section>
+
+<section class="panel conncard" id="mail">
+  <div class="connhead"><span class="connico">{{template "ico-inbox"}}</span>
+    <div><h2>Mail</h2><p class="muted">Reads replies from companies and files drafts in your mailbox. It never sends anything.</p></div>
+    {{if .Mail}}<span class="badge done">Connected</span>{{else}}<span class="badge todo">Not set up</span>{{end}}</div>
+  <ul class="connopts">
+    {{with .AI}}{{range .Agents}}{{$on := and (eq $d.Mail "agent") (eq . $d.AI.Agent)}}<li{{if $on}} class="on"{{end}} data-mail-check="/mail/agent/check?agent={{.}}" data-lazy>
+      <form method="post" action="/mail/agent"><input type="hidden" name="back" value="/connections"><input type="hidden" name="agent" value="{{.}}"><button class="opt"{{if $on}} aria-pressed="true"{{end}}><i class="radio" aria-hidden="true"></i>
+        <span><b><span class="agentname">{{.}}</span> reads my mail</b><small>Through its Gmail or Microsoft 365 connector. <span class="conns"></span></small></span></button></form>
+      <span class="optacts">{{if $on}}<span class="badge done">In use</span>{{end}}<button class="mini" type="button" data-recheck>Test</button></span></li>{{end}}{{end}}
+    {{with .Google}}{{if .Offered}}<li{{if eq $d.Mail "gmail"}} class="on"{{end}}><a class="opt" href="/inbox?connect=1#google"><i class="radio" aria-hidden="true"></i>
+      <span><b>Google account</b><small>{{if eq $d.Mail "gmail"}}{{$d.MailAccount}}{{else}}Your own Google client: no AI reads your mail. About 3 minutes to set up.{{end}}</small></span></a>
+      {{if eq $d.Mail "gmail"}}<span class="optacts"><span class="badge done">In use</span><form class="inline" method="post" action="/gmail/disconnect"><input type="hidden" name="back" value="/connections"><button class="mini danger">Disconnect</button></form></span>{{end}}</li>{{end}}{{end}}
+    <li{{if eq .Mail "imap"}} class="on"{{end}}><a class="opt" href="/inbox?connect=1#imap"><i class="radio" aria-hidden="true"></i>
+      <span><b>Other mailbox (IMAP)</b><small>{{if eq .Mail "imap"}}{{.MailAccount}}{{else}}iCloud, Fastmail, Yahoo and others. Reads only.{{end}}</small></span></a>{{if eq .Mail "imap"}}<span class="optacts"><span class="badge done">In use</span></span>{{end}}</li>
+  </ul>
+  {{if eq .Mail "agent"}}<form method="post" action="/mail/agent/off"><input type="hidden" name="back" value="/connections"><button class="mini">Stop using the AI assistant for mail</button></form>{{end}}
+</section>
+
+<section class="panel conncard" id="calendar">
+  <div class="connhead"><span class="connico">{{template "ico-calendar"}}</span>
+    <div><h2>Calendar</h2><p class="muted">Syncs your interviews both ways: ScoutJobs adds them to your calendar and picks up the ones you get there.</p></div>
+    {{if .Calendar}}<span class="badge done">Connected</span>{{else}}<span class="badge todo">Not set up</span>{{end}}</div>
+  <ul class="connopts">
+    {{if .Agents}}<li{{if eq .Calendar "agent"}} class="on"{{end}}{{with .CalAgent}} data-mail-check="/mail/agent/check?agent={{.}}" data-lazy{{end}}>
+      <form method="post" action="/connections/calendar"><input type="hidden" name="via" value="{{if eq .Calendar "agent"}}off{{else}}agent{{end}}"><button class="opt"{{if eq .Calendar "agent"}} aria-pressed="true"{{end}}><i class="radio" aria-hidden="true"></i>
+        <span><b>My AI assistant's calendar connector</b><small>{{with .CalAgent}}<span class="agentname">{{.}}</span>{{else}}Your AI app{{end}} syncs through its Google Calendar connector, when you press Sync now. <span class="conns"></span></small></span></button></form>
+      <span class="optacts">{{if eq .Calendar "agent"}}<span class="badge done">In use</span>{{end}}{{if .CalAgent}}<button class="mini" type="button" data-recheck>Test</button>{{end}}</span></li>{{end}}
+    {{if .GoogleCal}}<li{{if eq .Calendar "google"}} class="on"{{end}}><a class="opt" href="{{if eq .GoogleCal "on"}}/calendar{{else}}/inbox?connect=1#google{{end}}"><i class="radio" aria-hidden="true"></i>
+      <span><b>Google account</b><small>{{if eq .GoogleCal "on"}}Syncs every few minutes in the background.{{else if eq .GoogleCal "setup"}}Connect Google once for mail and calendar.{{else}}Reconnect Google and allow Calendar.{{end}}</small></span></a>{{if eq .Calendar "google"}}<span class="optacts"><span class="badge done">In use</span></span>{{end}}</li>{{end}}
+    <li><details class="opt feed"><summary><i class="radio" aria-hidden="true"></i><span><b>Apple Calendar or Outlook on this Mac</b><small>Subscribe to a read-only feed. Google Calendar cannot reach it.</small></span></summary>
+      <p class="small">In Apple Calendar: File › New Calendar Subscription, then paste:</p><input class="feedurl" readonly value="{{.FeedURL}}" aria-label="calendar feed address">{{with .FeedNote}}<p class="small muted">{{.}}</p>{{end}}</details></li>
+  </ul>
+  {{if eq .Calendar "agent"}}{{with .CalRun}}{{if eq .State "running"}}<div data-run="/mail/agent/run">{{template "runprog" .}}</div>{{else if .Error}}<p class="callout bad small"><b>Last sync stopped:</b> {{.Error}}</p>{{end}}{{end}}
+  <div class="row"><form method="post" action="/connections/calendar/sync" data-busy="Starting…"><button class="primary"{{if .CalActive}} disabled{{end}}>Sync now</button></form>
+    <span class="small muted">{{with .CalSynced}}Last synced {{when .}}{{else}}Not synced yet{{end}} · takes a minute or two, uses your AI assistant</span></div>{{end}}
+</section>
+
+<section class="panel conncard" id="sources">
+  <div class="connhead"><span class="connico">{{template "ico-search"}}</span>
+    <div><h2>Job sources</h2><p class="muted">Where Find jobs looks for openings.</p></div>
+    <span class="badge done">Ready</span></div>
+  <h3 class="connsub">Remote job sites</h3>
+  <div class="chips">{{range .RemoteSites}}<span class="chip">{{.}}</span>{{end}}</div>
+  <p class="small muted">{{if .SearchRemote}}On for every search.{{else}}Tick “Also search remote job sites” under More options on Find jobs.{{end}}</p>
+  <h3 class="connsub">Company career pages</h3>
+  <div class="chips">{{range .Boards}}<span class="chip dim">{{.}}</span>{{end}}</div>
+  <p class="small muted">Paste a company's careers page link on Find jobs, under More options. Save the search to keep it.</p>
+  <a class="btn" href="/search">Open Find jobs</a>
+</section>
+
+</div>
+{{end}}
+{{template "foot" .}}

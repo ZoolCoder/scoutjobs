@@ -324,6 +324,10 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /profile/prepare/cancel", srv.cancelMaster)
 	mux.HandleFunc("GET /profile/prepare", srv.masterState)
 	mux.HandleFunc("POST /settings/auto-prepare", srv.setAutoPrepare)
+	mux.HandleFunc("GET /connections", srv.connections)
+	mux.HandleFunc("POST /connections/agent", srv.setDefaultAgent)
+	mux.HandleFunc("POST /connections/calendar", srv.setCalendarVia)
+	mux.HandleFunc("POST /connections/calendar/sync", srv.syncCalendarAgent)
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
@@ -447,6 +451,7 @@ func hue(s string) int {
 
 var subtitles = map[string]string{
 	"inbox":       "Replies from companies, matched to your applications.",
+	"connections": "The tools ScoutJobs works with: your AI assistant, mail, calendar and job sources.",
 	"overview":    "Your job search, at a glance. Here's what to do next.",
 	"pipeline":    "Every opportunity, from discovery to outcome.",
 	"interviews":  "Prepare for what is coming, record how it went.",

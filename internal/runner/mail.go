@@ -21,9 +21,11 @@ import (
 const MailID = -1
 
 // Settings that pick the inbox: MailVia "agent" reads mail through MailAgent's connectors.
+// CalendarVia "agent" syncs the interviews with the calendar through the same agent.
 const (
-	MailVia   = "mail_via"
-	MailAgent = "mail_agent"
+	MailVia     = "mail_via"
+	MailAgent   = "mail_agent"
+	CalendarVia = "calendar_via"
 )
 
 // Connector is a mail or calendar MCP server the agent has: a claude.ai connector such as Gmail,
@@ -35,9 +37,10 @@ type Connector struct {
 	Tools    []string `json:"tools,omitempty"` // the tools the inbox agent may call; nil when the agent cannot list them (Codex)
 }
 
-// MailTask is one job for the inbox agent: read new replies, or put one e-mail into the drafts.
+// MailTask is one job for the inbox agent: read new replies, put one e-mail into the drafts, or
+// sync the interviews with the calendar.
 type MailTask struct {
-	Kind  string // sync | draft
+	Kind  string // sync | draft | calendar
 	Since time.Time
 	JobID int64
 	Draft mail.Message // draft: the e-mail to file, never to send
@@ -240,6 +243,13 @@ func MailPrompt(t MailTask, mailboxes, calendars []Connector) string {
 			fmt.Fprintf(&b, "Attachments: %s. Attach these files if the draft tool takes files; otherwise name them in your last line so the user attaches them.\n", strings.Join(m.Attachments, ", "))
 		}
 		fmt.Fprintf(&b, "Then call scoutjobs job_set with job=%d and note \"draft filed: %s\". End with one line: where the draft is.\n", t.JobID, t.Label)
+	case "calendar":
+		fmt.Fprintf(&b, `Task: sync the user's job interviews between ScoutJobs and their calendar, today is %s.
+1. Call scoutjobs job_list (the tracked companies) and scoutjobs interview_list (the interviews ScoutJobs knows).
+2. ScoutJobs to calendar: for each upcoming interview with a time, look in the calendar for an event "Interview: <company>" at that time. When there is none, create it: that title, the interview's time and length, its location or link in the location, no guests, no notifications.
+3. Calendar to ScoutJobs: list the calendar events of the next 60 days. For each event that is plainly a job interview with a tracked company (its title or description names the company, or says interview, screen or recruiter call next to the company) and has no interview in ScoutJobs at that time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, duration, format, location when given). Skip events ScoutJobs created ("Interview: <company>") and events you cannot tie to one tracked job.
+End with one line: how many events you created and interviews you added.
+`, t.Since.Format("2006-01-02"))
 	default:
 		fmt.Fprintf(&b, `Task: bring the user's job search up to date from their mail since %s.
 1. Call scoutjobs job_list: the tracked companies, titles and contacts.
@@ -269,11 +279,16 @@ func connectorNames(cs []Connector) string {
 
 // PlanMail makes the run for a mail task. It fails when the agent has no signed-in mailbox.
 func PlanMail(t MailTask, ag Agent, conns []Connector) (*Run, error) {
-	if mb, _ := ReadyConnectors(conns); len(mb) == 0 {
-		return nil, errors.New(NoMailbox(ag.Name, conns))
-	}
+	mb, cal := ReadyConnectors(conns)
 	label := "Read new replies"
-	if t.Kind == "draft" {
+	switch {
+	case t.Kind == "calendar" && len(cal) == 0:
+		return nil, errors.New(NoCalendar(ag.Name, conns))
+	case t.Kind == "calendar":
+		label = "Sync the calendar"
+	case len(mb) == 0:
+		return nil, errors.New(NoMailbox(ag.Name, conns))
+	case t.Kind == "draft":
 		label = "File the draft"
 	}
 	run := newRun(fmt.Sprintf("mail-%d", time.Now().UnixMilli()), MailID, false)
@@ -296,6 +311,22 @@ func NoMailbox(agent string, conns []Connector) string {
 		return "codex has no mail server: add one with codex mcp add, or switch to Claude"
 	}
 	return "Claude has no mail connector: open claude.ai > Settings > Connectors and connect Gmail or Microsoft 365"
+}
+
+// NoCalendar explains what to connect when the agent has no signed-in calendar.
+func NoCalendar(agent string, conns []Connector) string {
+	for _, c := range conns {
+		if c.Calendar && !c.Ready {
+			if agent == "codex" {
+				return fmt.Sprintf("%s needs you to sign in: run codex mcp login %s", c.Name, c.Name)
+			}
+			return c.Name + " is added but not signed in: open claude.ai > Settings > Connectors and connect it"
+		}
+	}
+	if agent == "codex" {
+		return "codex has no calendar server: add one with codex mcp add, or switch to Claude"
+	}
+	return "Claude has no calendar connector: open claude.ai > Settings > Connectors and connect Google Calendar"
 }
 
 // ExecMail runs the inbox agent once and logs what it does.

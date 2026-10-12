@@ -1099,3 +1099,36 @@ h3.evday-h{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacin
 @media (max-width:640px){.jobmain .ivcard{grid-template-columns:44px minmax(0,1fr)}.ivacts{grid-column:2}.jobmain .prepcheck{grid-template-columns:1fr}.jobmain ul.evrows.tl>li{grid-template-columns:40px minmax(0,1fr)}.jobmain ul.evrows.tl .evico,.jobmain ul.evrows.tl .badge{display:none}}
 .mailpane h3{text-transform:none;letter-spacing:normal;color:var(--fg)}
 .ivhead b::first-letter{text-transform:uppercase}
+/* connections */
+.conngrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.conncard{display:flex;flex-direction:column;gap:12px;margin:0}
+.connhead{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:start}
+.connhead h2{margin:0 0 2px;font-size:17px}.connhead p{margin:0;font-size:13px}
+.connico{width:44px;height:44px;border-radius:12px;background:var(--acc-sub);display:inline-flex;align-items:center;justify-content:center}
+.connico svg{width:20px;height:20px;fill:none;stroke:var(--acc);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+ul.connopts{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:12px}
+ul.connopts>li{display:flex;align-items:center;gap:10px;padding:0 12px 0 0;border-top:1px solid var(--line)}
+ul.connopts>li:first-child{border-top:0}
+ul.connopts>li>form{flex:1;min-width:0}
+ul.connopts .opt{display:flex;align-items:flex-start;gap:12px;width:100%;flex:1;min-width:0;padding:12px 14px;background:none;border:0;border-radius:0;box-shadow:none;text-align:left;color:var(--fg);font:inherit;cursor:pointer}
+ul.connopts a.opt:hover,ul.connopts button.opt:hover{background:var(--subtle);text-decoration:none}
+ul.connopts .opt b{display:block;font-size:14px;font-weight:600}
+ul.connopts .opt small{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.opt .radio{flex:none;width:16px;height:16px;margin-top:2px;border-radius:50%;border:1.5px solid var(--line2);background:var(--surface)}
+ul.connopts li.on .radio{border:5px solid var(--acc)}
+.optacts{display:flex;gap:6px;align-items:center;flex:none}
+.opt .conns{display:block;margin-top:2px}.opt .conns .ready{color:var(--ok)}.opt .conns .auth,.opt .conns .hint{color:var(--warn);display:block}
+details.opt{display:block;padding:0}
+details.opt>summary{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;cursor:pointer;list-style:none}
+details.opt>summary::-webkit-details-marker{display:none}
+details.opt[open]{padding-bottom:12px}details.opt>p,details.opt>input{margin:0 14px 6px 42px;width:calc(100% - 56px)}
+.feedurl{font-family:var(--mono,ui-monospace,monospace);font-size:12px}
+h3.connsub{margin:4px 0 0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.conncard .chips{display:flex;flex-wrap:wrap;gap:6px}
+.conncard>.btn{align-self:flex-start}
+.conncard .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+button.danger{color:var(--bad);border-color:var(--bad-sub)}
+@media (max-width:1000px){.conngrid{grid-template-columns:1fr}}
+ul.connopts button.opt{height:auto;justify-content:flex-start;white-space:normal;line-height:1.35}
+ul.connopts .opt>span{flex:1;min-width:0}
+ul.connopts details.opt{padding:0}

@@ -25,6 +25,7 @@
     <a href="/learning" {{if eq .Active "learning"}}class="on" aria-current="page"{{end}}>{{template "ico-book"}}Learning</a>
     <p class="navh">You</p>
     <a href="/profile" {{if eq .Active "profile"}}class="on" aria-current="page"{{end}}>{{template "ico-user"}}Profile &amp; CV</a>
+    <a href="/connections" {{if eq .Active "connections"}}class="on" aria-current="page"{{end}}>{{template "ico-plug"}}Connections</a>
     <a href="/preferences" {{if eq .Active "preferences"}}class="on" aria-current="page"{{end}}>{{template "ico-sliders"}}Preferences</a>
     <a href="/reviews" {{if eq .Active "reviews"}}class="on" aria-current="page"{{end}}>{{template "ico-bars"}}Reviews</a>
     <a href="/activity" {{if eq .Active "activity"}}class="on" aria-current="page"{{end}}>{{template "ico-pulse"}}Activity</a>
@@ -82,6 +83,7 @@
 {{define "ico-calendar"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>{{end}}
 {{define "ico-book"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4zM20 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"/></svg>{{end}}
 {{define "ico-sliders"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></svg>{{end}}
+{{define "ico-plug"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg>{{end}}
 {{define "ico-user"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>{{end}}
 {{define "ico-doc"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/></svg>{{end}}
 {{define "ico-send"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>{{end}}

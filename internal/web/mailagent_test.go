@@ -98,3 +98,44 @@ func TestInboxAgentConnect(t *testing.T) {
 		t.Error("agent not stopped")
 	}
 }
+
+func TestConnections(t *testing.T) {
+	fakeCodex(t)
+	s := testStore(t)
+	m := runner.NewManager(&runner.Runner{Store: s, Exe: "scoutjobs"})
+	h, _ := Handler(s, Config{Runner: m})
+	post := func(path, body string) string {
+		req := httptest.NewRequest("POST", path, strings.NewReader(body))
+		req.Host = "127.0.0.1:7070"
+		req.Header.Set("Origin", "http://127.0.0.1:7070")
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Header().Get("Location")
+	}
+
+	b := get(h, "/connections").Body.String()
+	for _, want := range []string{"AI assistant", "Mail", "Calendar", "Job sources", `name="agent" value="codex"`, "/calendar.ics"} {
+		if !strings.Contains(b, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	if loc := post("/connections/agent", "agent=nope"); !strings.Contains(loc, "err=") || s.Setting(runner.DefaultAgent) != "" {
+		t.Errorf("unknown agent accepted: %s", loc)
+	}
+	if loc := post("/connections/agent", "agent=codex"); !strings.Contains(loc, "msg=") || s.Setting(runner.DefaultAgent) != "codex" {
+		t.Errorf("agent not saved: %s", loc)
+	}
+	if post("/connections/calendar", "via=agent"); s.Setting(runner.CalendarVia) != "agent" {
+		t.Error("calendar via agent not saved")
+	}
+	if b := get(h, "/connections").Body.String(); !strings.Contains(b, "Sync now") {
+		t.Error("no Sync now once the agent syncs the calendar")
+	}
+	if loc := post("/connections/calendar/sync", ""); !strings.Contains(loc, "calendar+server") && !strings.Contains(loc, "calendar%20server") {
+		t.Errorf("sync without a calendar connector: %s", loc)
+	}
+	if post("/connections/calendar", "via=off"); s.Setting(runner.CalendarVia) != "" {
+		t.Error("calendar via agent not turned off")
+	}
+}

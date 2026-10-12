@@ -235,11 +235,11 @@ func (v *server) gmailDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 	if c := v.gmailClient(); c != nil {
 		if err := c.Disconnect(r.Context()); err != nil {
-			http.Redirect(w, r, withParam("/inbox", "err", err.Error()), http.StatusSeeOther)
+			http.Redirect(w, r, withParam(back(r, "/inbox"), "err", err.Error()), http.StatusSeeOther)
 			return
 		}
 	}
-	http.Redirect(w, r, withParam("/inbox", "msg", "Google disconnected: access revoked at Google, token deleted"), http.StatusSeeOther)
+	http.Redirect(w, r, withParam(back(r, "/inbox"), "msg", "Google disconnected: access revoked at Google, token deleted"), http.StatusSeeOther)
 }
 
 // oauthTarget is the feature a Google sign-in was started for: its name in messages and its page.

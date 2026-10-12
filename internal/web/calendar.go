@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -73,6 +74,7 @@ type calView struct {
 	FeedDownload          string
 	Counts                map[string]int
 	GoogleCal             string // on | reconnect | setup | "" when Gmail is not offered
+	AgentCal              bool   // the AI assistant syncs the calendar
 	GoogleErr             string
 	Msg, Err              string
 	Stages, Formats, Mins []string
@@ -345,6 +347,7 @@ func (v *server) calendar(w http.ResponseWriter, r *http.Request) {
 			cv.GoogleCal = "setup"
 		}
 	}
+	cv.AgentCal = v.cfg.Runner != nil && v.s.Setting(runner.CalendarVia) == "agent"
 	cv.FeedURL, cv.FeedNote = v.feedURL(r)
 	cv.FeedDownload = "/calendar.ics?download=1"
 	if k := feedKey(v.cfg.APIToken); k != "" {
