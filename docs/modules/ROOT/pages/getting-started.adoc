@@ -97,13 +97,13 @@ An interview invitation becomes an interview on that job, with its date and leng
 
 *Interviews* puts the next interview on top with a prep checklist: research the company, map the posting to your stories, rehearse, write questions, run a mock interview, test the link or route. *How did it go?* asks for the outcome of past interviews, one click each; *Later* lists the rest.
 
-image::interviews.png[Interviews: the next interview with its prep checklist, past interviews waiting for an outcome, and later ones,1200]
+image::interviews.png[Interviews: the next interview with its prep pack ready and its prep checklist, past interviews waiting for an outcome, and later ones,1200]
 
 *Build prep pack* has your assistant research the company and write a prep sheet with the stories to tell. Your stories live on *Stories*, each matched to the jobs that ask for it; a job's *Interviews* tab shows which must-haves still have no story.
 
 *Calendar* shows interviews, deadlines and follow-ups by day, week or month. Click an empty slot to add an interview, click an event to move it. *Sync now* sends your interviews to your own calendar and brings your other events in.
 
-image::calendar.png[The calendar week view with interviews, a deadline and the calendars list,1200]
+image::calendar.png[The calendar week view with the Stripe screen open: job, link, prep progress, Add to Google Calendar and Reschedule,1200]
 
 == 9. Get better every week
 

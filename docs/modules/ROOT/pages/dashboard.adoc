@@ -29,9 +29,9 @@ Dates read the way you would say them: *today 10:00*, *yesterday 16:00*, *13 Oct
 
 == Navigation
 
-image::sidebar-folded.png[The sidebar folded to icons, with the Pipeline tooltip showing,1200]
+image::sidebar-folded.png[The sidebar folded to a rail of icons, with the upcoming interviews badge,1200]
 
-The sidebar groups the pages by what you are doing: *Apply* (Find jobs, Pipeline, Inbox), *Interview* (Interviews, Calendar, Learning) and *You* (Profile & CV, Connections, Preferences, Reviews, Activity). The button next to the logo folds it to a rail of icons and back; the choice is kept in a cookie. Folded, each icon shows its name in a tooltip on hover or keyboard focus, and the badges (upcoming interviews) stay visible. Tooltips across the dashboard are the same accessible kind: they appear on focus as well as hover, are read out by screen readers, and close with `Esc`.
+The sidebar groups the pages by what you are doing: *Apply* (Find jobs, Pipeline, Inbox), *Interview* (Interviews, Calendar, Stories, Learning) and *You* (Profile & CV, Connections, Preferences, Reviews, Activity). The button next to the logo folds it to a rail of icons and back; the choice is kept in a cookie. Folded, each icon shows its name in a tooltip on hover or keyboard focus, and the badges (upcoming interviews) stay visible. Tooltips across the dashboard are the same accessible kind: they appear on focus as well as hover, are read out by screen readers, and close with `Esc`.
 
 === Command palette and shortcuts
 
@@ -106,6 +106,8 @@ Replies from companies, matched to your applications and grouped by day. Each on
 image::stories.png[The story bank: three stories with their metrics, themes and the jobs each one answers,1200]
 
 Your interview stories, one STAR story per file in `stories/` in the data folder, with front matter for `title`, `themes` and `metrics`. Each one lists the open jobs whose must-have requirements it answers, matched on the words of the requirement against the story's themes, title and facts; below the list, how many must-haves have no story yet. *New story* writes one from a form: title, context, role, when, themes, numbers, core facts and the four STAR parts. Click a story's title to read it, and *Edit* to change the Markdown with its front matter. The `interview-prep` skill and the `behavioral-story-extractor` agent write new stories for you too, and add variants.
+
+image::story-new.png[New story: title, context, role, when, themes, numbers, core facts and the four STAR parts,1200]
 
 On a job, the *Interviews* tab has *Stories for this job*: every must-have with the best story for it, or a flag when there is none. The prep pack uses the same map.
 
