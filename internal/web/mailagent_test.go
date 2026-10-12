@@ -133,6 +133,15 @@ func TestConnections(t *testing.T) {
 	if b := get(h, "/connections").Body.String(); !strings.Contains(b, "Sync now") {
 		t.Error("no Sync now once the agent syncs the calendar")
 	}
+	if !strings.Contains(get(h, "/connections").Body.String(), `<option value="14" selected>`) {
+		t.Error("sync period does not default to 14 days")
+	}
+	if post("/connections/calendar/days", "days=7"); s.Setting(calendarDays) != "7" {
+		t.Error("sync period not saved")
+	}
+	if loc := post("/connections/calendar/days", "days=365"); !strings.Contains(loc, "err=") || s.Setting(calendarDays) != "7" {
+		t.Errorf("odd sync period accepted: %s", loc)
+	}
 	if loc := post("/connections/calendar/sync", ""); !strings.Contains(loc, "calendar+server") && !strings.Contains(loc, "calendar%20server") {
 		t.Errorf("sync without a calendar connector: %s", loc)
 	}

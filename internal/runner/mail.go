@@ -49,6 +49,7 @@ type MailTask struct {
 	// calendar: what ScoutJobs knows, put in the prompt so the agent need not look it up
 	Interviews []store.Interview
 	Companies  []string
+	Days       int // calendar: how far ahead to look, 14 when unset
 }
 
 var mailWords = []string{"mail", "outlook", "microsoft", "365", "exchange", "icloud", "fastmail", "proton", "calendar"}
@@ -268,6 +269,7 @@ func MailPrompt(t MailTask, mailboxes, calendars []Connector) string {
 // calendarPrompt hands the agent the interviews and companies up front, so the sync is one calendar
 // listing plus the events it creates or interviews it adds.
 func calendarPrompt(b *strings.Builder, t MailTask) {
+	days := t.Window()
 	fmt.Fprintf(b, "Task: sync the user's job interviews between ScoutJobs and their calendar, today is %s. Be quick: use as few tool calls as you can.\n\n", t.Since.Format("2006-01-02"))
 	fmt.Fprintf(b, "Tracked companies: %s.\n\nUpcoming interviews in ScoutJobs:\n", strings.Join(t.Companies, ", "))
 	if len(t.Interviews) == 0 {
@@ -284,7 +286,7 @@ func calendarPrompt(b *strings.Builder, t MailTask) {
 		b.WriteString("\n")
 	}
 	b.WriteString(`
-1. List the calendar events from today to 30 days ahead in one call (page only if needed). Work from that list; do not search event by event.
+1. List the calendar events from today to ` + strconv.Itoa(days) + ` days ahead in one call (page only if needed). Look at nothing outside that window. Work from that list; do not search event by event.
 2. ScoutJobs to calendar: for each interview above with no "Interview: <company>" event at its time, create one: that title, the interview's time and length, its location or link in the location, no guests, no notifications. Description, one item per line: the role, the stage and format, "Prep: read the job posting again, research the company, prepare two questions to ask", "Added by ScoutJobs".
 3. Calendar to ScoutJobs: for each listed event that is plainly a job interview with a tracked company (its title or description names the company, or says interview, screen or recruiter call next to it) and has no interview above at that time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, duration, format, location when given). Skip "Interview: <company>" events and events you cannot tie to one tracked job; call scoutjobs job_list only to find a job's id.
 End with one line: how many events you created and interviews you added, naming each.
@@ -355,12 +357,20 @@ func NoCalendar(agent string, conns []Connector) string {
 }
 
 // ExecMail runs the inbox agent once and logs what it does.
-// calendarFacts are the upcoming interviews with a time and the open jobs' companies.
-func (rn *Runner) calendarFacts() ([]store.Interview, []string) {
+// Window is how many days ahead a calendar sync looks.
+func (t MailTask) Window() int {
+	if t.Days <= 0 {
+		return 14
+	}
+	return t.Days
+}
+
+// calendarFacts are the upcoming interviews with a time before until, and the open jobs' companies.
+func (rn *Runner) calendarFacts(until time.Time) ([]store.Interview, []string) {
 	ivs, _ := rn.Store.Interviews(0, true)
 	var timed []store.Interview
 	for _, iv := range ivs {
-		if len(iv.At) > 10 {
+		if len(iv.At) > 10 && iv.At[:10] <= until.Format("2006-01-02") {
 			timed = append(timed, iv)
 		}
 	}
@@ -385,7 +395,7 @@ func (rn *Runner) ExecMail(ctx context.Context, run *Run, ag Agent, conns []Conn
 		}
 		mb, cal := ReadyConnectors(conns)
 		if t.Kind == "calendar" {
-			t.Interviews, t.Companies = rn.calendarFacts()
+			t.Interviews, t.Companies = rn.calendarFacts(t.Since.AddDate(0, 0, t.Window()))
 		}
 		run.set(0, Running, "")
 		run.logf("%s: %s with %s", ag.Name, strings.ToLower(run.Steps[0].Label), connectorNames(append(mb, cal...)))

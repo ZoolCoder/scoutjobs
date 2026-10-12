@@ -331,6 +331,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /connections/agent", srv.setDefaultAgent)
 	mux.HandleFunc("POST /connections/calendar", srv.setCalendarVia)
 	mux.HandleFunc("POST /connections/calendar/sync", srv.syncCalendarAgent)
+	mux.HandleFunc("POST /connections/calendar/days", srv.setCalendarDays)
 	mux.HandleFunc("POST /connections/mail", srv.setMailVia)
 	mux.HandleFunc("POST /connections/sources", srv.setSource)
 	mux.HandleFunc("GET /connections/test", srv.testConnection)

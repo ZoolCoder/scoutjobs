@@ -1211,3 +1211,5 @@ details.evdata p.pre{margin:8px 0 0;padding:8px 10px;border-radius:8px;backgroun
 .issue ul.evrows>li{grid-template-columns:30px minmax(0,1fr) auto;gap:12px}
 .issue .issue-acts .jobmenu{position:relative}
 .panel-h .act.mini{margin-left:auto}
+.calwin{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;font-size:13px}
+.calwin select{width:auto;padding:4px 8px}

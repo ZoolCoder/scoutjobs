@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,19 @@ import (
 
 // calendarSynced is when the agent last finished a calendar sync.
 const calendarSynced = "calendar_agent_synced"
+
+// calendarDays is how many days ahead the agent's calendar sync looks: fewer is quicker.
+const calendarDays = "calendar_agent_days"
+
+var calendarPeriods = []int{7, 14, 30}
+
+func (v *server) calendarWindow() int {
+	n, _ := strconv.Atoi(v.s.Setting(calendarDays))
+	if !slices.Contains(calendarPeriods, n) {
+		return 14
+	}
+	return n
+}
 
 // sourceTitles names the job sources in plain words.
 var sourceTitles = map[string]string{
@@ -43,6 +57,8 @@ type connectionsView struct {
 	MailOff        string // where Disconnect posts, "" when the mailbox cannot be disconnected here
 	CalSync        string // where Sync now posts, "" when nothing syncs
 	CalSynced      string
+	CalDays        int
+	CalPeriods     []int
 	FeedURL        string
 	FeedNote       string
 	Sync           *runner.Status // the calendar sync the page waits on
@@ -69,6 +85,7 @@ func (v *server) connections(w http.ResponseWriter, r *http.Request) {
 	switch c.CalOn {
 	case "agent":
 		c.CalSync, c.CalSynced = "/connections/calendar/sync", v.s.Setting(calendarSynced)
+		c.CalDays, c.CalPeriods = v.calendarWindow(), calendarPeriods
 	case "google":
 		c.CalSync = "/calendar/sync"
 	}
@@ -356,7 +373,7 @@ func (v *server) syncCalendarAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	started := time.Now()
-	run, err := v.cfg.Runner.StartMail(runner.MailTask{Kind: "calendar", Since: started}, agent)
+	run, err := v.cfg.Runner.StartMail(runner.MailTask{Kind: "calendar", Since: started, Days: v.calendarWindow()}, agent)
 	if err != nil {
 		connectionsDone(w, r, "calendar", "err", err.Error())
 		return
@@ -367,6 +384,24 @@ func (v *server) syncCalendarAgent(w http.ResponseWriter, r *http.Request) {
 			_ = v.s.SetSetting(calendarSynced, started.Format(time.RFC3339))
 		}
 	}()
+	http.Redirect(w, r, "/connections#calendar", http.StatusSeeOther)
+}
+
+// setCalendarDays sets how far ahead the agent's calendar sync looks.
+func (v *server) setCalendarDays(w http.ResponseWriter, r *http.Request) {
+	if sameOrigin(r) != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	n, err := strconv.Atoi(r.FormValue("days"))
+	if err != nil || !slices.Contains(calendarPeriods, n) {
+		connectionsDone(w, r, "calendar", "err", "pick 7, 14 or 30 days")
+		return
+	}
+	if err := v.s.SetSetting(calendarDays, strconv.Itoa(n)); err != nil {
+		connectionsDone(w, r, "calendar", "err", err.Error())
+		return
+	}
 	http.Redirect(w, r, "/connections#calendar", http.StatusSeeOther)
 }
 

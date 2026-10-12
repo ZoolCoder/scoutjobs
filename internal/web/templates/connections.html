@@ -35,6 +35,9 @@
     {{template "connbadge" .CalOn}}</div>
   <form id="f-cal" method="post" action="/connections/calendar" data-change><ul class="connopts">{{range .Cal}}{{template "connopt" .}}{{end}}</ul></form>
   {{if eq .CalOn "apple"}}<div class="feed"><label for="feedurl">In Apple Calendar: File › New Calendar Subscription, then paste</label><input id="feedurl" class="feedurl" readonly value="{{.FeedURL}}">{{with .FeedNote}}<small>{{.}}</small>{{end}}</div>{{end}}
+  {{if .CalDays}}<form class="calwin" method="post" action="/connections/calendar/days"><label for="caldays">Sync the next</label>
+    <select id="caldays" name="days" data-autosubmit>{{$d := .CalDays}}{{range .CalPeriods}}<option value="{{.}}" {{if eq . $d}}selected{{end}}>{{.}} days</option>{{end}}</select>
+    <small class="muted">Shorter is quicker.</small><noscript><button class="mini">Save</button></noscript></form>{{end}}
   {{with .CalSync}}<form id="f-sync" method="post" action="{{.}}" data-busy="Starting…"><input type="hidden" name="back" value="/connections#calendar"></form>{{end}}
   <div class="cfoot">{{if .CalSync}}<button class="primary" form="f-sync" type="submit">Sync now</button>{{else}}<button class="primary" type="button" data-test="calendar">Test connection</button>{{end}}<button form="f-cal" type="submit">Change</button>
     {{if eq .CalOn "agent"}}<span class="push small muted">{{with .CalSynced}}Last synced {{ago .}}{{else}}Not synced yet{{end}}</span>{{end}}</div>
@@ -60,7 +63,7 @@
 
 {{with .Sync}}<dialog class="syncdlg" open data-modal data-run="/mail/agent/run" data-phases data-done="/connections?synced=1#calendar" aria-labelledby="sync-title">
   <div class="synchead"><span class="connico">{{template "ico-calendar"}}</span>
-    <div><h2 id="sync-title">Syncing your calendar</h2><p class="muted">{{title .Agent}} is reading your calendar and adding your interviews, both ways. This usually takes 1–2 minutes.</p></div></div>
+    <div><h2 id="sync-title">Syncing your calendar</h2><p class="muted">{{title .Agent}} is reading your calendar and adding your interviews, both ways. It looks {{$.Data.CalDays}} days ahead and usually takes under a minute.</p></div></div>
   <div class="runprog live" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="">
     <progress max="100" value="5" aria-label="sync progress"></progress>
     <p class="runnow"><span class="spin" aria-hidden="true"></span><b data-now role="status">Starting your AI assistant…</b><span class="muted" data-elapsed></span></p></div>

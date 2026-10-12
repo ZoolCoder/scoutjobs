@@ -129,7 +129,7 @@ func TestPlanMailCalendar(t *testing.T) {
 	}
 	p := MailPrompt(MailTask{Kind: "calendar", Since: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), Companies: []string{"Acme"},
 		Interviews: []store.Interview{{Company: "Acme", Title: "Go Dev", Stage: "screen", At: "2026-10-14T10:00", Duration: 45}}}, nil, []Connector{cal})
-	for _, want := range []string{"2026-10-12", "Acme, Go Dev: screen at 2026-10-14T10:00, 45 min", "Tracked companies: Acme.", "in one call", "Prep:", "interview_add", `"Interview: <company>"`, "never change or delete a calendar event"} {
+	for _, want := range []string{"2026-10-12", "Acme, Go Dev: screen at 2026-10-14T10:00, 45 min", "Tracked companies: Acme.", "14 days ahead in one call", "Prep:", "interview_add", `"Interview: <company>"`, "never change or delete a calendar event"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("prompt lacks %q", want)
 		}
