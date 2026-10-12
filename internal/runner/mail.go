@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/mail"
+	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
 // MailID keys the inbox agent's run in the Manager; no job has a negative id.
@@ -45,6 +46,9 @@ type MailTask struct {
 	JobID int64
 	Draft mail.Message // draft: the e-mail to file, never to send
 	Label string       // draft: what the e-mail is, "follow-up to Acme"
+	// calendar: what ScoutJobs knows, put in the prompt so the agent need not look it up
+	Interviews []store.Interview
+	Companies  []string
 }
 
 var mailWords = []string{"mail", "outlook", "microsoft", "365", "exchange", "icloud", "fastmail", "proton", "calendar"}
@@ -191,7 +195,7 @@ func (a Agent) mailCommand(exe, home, dir string, conns []Connector) ([]string, 
 			allowed = append(allowed, c.Tools...)
 		}
 		argv := []string{a.Path, "-p", "--restricted", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
-			"--permission-mode", "dontAsk", "--mcp-config", string(mcp), "--allowedTools"}
+			"--model", "sonnet", "--permission-mode", "dontAsk", "--mcp-config", string(mcp), "--allowedTools"}
 		argv = append(argv, allowed...)
 		return append(argv, "--disallowedTools", "Bash", "WebFetch", "WebSearch", "Read", "Glob", "Grep", "Edit", "Write", "NotebookEdit", "Task"), nil
 	case "codex":
@@ -244,12 +248,7 @@ func MailPrompt(t MailTask, mailboxes, calendars []Connector) string {
 		}
 		fmt.Fprintf(&b, "Then call scoutjobs job_set with job=%d and note \"draft filed: %s\". End with one line: where the draft is.\n", t.JobID, t.Label)
 	case "calendar":
-		fmt.Fprintf(&b, `Task: sync the user's job interviews between ScoutJobs and their calendar, today is %s.
-1. Call scoutjobs job_list (the tracked companies) and scoutjobs interview_list (the interviews ScoutJobs knows).
-2. ScoutJobs to calendar: for each upcoming interview with a time, look in the calendar for an event "Interview: <company>" at that time. When there is none, create it: that title, the interview's time and length, its location or link in the location, no guests, no notifications.
-3. Calendar to ScoutJobs: list the calendar events of the next 60 days. For each event that is plainly a job interview with a tracked company (its title or description names the company, or says interview, screen or recruiter call next to the company) and has no interview in ScoutJobs at that time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, duration, format, location when given). Skip events ScoutJobs created ("Interview: <company>") and events you cannot tie to one tracked job.
-End with one line: how many events you created and interviews you added.
-`, t.Since.Format("2006-01-02"))
+		calendarPrompt(&b, t)
 	default:
 		fmt.Fprintf(&b, `Task: bring the user's job search up to date from their mail since %s.
 1. Call scoutjobs job_list: the tracked companies, titles and contacts.
@@ -264,6 +263,32 @@ End with one line: how many events you created and interviews you added.
 		b.WriteString("End with one line: how many messages you logged, interviews you added and events you created.\n")
 	}
 	return b.String()
+}
+
+// calendarPrompt hands the agent the interviews and companies up front, so the sync is one calendar
+// listing plus the events it creates or interviews it adds.
+func calendarPrompt(b *strings.Builder, t MailTask) {
+	fmt.Fprintf(b, "Task: sync the user's job interviews between ScoutJobs and their calendar, today is %s. Be quick: use as few tool calls as you can.\n\n", t.Since.Format("2006-01-02"))
+	fmt.Fprintf(b, "Tracked companies: %s.\n\nUpcoming interviews in ScoutJobs:\n", strings.Join(t.Companies, ", "))
+	if len(t.Interviews) == 0 {
+		b.WriteString("- none\n")
+	}
+	for _, iv := range t.Interviews {
+		fmt.Fprintf(b, "- %s, %s: %s at %s, %d min", iv.Company, iv.Title, iv.Stage, iv.At, iv.Duration)
+		if iv.Format != "" {
+			fmt.Fprintf(b, ", %s", iv.Format)
+		}
+		if iv.Location != "" {
+			fmt.Fprintf(b, ", %s", iv.Location)
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString(`
+1. List the calendar events from today to 30 days ahead in one call (page only if needed). Work from that list; do not search event by event.
+2. ScoutJobs to calendar: for each interview above with no "Interview: <company>" event at its time, create one: that title, the interview's time and length, its location or link in the location, no guests, no notifications. Description, one item per line: the role, the stage and format, "Prep: read the job posting again, research the company, prepare two questions to ask", "Added by ScoutJobs".
+3. Calendar to ScoutJobs: for each listed event that is plainly a job interview with a tracked company (its title or description names the company, or says interview, screen or recruiter call next to it) and has no interview above at that time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, duration, format, location when given). Skip "Interview: <company>" events and events you cannot tie to one tracked job; call scoutjobs job_list only to find a job's id.
+End with one line: how many events you created and interviews you added, naming each.
+`)
 }
 
 func connectorNames(cs []Connector) string {
@@ -330,6 +355,27 @@ func NoCalendar(agent string, conns []Connector) string {
 }
 
 // ExecMail runs the inbox agent once and logs what it does.
+// calendarFacts are the upcoming interviews with a time and the open jobs' companies.
+func (rn *Runner) calendarFacts() ([]store.Interview, []string) {
+	ivs, _ := rn.Store.Interviews(0, true)
+	var timed []store.Interview
+	for _, iv := range ivs {
+		if len(iv.At) > 10 {
+			timed = append(timed, iv)
+		}
+	}
+	jobs, _ := rn.Store.ListJobs(store.JobFilter{Open: true})
+	seen := map[string]bool{}
+	var companies []string
+	for _, j := range jobs {
+		if !seen[j.Company] {
+			seen[j.Company] = true
+			companies = append(companies, j.Company)
+		}
+	}
+	return timed, companies
+}
+
 func (rn *Runner) ExecMail(ctx context.Context, run *Run, ag Agent, conns []Connector, t MailTask, echo io.Writer) {
 	finish(ctx, run, echo, func(ctx context.Context) error {
 		argv, err := ag.mailCommand(rn.Exe, rn.Store.Home, os.TempDir(), conns)
@@ -338,6 +384,9 @@ func (rn *Runner) ExecMail(ctx context.Context, run *Run, ag Agent, conns []Conn
 			return err
 		}
 		mb, cal := ReadyConnectors(conns)
+		if t.Kind == "calendar" {
+			t.Interviews, t.Companies = rn.calendarFacts()
+		}
 		run.set(0, Running, "")
 		run.logf("%s: %s with %s", ag.Name, strings.ToLower(run.Steps[0].Label), connectorNames(append(mb, cal...)))
 		if err := rn.agentArgv(ctx, run, ag, argv, os.TempDir(), MailPrompt(t, mb, cal)); err != nil {

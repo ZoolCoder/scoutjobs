@@ -129,7 +129,7 @@ func (m *Manager) Connectors(ctx context.Context, ag Agent, fresh bool) ([]Conne
 	m.mu.Lock()
 	c, ok := m.conns[ag.Name]
 	m.mu.Unlock()
-	if ok && !fresh && time.Since(c.at) < 5*time.Minute {
+	if ok && !fresh && time.Since(c.at) < 30*time.Minute {
 		return c.conns, c.err
 	}
 	conns, err := ag.Connectors(ctx)

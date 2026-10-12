@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/mail"
+	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
 func TestSafeTool(t *testing.T) {
@@ -126,8 +127,9 @@ func TestPlanMailCalendar(t *testing.T) {
 	if err != nil || run.Steps[0].Name != "mail-calendar" || run.Steps[0].Label != "Sync the calendar" {
 		t.Errorf("plan: %+v %v", run, err)
 	}
-	p := MailPrompt(MailTask{Kind: "calendar", Since: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)}, nil, []Connector{cal})
-	for _, want := range []string{"2026-10-12", "interview_list", "interview_add", `"Interview: <company>"`, "never change or delete a calendar event"} {
+	p := MailPrompt(MailTask{Kind: "calendar", Since: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), Companies: []string{"Acme"},
+		Interviews: []store.Interview{{Company: "Acme", Title: "Go Dev", Stage: "screen", At: "2026-10-14T10:00", Duration: 45}}}, nil, []Connector{cal})
+	for _, want := range []string{"2026-10-12", "Acme, Go Dev: screen at 2026-10-14T10:00, 45 min", "Tracked companies: Acme.", "in one call", "Prep:", "interview_add", `"Interview: <company>"`, "never change or delete a calendar event"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("prompt lacks %q", want)
 		}
