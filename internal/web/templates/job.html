@@ -33,7 +33,6 @@
 {{with .Drafted}}<p class="callout">Draft saved in Gmail. <a href="{{.}}" rel="noopener noreferrer" target="_blank">Open it</a>, review, and send it from there.</p>{{end}}
 {{if eq $tab "overview"}}
 {{with .Emails}}<p class="callout">{{template "ico-mail"}}{{len .}} suggested {{if eq (len .) 1}}e-mail is{{else}}e-mails are{{end}} ready for you to check. <a href="/jobs/{{$j.ID}}?tab=mail#emails">Open {{if eq (len .) 1}}it{{else}}them{{end}}</a></p>{{end}}
-{{template "aipanel" .}}
 {{if eq $j.Status "offer"}}<section class="panel" id="offer">
   <div class="panel-h"><h2>Offer</h2><span class="act muted">prepare the conversation before you answer</span></div>
   {{if .OfferReady}}<p class="preppack"><span class="badge ready">Offer prep ready</span><a href="/jobs/{{$j.ID}}/files/offer-prep.md">Open offer prep</a></p>{{end}}
@@ -41,6 +40,7 @@
   {{else}}{{if not .OfferReady}}<p class="small muted">Ask your agent to use the <code>salary-negotiation-prep</code> skill on job {{$j.ID}}.</p>{{end}}{{end}}
   <p class="small muted">Nothing is accepted or sent for you. Reply to the company yourself.</p>
 </section>{{end}}
+{{template "aipanel" .}}
 <section class="panel" id="docs">
   <div class="panel-h"><h2>Drafts</h2><span class="act muted">review and edit before you send</span></div>
   <div class="dcards">
