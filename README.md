@@ -334,6 +334,10 @@ The job page has one button, *Continue with AI*: your assistant tailors the resu
 
 ![Ready to send: the quality gates and why the job fits, with evidence from your profile](docs/modules/ROOT/images/job-gates.png)
 
+Daily chores run by themselves while the dashboard is up, or from cron with `scoutjobs daily`: saved searches marked daily add their good matches, quiet applications get a follow-up drafted for you to review, and interviews in the coming week get a prep pack. Nothing is ever sent. Tick several jobs in the pipeline's list view to have the assistant prepare them one after another; *Keywords to add* on a job lists the posting's wording your resume still misses, with the profile line that backs each; *Stories* maps your interview stories to each job's must-haves; *What works* on Reviews shows which sources and fit scores get answers. `Ctrl K` / `⌘K` opens a palette to jump to any job or page:
+
+![The command palette: jump to a page, a job or an action by typing a few letters](docs/modules/ROOT/images/palette.png)
+
 Every page is described in the manual: [Dashboard](https://zoolcoder.github.io/scoutjobs/scoutjobs/dashboard.html).
 
 ## JSON API

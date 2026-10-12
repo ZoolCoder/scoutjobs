@@ -124,4 +124,16 @@ $ scoutjobs stats                         # funnel, weekly numbers, follow-ups d
 $ scoutjobs brief [--compact]             # everything the daily briefing needs, as JSON
 ----
 
+[source,console]
+----
+$ scoutjobs daily [--json]                # daily searches, follow-up drafts, prep packs that are due
+----
+
+`daily` runs the same chores as the dashboard's hourly *Automation*: every saved search marked daily that has not run in 20 hours, the follow-up and thank-you drafts when that switch is on, and prep packs for the coming week when that switch is on and an AI assistant is set. A second run straight after does nothing. It never sends anything. Put it in cron or a launchd agent when the dashboard is not running all day:
+
+[source,console]
+----
+0 8 * * * /usr/local/bin/scoutjobs daily >> ~/.scoutjobs/daily.log 2>&1
+----
+
 `brief` returns `stats`, `upcoming_interviews`, `new_jobs`, `ranked_jobs`, `drafted_jobs`, `learning`, `preferences`, `recent_activity` and `config` in one call.

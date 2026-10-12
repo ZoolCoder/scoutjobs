@@ -7,6 +7,31 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+### Added
+- Daily searches: press *Run daily* on a saved search and it runs once a day,
+  adding up to 20 good matches to the pipeline. The overview says how many
+  came in.
+- Automation panel on Preferences, run every hour by `scoutjobs serve` or by
+  the new `scoutjobs daily [--json]` from cron: daily searches, follow-up and
+  thank-you drafts for quiet applications and past interviews, and interview
+  prep packs. Nothing is ever sent.
+- *Build prep pack* on an interview: the AI assistant writes the company
+  research, the stories to tell and a prep sheet, and ticks the prep items it
+  covered.
+- Apply queue: tick several jobs in the pipeline's list view and press
+  *Prepare selected with AI*; a strip on the pipeline shows what runs and what
+  waits.
+- *Keywords to add* on the job page: requirements the tailored resume does
+  not word like the posting yet, each with the profile line that backs it.
+  *Fix with AI* adds only the backed wordings.
+- Story bank: the new *Stories* page lists your interview stories and the
+  jobs each one answers; a job's Interviews tab maps every must-have to a
+  story or flags it.
+- *What works* on Reviews: answer, interview and offer rates by source, fit
+  band and month applied, and `GET /api/funnel`.
+- Command palette: `Ctrl K` / `⌘K` jumps to any page, job or action; `g`
+  then a letter goes to a page and `?` lists every shortcut.
+
 ## [0.7.0] - 2026-10-12
 
 ### Added

@@ -54,7 +54,7 @@ Results come best match first. Each one shows a score, a label (*Great match*, *
 
 image::search-results.png[Search results: a score and label per job, what fits and what does not, and an Add to pipeline button,1200]
 
-Press *+ Add to pipeline* on the ones you like. Tick *Hide jobs that break my must-haves* to drop jobs in the wrong place, of the wrong type or below your salary floor. *More options* lets you add a company's careers page and save the search to run it again with one click.
+Press *+ Add to pipeline* on the ones you like. Tick *Hide jobs that break my must-haves* to drop jobs in the wrong place, of the wrong type or below your salary floor. *More options* lets you add a company's careers page and save the search to run it again with one click. Press *Run daily* on a saved search and ScoutJobs runs it every morning and adds the good matches for you; the overview says how many came in.
 
 == 5. Keep track: Pipeline
 
@@ -62,7 +62,7 @@ Open *Pipeline*. Every job you added is a card in a column, from *New* to *Offer
 
 image::pipeline.png[The pipeline board: New, Ranked, Drafted, Applied, Interview and Offer columns with one card per job,1200]
 
-Click a card to open the job. Drag a card to another column when something changes, for example from *Applied* to *Interview*. *Due this week* shows only jobs with a deadline or a follow-up coming up; *List* switches to a table. The sidebar switch at the bottom left changes between light, dark and your system's setting:
+Click a card to open the job. Drag a card to another column when something changes, for example from *Applied* to *Interview*. *Due this week* shows only jobs with a deadline or a follow-up coming up; *List* switches to a table, where you can tick several new jobs and press *Prepare selected with AI* to have them all drafted one after another. The sidebar switch at the bottom left changes between light, dark and your system's setting:
 
 image::pipeline-dark.png[The same board in the dark theme,1200]
 
@@ -81,6 +81,8 @@ image::drafts.png[A cover letter opened in the drafts viewer,1200]
 image::job-gates.png[Ready to send: one check still to fix, and why the job fits with evidence from your profile,760]
 . Send it yourself. *Mail app* on the e-mail draft opens your own mail program with everything filled in, or apply on the company's site with *View posting*. Then move the job to *applied* under *Application*.
 
+*Keywords to add* above the checks lists the requirements your tailored resume does not word the way the posting does yet, each with the line from your profile that backs it. *Fix with AI* adds only those.
+
 ScoutJobs never sends an application on its own.
 
 == 7. Answers: Inbox
@@ -97,6 +99,8 @@ An interview invitation becomes an interview on that job, with its date and leng
 
 image::interviews.png[Interviews: the next interview with its prep checklist, past interviews waiting for an outcome, and later ones,1200]
 
+*Build prep pack* has your assistant research the company and write a prep sheet with the stories to tell. Your stories live on *Stories*, each matched to the jobs that ask for it; a job's *Interviews* tab shows which must-haves still have no story.
+
 *Calendar* shows interviews, deadlines and follow-ups by day, week or month. Click an empty slot to add an interview, click an event to move it. *Sync now* sends your interviews to your own calendar and brings your other events in.
 
 image::calendar.png[The calendar week view with interviews, a deadline and the calendars list,1200]
@@ -109,10 +113,15 @@ image::learning.png[Learning: skill gaps ranked by how many jobs ask for them,12
 Preferences:: What you told ScoutJobs and what it learned from the jobs you skip and apply to, for example "avoid on-call", with how sure it is and why. The scores and the drafts use them; anything you set yourself is never overwritten.
 +
 image::preferences.png[Preferences: what you want, how sure ScoutJobs is and why,1200]
++
+Its *Automation* panel turns on the chores ScoutJobs does for you each day: drafting follow-ups when an application goes quiet, and prep packs before interviews. Nothing is ever sent.
+Reviews:: Your weekly reviews and *What works*: which sources, fit scores and months got you answers, interviews and offers.
++
+image::what-works.png[What works: answer rate by source, by fit band and by month applied,1200]
 Activity:: Every change, by you or the assistant, in one log.
 +
 image::activity.png[Activity: a log of every change,1200]
 
-That is the loop. Come back to the *Overview* each day: *Next best move* and *Today* tell you what to do next.
+That is the loop. Come back to the *Overview* each day: *Next best move* and *Today* tell you what to do next. Press `Ctrl K` (`⌘K` on a Mac) on any page to jump to a job or a page by typing a few letters, and `?` for the other shortcuts.
 
 Prefer to work from your AI assistant's chat? Everything here is also a skill and a command; see xref:quickstart.adoc[] and xref:agents.adoc[].
