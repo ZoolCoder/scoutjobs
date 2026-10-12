@@ -1039,7 +1039,7 @@ func (s *Store) CVChecks(limit int) ([]CVCheck, error) {
 // WeeklyCounts returns the number of events of kind matching notePattern per ISO week for the last n weeks, oldest first.
 func (s *Store) WeeklyCounts(kind, notePattern string, n int) []int64 {
 	out := make([]int64, n)
-	start := time.Now().UTC()
+	start := time.Now().UTC().Truncate(24 * time.Hour)
 	wd := int(start.Weekday())
 	if wd == 0 {
 		wd = 7
