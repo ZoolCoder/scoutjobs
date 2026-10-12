@@ -258,7 +258,7 @@ func MailPrompt(t MailTask, mailboxes, calendars []Connector) string {
 1. Call scoutjobs job_list: the tracked companies, titles and contacts.
 2. Search the mailbox for messages received since then, not sent by the user, from those companies, their recruiters or hiring systems (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR, Workday and the like). Use one or two searches, read at most 20 messages, and skip newsletters and job alerts. A message whose subject or body names a tracked company counts, even from a personal address or another domain.
 3. For each message about one tracked application, call scoutjobs email_log with job, from, subject, a one-line snippet, date (RFC3339), thread, message_id and kind (interview, offer, rejected, request or ack). Pass status only when the message plainly says so: rejected for a rejection, interview for an invitation, offer for an offer. Repeats are ignored, so logging a message twice is harmless.
-4. For an invitation with a fixed date and time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, format, location when given).
+4. For an invitation with a fixed date and time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, duration in minutes, format, location when given).
 `, t.Since.Format("2006-01-02"))
 		b.WriteString("Do not touch the calendar: the calendar sync adds the interviews there. End with one line: how many messages you logged and interviews you added.\n")
 	}
