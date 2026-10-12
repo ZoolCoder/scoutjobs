@@ -78,7 +78,10 @@
       if (!run) return;
       if (panel.dataset.queued) { if (run.state !== 'queued') location.reload(); return; }
       if (run.state !== 'running') {
-        if (panel.dataset.done) location.href = panel.dataset.done; else location.reload();
+        // a link that only changes the #hash does not reload, so reload when the page stays the same
+        var done = panel.dataset.done && new URL(panel.dataset.done, location.href);
+        if (done && done.pathname + done.search !== location.pathname + location.search) location.href = done.href;
+        else location.reload();
         return;
       }
       var done = 0, now = [];
