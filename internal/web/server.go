@@ -388,6 +388,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 		w.Header().Set("Cache-Control", "no-store")
 		writeJSON(w, http.StatusOK, Health{App: "scoutjobs", Version: cfg.Version, PID: os.Getpid(), Exe: exe, Home: s.Home})
 	})
+	mux.HandleFunc("GET /palette.json", srv.paletteJSON)
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")

@@ -1253,3 +1253,27 @@ details.evdata p.pre{margin:8px 0 0;padding:8px 10px;border-radius:8px;backgroun
 @keyframes tipin{from{opacity:0}to{opacity:1}}
 .dayh::first-letter{text-transform:uppercase}
 .dash .weeks li:nth-child(odd) span{visibility:hidden}
+
+/* command palette */
+.palhint{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--subtle);color:var(--muted);font-size:13px;cursor:pointer;text-align:left}
+.palhint:hover{border-color:var(--line2);color:var(--fg)}
+.palhint svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.palhint span{flex:1}
+.palhint kbd,.palette kbd{font:11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;background:var(--surface);color:var(--fg)}
+.shell.mini .palhint{justify-content:center;padding:8px 0}
+.shell.mini .palhint span,.shell.mini .palhint kbd{display:none}
+dialog.palette{width:min(560px,calc(100vw - 32px));margin:12vh auto auto;padding:0;border:1px solid var(--line2);border-radius:14px;background:var(--surface);color:var(--fg);box-shadow:var(--pop-shadow);overflow:hidden}
+dialog.palette::backdrop{background:rgba(8,10,16,.45)}
+dialog.palette input{width:100%;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:14px 16px;font-size:15px;background:transparent;color:var(--fg);outline:none}
+dialog.palette ul{list-style:none;margin:0;padding:6px;max-height:min(50vh,420px);overflow:auto}
+dialog.palette li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 10px;border-radius:8px;cursor:pointer}
+dialog.palette li b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog.palette li small{color:var(--muted);font-size:12px;white-space:nowrap}
+dialog.palette li[aria-selected=true]{background:var(--acc-sub)}
+dialog.palette li.none{color:var(--muted);cursor:default}
+dialog.palette .palfoot{margin:0;padding:8px 14px;border-top:1px solid var(--line);font-size:12px}
+dialog.palette .palfoot kbd{margin-right:2px}
+dialog.keys{padding:20px}
+dialog.keys h2{margin:0 0 12px;font-size:16px}
+dialog.keys dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin:0 0 16px;align-items:center}
+dialog.keys dd{margin:0}

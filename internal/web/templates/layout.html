@@ -17,6 +17,7 @@
   <a class="brand" href="/" title="ScoutJobs home" aria-label="ScoutJobs home">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
   <button class="sidefold" type="button" data-fold aria-label="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}" aria-expanded="{{if .Mini}}false{{else}}true{{end}}" title="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 10l-2 2 2 2"/></svg></button>
   </div>
+  <button class="palhint" type="button" data-palette aria-keyshortcuts="Control+K Meta+K" title="Search jobs and pages, run actions">{{template "ico-search"}}<span>Jump to…</span><kbd data-palkey>Ctrl K</kbd></button>
   <nav aria-label="main">
     <a href="/" {{if eq .Active "overview"}}class="on" aria-current="page"{{end}}>{{template "ico-grid"}}Overview</a>
     <p class="navh">Apply</p>
@@ -54,6 +55,26 @@
 
 {{define "foot"}}
 </main>
+<dialog class="palette" id="palette" aria-label="Search and jump">
+  <input type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" aria-label="Search jobs, pages and actions" placeholder="Search jobs, pages and actions" autocomplete="off" spellcheck="false">
+  <ul id="palette-list" role="listbox" aria-label="Results"></ul>
+  <p class="palfoot muted"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close · <kbd>?</kbd> all shortcuts</p>
+</dialog>
+<dialog class="palette keys" id="keys" aria-labelledby="keys-h">
+  <h2 id="keys-h">Keyboard shortcuts</h2>
+  <dl>
+    <dt><kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>K</kbd></dt><dd>Search jobs, pages and actions</dd>
+    <dt><kbd>g</kbd> <kbd>o</kbd></dt><dd>Overview</dd>
+    <dt><kbd>g</kbd> <kbd>p</kbd></dt><dd>Pipeline</dd>
+    <dt><kbd>g</kbd> <kbd>i</kbd></dt><dd>Inbox</dd>
+    <dt><kbd>g</kbd> <kbd>c</kbd></dt><dd>Calendar</dd>
+    <dt><kbd>g</kbd> <kbd>s</kbd></dt><dd>Find jobs</dd>
+    <dt><kbd>/</kbd></dt><dd>Search the pipeline</dd>
+    <dt><kbd>f</kbd></dt><dd>Pipeline full screen</dd>
+    <dt><kbd>?</kbd></dt><dd>This list</dd>
+  </dl>
+  <form method="dialog"><button class="mini">Close</button></form>
+</dialog>
 <footer>Nothing leaves this machine · <code>scoutjobs serve</code> · JSON API on <code>/api/*</code>{{if .Cfg.Version}} · <a href="https://github.com/zoolcoder/scoutjobs/releases" rel="noopener noreferrer" target="_blank" title="releases; scoutjobs update installs the latest">v{{.Cfg.Version}}</a>{{end}}</footer>
 </div>
 </div>

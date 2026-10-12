@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -261,5 +262,24 @@ func TestWhatWorksPanelAndAPI(t *testing.T) {
 	}
 	if rec := get(h, "/api/funnel"); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"group":"lever","applied":3,"responded":2`) {
 		t.Errorf("api: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPaletteJSONAndShortcutHelp(t *testing.T) {
+	s := testStore(t)
+	h := mustHandler(t, s, Config{})
+	rec := get(h, "/palette.json")
+	var jobs []map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &jobs); err != nil || rec.Code != 200 || len(jobs) != 1 || jobs[0]["company"] != "Acme" || jobs[0]["id"] != float64(1) {
+		t.Fatalf("palette.json: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, ok := jobs[0]["notes"]; ok {
+		t.Error("palette.json leaks more than it needs")
+	}
+	b := get(h, "/").Body.String()
+	for _, want := range []string{`data-palette`, `id="palette"`, `role="combobox"`, `id="keys"`, "Keyboard shortcuts"} {
+		if !strings.Contains(b, want) {
+			t.Errorf("layout lacks %q", want)
+		}
 	}
 }
