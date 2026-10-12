@@ -7,7 +7,24 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-12
+
 ### Added
+- New dashboard look: a violet brand, an overview that leads with the next
+  best move and a *Today* list of what to do, a pipeline that fits every stage
+  on screen, and a sidebar that folds to icons.
+- Connections page: pick the AI assistant, connect mail and calendar and the
+  job sources in one place, each with a *Test connection* button.
+- Calendar sync through the AI assistant: interviews go to your calendar and
+  your other events come in. Choose how far ahead it looks.
+- Mail sync shows a progress bar in a dialog that can be cancelled; what was
+  already found stays.
+- Every page asks before it acts and shows a loading bar; the activity
+  timeline and job events are written in plain language.
+- Accessible tooltips on every hint: they show on hover and keyboard focus,
+  close with Esc, and screen readers announce them. The folded sidebar names
+  each icon.
+- The overview asks how a past interview went, with a link to log the outcome.
 - Read mail through your AI agent: on the Inbox page pick Claude Code or
   Codex, and it reads replies with the connectors you signed in to (Gmail and
   Google Calendar, Microsoft 365, any mail MCP server), logs them, adds
@@ -34,11 +51,23 @@ All notable changes to ScoutJobs. The format follows
   boxes were left unticked on Google's screen.
 
 ### Changed
+- The job page leads with the next step and folds the details; search and the
+  interviews, learning, preferences and profile pages are simpler.
+- Dates read "today", "yesterday" or "13 Oct" instead of `2026-10-13`. The
+  weekly chart is labelled by week.
+- Better contrast for muted text, underlined links in text, larger click
+  targets, and filter chips that say what they do.
+- Calendar and mail sync start at once and are capped in time.
 - The boards of a search are queried in parallel.
 - Gmail sync reads every folder except Sent, Drafts and the promotions and
   social tabs, so archived or filtered replies are found.
 
 ### Fixed
+- The overview no longer cuts panels off on laptop screens; it scrolls.
+- Interviews already past no longer show as upcoming.
+- Adding an interview at a time that already has one skips the duplicate.
+- A page reloads when a sync ends on it, and mail sync passes the interview
+  length on.
 - Jobs added from a search keep the posting: its text is saved to
   `posting.md`, and Prepare application fetches a missing one from the job's
   URL (Remotive links included) before the agent starts, so the fit and draft
@@ -291,7 +320,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.4.0
