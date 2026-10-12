@@ -58,6 +58,12 @@ func (rn *Runner) done(j store.Job, name string) (bool, string) {
 		return exists(dir, apply.DraftName), apply.DraftName
 	case "prep":
 		return rn.prepDone(j, dir)
+	case "intel":
+		return exists(dir, apply.IntelName), apply.IntelName
+	case "mock":
+		return apply.MockScored(dir)
+	case "offer":
+		return exists(dir, apply.OfferName), apply.OfferName
 	}
 	return false, ""
 }
@@ -297,12 +303,16 @@ func (rn *Runner) Reconcile(j store.Job) []string {
 	return notes
 }
 
-// record turns the agent's review and ATS result files into the review event and the CV check.
+// record turns the agent's result files into what ScoutJobs keeps: the review event, the CV check,
+// the company research, the question bank and scored mock interviews.
 func (rn *Runner) record(j store.Job) error {
 	events, _ := rn.Store.Events(j.ID, 200)
 	_, err1 := apply.RecordReview(rn.Store, j, events)
 	_, err2 := apply.RecordATS(rn.Store, j, events)
-	return errors.Join(err1, err2)
+	_, err3 := apply.RecordIntel(rn.Store, j)
+	_, err4 := apply.RecordQuestions(rn.Store, j)
+	_, err5 := apply.RecordMock(rn.Store, j, events)
+	return errors.Join(err1, err2, err3, err4, err5)
 }
 
 func (rn *Runner) lastEvent(j store.Job, prefix string) (store.Event, bool) {

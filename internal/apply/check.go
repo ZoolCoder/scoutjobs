@@ -94,6 +94,10 @@ func Check(s *store.Store, j store.Job, events []store.Event, o CheckOptions) Re
 	add(gateCoverage(review, reviewErr, drafts))
 	add(gateGrounding(dir, events, drafts))
 	add(gateDuplicates(s, dir, drafts))
+	add(gateClaims(s.Home, dir, drafts))
+	add(gateSpecific(j, review, drafts))
+	add(gatePreferences(s, j, dir))
+	add(gateRepeat(s, j, time.Now()))
 	if !o.Export {
 		add(gateATS(dir))
 		add(gateFilenames(dir))

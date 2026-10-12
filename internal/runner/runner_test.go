@@ -384,3 +384,47 @@ func TestExtraReachesTheStepTask(t *testing.T) {
 		t.Errorf("prompt:\n%.600s", prompt)
 	}
 }
+
+// interviewAgent writes what the intel, mock and offer steps ask for.
+const interviewAgent = `#!/bin/sh
+cat > prompt.txt
+grep -q "Step [0-9], company research" prompt.txt && printf '# Acme\n\nSells anvils.\n' > company-intel.md
+grep -q "Step [0-9], mock interview score" prompt.txt && printf 'Good.\n' > mock-1-feedback.md && printf '{"overall":4,"summary":"Solid.","answers":[]}' > mock-1-result.json
+grep -q "Step [0-9], offer and negotiation" prompt.txt && printf '# Offer\n' > offer-prep.md
+echo done
+`
+
+func TestInterviewSteps(t *testing.T) {
+	rn, j := setup(t, interviewAgent)
+	got := run(t, rn, j, Request{Steps: []string{"intel", "offer"}})
+	if got.State != Done || states(got) != "intel=done offer=done" {
+		t.Fatalf("%s %s %s %v", got.State, got.Error, states(got), got.Log)
+	}
+	if !strings.Contains(apply.CompanyFile(rn.Store, j.Company, apply.CompanyIntel), "Sells anvils.") {
+		t.Error("intel not kept on the company")
+	}
+	if prompt, _ := os.ReadFile(filepath.Join(apply.Dir(rn.Store, j), "prompt.txt")); !strings.Contains(string(prompt), "companies/acme/notes.md") {
+		t.Error("{company} not replaced in the task")
+	}
+	if got = run(t, rn, j, Request{Steps: []string{"mock"}}); got.State == Done {
+		t.Error("mock step done without an answered mock")
+	}
+	_, _ = rn.Store.AddQuestion(j, store.Question{Text: "Why Acme?"})
+	m, err := apply.StartMock(rn.Store, j)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := apply.Dir(rn.Store, j)
+	_ = apply.SaveAnswers(dir, m.N, map[int64]string{m.Questions[0].ID: "Anvils."})
+	got = run(t, rn, j, Request{Steps: []string{"mock"}, Force: true, Extra: map[string]string{"mock": "The mock file is mock-1.json."}})
+	if got.State != Done {
+		t.Fatalf("mock: %s %s %v", got.State, got.Error, got.Log)
+	}
+	prompt, _ := os.ReadFile(filepath.Join(dir, "prompt.txt"))
+	if !strings.Contains(string(prompt), "The mock file is mock-1.json.") {
+		t.Error("mock file not named in the task")
+	}
+	if sessions, _ := rn.Store.Sessions(0); len(sessions) != 1 || sessions[0].Score != 80 {
+		t.Errorf("mock session: %+v", sessions)
+	}
+}

@@ -97,13 +97,19 @@ An interview invitation becomes an interview on that job, with its date and leng
 
 *Interviews* puts the next interview on top with a prep checklist: research the company, map the posting to your stories, rehearse, write questions, run a mock interview, test the link or route. *How did it go?* asks for the outcome of past interviews, one click each; *Later* lists the rest.
 
-image::interviews.png[Interviews: the next interview with its prep checklist, past interviews waiting for an outcome, and later ones,1200]
+image::interviews.png[Interviews: the next interview with its prep pack ready and its prep checklist, past interviews waiting for an outcome, and later ones,1200]
 
 *Build prep pack* has your assistant research the company and write a prep sheet with the stories to tell. Your stories live on *Stories*, each matched to the jobs that ask for it; a job's *Interviews* tab shows which must-haves still have no story.
 
+The same tab keeps a question bank for the company. Paste interview reports you found (ScoutJobs never visits Glassdoor or similar sites for you) and the questions in them are added; after each interview, write a short debrief and the questions they asked join too. Tick the ones you rehearsed, then press *Start mock interview*: type your answers to five of them and let the assistant score them.
+
+image::question-bank.png[The question bank: questions with where each came from, rehearsed ticks and answer ratings, and the mock interview buttons,1200]
+
+When an offer comes in, the job page gets an *Offer* panel: the assistant prepares what to ask for and how. You reply to the company yourself.
+
 *Calendar* shows interviews, deadlines and follow-ups by day, week or month. Click an empty slot to add an interview, click an event to move it. *Sync now* sends your interviews to your own calendar and brings your other events in.
 
-image::calendar.png[The calendar week view with interviews, a deadline and the calendars list,1200]
+image::calendar.png[The calendar week view with the Stripe screen open: job, link, prep progress, Add to Google Calendar and Reschedule,1200]
 
 == 9. Get better every week
 
@@ -115,7 +121,7 @@ Preferences:: What you told ScoutJobs and what it learned from the jobs you skip
 image::preferences.png[Preferences: what you want, how sure ScoutJobs is and why,1200]
 +
 Its *Automation* panel turns on the chores ScoutJobs does for you each day: drafting follow-ups when an application goes quiet, and prep packs before interviews. Nothing is ever sent.
-Reviews:: Your weekly reviews and *What works*: which sources, fit scores and months got you answers, interviews and offers.
+Reviews:: Your weekly reviews and *What works*: which sources, fit scores, months and quality scores got you answers, interviews and offers, and how many interviews to expect in the next 30 days.
 +
 image::what-works.png[What works: answer rate by source, by fit band and by month applied,1200]
 Activity:: Every change, by you or the assistant, in one log.

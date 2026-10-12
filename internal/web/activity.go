@@ -42,6 +42,15 @@ var eventTitles = map[string]string{
 	"run:ats":                  "Assistant ran an ATS check",
 	"run:export":               "Assistant exported your CV",
 	"run:prep":                 "Assistant built a prep pack",
+	"run:intel":                "Assistant researched the company",
+	"run:mock":                 "Assistant scored a mock interview",
+	"run:offer":                "Assistant prepared the offer talk",
+	"intel:paste":              "Company notes pasted",
+	"debrief":                  "Interview debrief",
+	"mock:start":               "Mock interview started",
+	"mock:scored":              "Mock interview scored",
+	"quality":                  "Quality checks recorded",
+	"check:override":           "Sent with open checks",
 	"digest":                   "Daily search",
 	"run:done":                 "Assistant finished",
 	"run:failed":               "Assistant run failed",
@@ -57,13 +66,13 @@ func eventGroup(kind string) string {
 		return "jobs"
 	case "status":
 		return "status"
-	case "cv", "cv_check", "review":
+	case "cv", "cv_check", "review", "quality", "check":
 		return "applications"
 	case "run":
 		return "assistant"
 	case "email", "gmail":
 		return "emails"
-	case "interview", "practice":
+	case "interview", "practice", "intel", "debrief", "mock":
 		return "interviews"
 	case "learning":
 		return "learning"

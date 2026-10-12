@@ -18,6 +18,10 @@ var gateLabels = map[string]string{
 	"cover_template": "Cover letter follows your template",
 	"duplicates":     "Not applied here before",
 	"filenames":      "File names look professional",
+	"claims":         "Every number traces to your profile, CV or stories",
+	"specific":       "Cover letter is written for this company",
+	"preferences":    "Job fits your must-haves",
+	"repeat":         "No other recent application to this company",
 }
 
 func gateLabel(name string) string {
@@ -38,6 +42,9 @@ var stepLabels = map[string]string{
 	"check":  "Run the final checks",
 	"draft":  "Prepare the e-mail",
 	"prep":   "Build the interview prep pack",
+	"intel":  "Research the company",
+	"mock":   "Score the mock interview",
+	"offer":  "Prepare the offer talk",
 }
 
 func stepLabel(name string) string {

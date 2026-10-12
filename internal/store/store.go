@@ -311,6 +311,18 @@ CREATE TABLE IF NOT EXISTS saved_searches (
   filters TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS questions (
+  id INTEGER PRIMARY KEY,
+  company_key TEXT NOT NULL,
+  job_id INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  text TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'manual',
+  rehearsed INTEGER NOT NULL DEFAULT 0,
+  rating INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  UNIQUE(company_key, text)
+);
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL DEFAULT ''
@@ -343,7 +355,9 @@ func (s *Store) migrate() error {
 		`ALTER TABLE mail ADD COLUMN kind TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE interviews ADD COLUMN google_id TEXT NOT NULL DEFAULT ''`, `ALTER TABLE interviews ADD COLUMN google_mode TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE interviews ADD COLUMN google_sig TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE saved_searches ADD COLUMN daily INTEGER NOT NULL DEFAULT 0`, `ALTER TABLE saved_searches ADD COLUMN last_run TEXT NOT NULL DEFAULT ''`} {
+		`ALTER TABLE saved_searches ADD COLUMN daily INTEGER NOT NULL DEFAULT 0`, `ALTER TABLE saved_searches ADD COLUMN last_run TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE interviews ADD COLUMN asked TEXT NOT NULL DEFAULT ''`, `ALTER TABLE interviews ADD COLUMN went_well TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE interviews ADD COLUMN weak TEXT NOT NULL DEFAULT ''`} {
 		if _, err := s.DB.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}
@@ -758,9 +772,13 @@ type Interview struct {
 	Duration    int64  `json:"duration"` // minutes
 	Location    string `json:"location"` // meeting link or address
 	Prep        string `json:"prep"`     // done checklist items, comma separated (see PrepItems)
-	CreatedAt   string `json:"created_at"`
-	Company     string `json:"company"`
-	Title       string `json:"title"`
+	// the debrief, written right after the interview: the questions asked, one per line, what went well and what did not
+	Asked     string `json:"asked,omitempty"`
+	WentWell  string `json:"went_well,omitempty"`
+	Weak      string `json:"weak,omitempty"`
+	CreatedAt string `json:"created_at"`
+	Company   string `json:"company"`
+	Title     string `json:"title"`
 	// Google Calendar link: the event id; mode "push" (ScoutJobs created it), "pull" (found in the
 	// user's calendar) or "gone" (deleted there, never recreated); sig is the state last synced.
 	GoogleID   string `json:"google_id,omitempty"`
@@ -787,6 +805,7 @@ func (s *Store) AddInterview(i Interview) (int64, error) {
 
 type InterviewPatch struct {
 	At, Format, Interviewer, PrepStatus, Outcome, Feedback, Stage, Location, Prep *string
+	Asked, WentWell, Weak                                                         *string
 	Duration                                                                      *int64
 }
 
@@ -801,7 +820,7 @@ func (s *Store) UpdateInterview(id int64, p InterviewPatch) error {
 			p.PrepStatus = &st
 		}
 	}
-	for col, v := range map[string]*string{"at": p.At, "format": p.Format, "interviewer": p.Interviewer, "prep_status": p.PrepStatus, "outcome": p.Outcome, "feedback": p.Feedback, "stage": p.Stage, "location": p.Location, "prep": p.Prep} {
+	for col, v := range map[string]*string{"at": p.At, "format": p.Format, "interviewer": p.Interviewer, "prep_status": p.PrepStatus, "outcome": p.Outcome, "feedback": p.Feedback, "stage": p.Stage, "location": p.Location, "prep": p.Prep, "asked": p.Asked, "went_well": p.WentWell, "weak": p.Weak} {
 		if v != nil {
 			sets = append(sets, col+"=?")
 			args = append(args, *v)
@@ -831,7 +850,7 @@ func (s *Store) LinkGoogle(id int64, eventID, mode, sig string) error {
 }
 
 func (s *Store) Interviews(jobID int64, upcomingOnly bool) ([]Interview, error) {
-	q := `SELECT i.id,i.job_id,i.stage,i.at,i.format,i.interviewer,i.prep_status,i.outcome,i.feedback,i.duration,i.location,i.prep,i.created_at,j.company,j.title,i.google_id,i.google_mode,i.google_sig FROM interviews i JOIN jobs j ON j.id=i.job_id WHERE 1=1`
+	q := `SELECT i.id,i.job_id,i.stage,i.at,i.format,i.interviewer,i.prep_status,i.outcome,i.feedback,i.duration,i.location,i.prep,i.created_at,j.company,j.title,i.google_id,i.google_mode,i.google_sig,i.asked,i.went_well,i.weak FROM interviews i JOIN jobs j ON j.id=i.job_id WHERE 1=1`
 	var args []any
 	if jobID > 0 {
 		q += ` AND i.job_id=?`
@@ -850,7 +869,7 @@ func (s *Store) Interviews(jobID int64, upcomingOnly bool) ([]Interview, error) 
 	var out []Interview
 	for rows.Next() {
 		var i Interview
-		if err := rows.Scan(&i.ID, &i.JobID, &i.Stage, &i.At, &i.Format, &i.Interviewer, &i.PrepStatus, &i.Outcome, &i.Feedback, &i.Duration, &i.Location, &i.Prep, &i.CreatedAt, &i.Company, &i.Title, &i.GoogleID, &i.GoogleMode, &i.GoogleSig); err != nil {
+		if err := rows.Scan(&i.ID, &i.JobID, &i.Stage, &i.At, &i.Format, &i.Interviewer, &i.PrepStatus, &i.Outcome, &i.Feedback, &i.Duration, &i.Location, &i.Prep, &i.CreatedAt, &i.Company, &i.Title, &i.GoogleID, &i.GoogleMode, &i.GoogleSig, &i.Asked, &i.WentWell, &i.Weak); err != nil {
 			return nil, err
 		}
 		out = append(out, i)
