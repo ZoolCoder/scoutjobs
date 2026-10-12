@@ -34,6 +34,13 @@
 {{if eq $tab "overview"}}
 {{with .Emails}}<p class="callout">{{template "ico-mail"}}{{len .}} suggested {{if eq (len .) 1}}e-mail is{{else}}e-mails are{{end}} ready for you to check. <a href="/jobs/{{$j.ID}}?tab=mail#emails">Open {{if eq (len .) 1}}it{{else}}them{{end}}</a></p>{{end}}
 {{template "aipanel" .}}
+{{if eq $j.Status "offer"}}<section class="panel" id="offer">
+  <div class="panel-h"><h2>Offer</h2><span class="act muted">prepare the conversation before you answer</span></div>
+  {{if .OfferReady}}<p class="preppack"><span class="badge ready">Offer prep ready</span><a href="/jobs/{{$j.ID}}/files/offer-prep.md">Open offer prep</a></p>{{end}}
+  {{with .RunP}}{{if .Active}}<p class="small muted">Your AI assistant is working on this job now.</p>{{else if .Agents}}<form class="preppack" method="post" action="/jobs/{{$j.ID}}/run" data-busy="Starting your agent…"><input type="hidden" name="redo" value="offer"><button class="mini go" type="submit">{{if $.Data.OfferReady}}Write offer prep again{{else}}Prepare for the offer talk{{end}}</button><small class="muted">Your AI assistant compares the offer with your preferences and the market, and writes what to ask for and how. It never invents numbers.</small></form>{{end}}
+  {{else}}{{if not .OfferReady}}<p class="small muted">Ask your agent to use the <code>salary-negotiation-prep</code> skill on job {{$j.ID}}.</p>{{end}}{{end}}
+  <p class="small muted">Nothing is accepted or sent for you. Reply to the company yourself.</p>
+</section>{{end}}
 <section class="panel" id="docs">
   <div class="panel-h"><h2>Drafts</h2><span class="act muted">review and edit before you send</span></div>
   <div class="dcards">
@@ -153,6 +160,35 @@
   <div class="panel-h"><h2>Stories for this job</h2><a class="act btn mini" href="/stories">Story bank</a></div>
   <ul class="kwlist">{{range .}}<li class="{{if .Story}}add{{else}}hold{{end}}"><div><b>{{.Requirement}}</b><small>{{with .Story}}Tell “{{.Title}}”{{with .Metrics}} · {{index . 0}}{{end}}{{else}}No story yet · capture one with <code>/scoutjobs:interview</code>{{end}}</small></div></li>{{end}}</ul>
 </section>{{end}}
+{{with .Company}}{{$c := .}}<section class="panel" id="questions">
+  <div class="panel-h"><h2>Question bank</h2><span class="n">{{len .Questions}}</span><span class="act muted">rehearsed {{.Rehearsed}}/{{len .Questions}}</span></div>
+  {{if .Questions}}<ul class="qbank">{{range .Questions}}<li class="{{if .Rehearsed}}done{{end}}">
+    <form class="qrow" method="post" action="/jobs/{{$j.ID}}/questions/{{.ID}}">
+      <span class="qtext">{{.Text}}<small class="muted">{{.Kind}} · {{.Source}}</small></span>
+      <label class="check"><input type="checkbox" name="rehearsed" value="1" {{if .Rehearsed}}checked{{end}}> Rehearsed</label>
+      <label class="qrate">Answer <select name="rating" aria-label="How good is your answer, 1 to 5"><option value="0">–</option>{{$r := .Rating}}{{range $n := seq 1 5}}<option value="{{$n}}" {{if eq $n $r}}selected{{end}}>{{$n}}/5</option>{{end}}</select></label>
+      <button class="mini" type="submit">Save</button><button class="mini out" type="submit" name="delete" value="1" aria-label="Remove this question">Remove</button>
+    </form></li>{{end}}</ul>
+  <p class="small muted">Rehearse three answers out loud and the “stories” item of your next interview is ticked.</p>
+  {{else}}<p class="empty">No questions yet<small>Add the questions you expect, paste what other candidates reported below, or let the prep pack fill the bank.</small></p>{{end}}
+  <details class="gdet"><summary>Add a question</summary>
+    <form class="stack-form" method="post" action="/jobs/{{$j.ID}}/questions"><label>Question <input name="text" required autocomplete="off" placeholder="Tell me about a time you…"></label>
+    <label>Kind <select name="kind">{{range .Kinds}}<option>{{.}}</option>{{end}}</select></label><button class="mini primary" type="submit">Add</button></form></details>
+  <div class="runbar">{{if .Mocks}}{{with index .Mocks 0}}<a class="btn mini" href="/jobs/{{$j.ID}}/mock/{{.N}}">Open last mock ({{.Answered}}/{{len .Questions}} answered)</a>{{end}}{{end}}
+  {{if .Questions}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/mock"><button class="mini go" type="submit">Start mock interview</button></form><small class="muted">Up to 5 questions, unrehearsed first. You type the answers; AI scoring is optional.</small>{{end}}</div>
+</section>
+<section class="panel" id="company">
+  <div class="panel-h"><h2>Company file</h2><span class="act muted">{{.Name}}</span></div>
+  {{if or .Intel .Notes}}<p class="preppack">{{if .Intel}}<a class="btn mini" href="/jobs/{{$j.ID}}/company/intel.md">Company research</a>{{end}}{{if .Notes}}<a class="btn mini" href="/jobs/{{$j.ID}}/company/notes.md">Your notes</a>{{end}}</p>{{end}}
+  {{with $.Data.RunP}}{{if .Active}}<p class="small muted">Your AI assistant is working on this job now.</p>{{else if .Agents}}<form class="preppack" method="post" action="/jobs/{{$j.ID}}/run" data-busy="Starting your agent…"><input type="hidden" name="redo" value="intel"><button class="mini go" type="submit">{{if $c.Intel}}Research again with AI{{else}}Research company with AI{{end}}</button><small class="muted">Public sources only: the company site, news, engineering blog. Costs agent tokens.</small></form>{{end}}{{end}}
+  <details class="gdet"{{if not (or .Intel .Notes)}} open{{end}}><summary>Paste reviews or interview reports</summary>
+    <form class="stack-form" method="post" action="/jobs/{{$j.ID}}/company/paste">
+      <p class="small muted">ScoutJobs never logs in to or scrapes Glassdoor or any review site. Copy what you read there and paste it here; lines ending in “?” go to the question bank.</p>
+      <label>Source <input name="source" required autocomplete="off" placeholder="Glassdoor, Blind, a friend…"></label>
+      <label>Link <small class="muted">(optional)</small> <input name="url" type="url" autocomplete="off" placeholder="https://"></label>
+      <label>Text <textarea name="text" rows="6" required></textarea></label>
+      <button class="mini primary" type="submit">Save to company file</button></form></details>
+</section>{{end}}
 {{$past := 0}}{{range .Interviews}}{{if lt .At $today}}{{$past = 1}}{{end}}{{end}}
 {{if $past}}<section class="panel">
   <div class="panel-h"><h2>Past interviews</h2></div>
@@ -268,6 +304,12 @@
     <p class="small muted">{{hm $i.At}}{{if $i.Duration}} · {{$i.Duration}} min{{end}}{{with $i.Format}} · {{.}}{{end}}{{with $i.Interviewer}} · with {{.}}{{end}}{{with $i.Location}} · {{if isURL .}}<a href="{{.}}" rel="noopener noreferrer" target="_blank">join link ↗</a>{{else}}{{.}}{{end}}{{end}}</p>
     {{if $up}}{{template "prep-check" .}}{{else if not $i.Outcome}}<p class="small muted">How did it go? Set the result from the <a href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">calendar</a>.</p>{{end}}
     {{with $i.Feedback}}<p class="small"><b>Notes:</b> {{.}}</p>{{end}}
+    {{if not $up}}<details class="gdet debrief"{{if not $i.Asked}} open{{end}}><summary>{{if $i.Asked}}Debrief{{else}}Write a debrief{{end}}</summary>
+      <form class="stack-form" method="post" action="/interviews/{{$i.ID}}/debrief"><input type="hidden" name="back" value="{{.Back}}">
+        <label>Questions they asked <small class="muted">(one per line)</small><textarea name="asked" rows="4">{{$i.Asked}}</textarea></label>
+        <label>What went well <textarea name="went_well" rows="2">{{$i.WentWell}}</textarea></label>
+        <label>What to work on <textarea name="weak" rows="2">{{$i.Weak}}</textarea></label>
+        <button class="mini primary" type="submit">Save debrief</button><small class="muted">The questions go to the bank; the notes to the company file.</small></form></details>{{end}}
   </div>
   <div class="ivacts"><a class="btn mini" href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">Open in calendar</a></div>
 </article>{{end}}

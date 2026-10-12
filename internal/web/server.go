@@ -202,13 +202,20 @@ var funcs = template.FuncMap{
 		}
 		return parts
 	},
-	"gaps":       cvGaps,
-	"statuses":   func() []string { return store.Statuses },
-	"next":       func(st string) []string { return store.NextStatuses[st] },
-	"initial":    initial,
-	"hue":        hue,
-	"today":      func() string { return time.Now().Format("2006-01-02") },
-	"add":        func(a, b int) int { return a + b },
+	"gaps":     cvGaps,
+	"statuses": func() []string { return store.Statuses },
+	"next":     func(st string) []string { return store.NextStatuses[st] },
+	"initial":  initial,
+	"hue":      hue,
+	"today":    func() string { return time.Now().Format("2006-01-02") },
+	"add":      func(a, b int) int { return a + b },
+	"seq": func(from, to int) []int {
+		var out []int
+		for n := from; n <= to; n++ {
+			out = append(out, n)
+		}
+		return out
+	},
 	"colcap":     func() int { return colCap },
 	"prepItems":  func() []store.PrepItem { return store.PrepItems },
 	"preparable": preparable,
@@ -349,6 +356,14 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /interviews", srv.interviews)
 	mux.HandleFunc("POST /interviews", srv.createInterview)
 	mux.HandleFunc("POST /interviews/{id}", srv.setInterview)
+	mux.HandleFunc("POST /interviews/{id}/debrief", srv.debrief)
+	mux.HandleFunc("POST /jobs/{id}/company/paste", srv.pasteIntel)
+	mux.HandleFunc("GET /jobs/{id}/company/{name}", srv.companyFile)
+	mux.HandleFunc("POST /jobs/{id}/questions", srv.addQuestion)
+	mux.HandleFunc("POST /jobs/{id}/questions/{qid}", srv.rateQuestion)
+	mux.HandleFunc("POST /jobs/{id}/mock", srv.startMock)
+	mux.HandleFunc("GET /jobs/{id}/mock/{n}", srv.mockPage)
+	mux.HandleFunc("POST /jobs/{id}/mock/{n}", srv.saveMock)
 	mux.HandleFunc("GET /calendar", srv.calendar)
 	mux.HandleFunc("POST /calendar/sync", srv.calendarSync)
 	mux.HandleFunc("GET /calendar.ics", srv.calendarFeed)
@@ -537,7 +552,7 @@ func (v *server) render(w http.ResponseWriter, r *http.Request, name, active str
 		theme = c.Value
 	}
 	title := active
-	bare := name == "job.html" || name == "file.html" // these pages draw their own header
+	bare := name == "job.html" || name == "file.html" || name == "mock.html" // these pages draw their own header
 	if bare {
 		if m, ok := data.(map[string]any); ok {
 			if j, ok := m["Job"].(store.Job); ok {
@@ -723,7 +738,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "Keywords": apply.KeywordGaps(dir, v.cvGaps(j.ID)), "StoryMap": v.storyMap(dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
 		"Cards": docCards(docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf")), "Points": fitPoints(review, 6), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
-		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(), "Score": gates.Score(), "Chance": v.chance(j),
+		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(), "Company": v.companyFor(j, tab), "OfferReady": j.Status == "offer" && fileExists(filepath.Join(dir, apply.OfferName)), "Score": gates.Score(), "Chance": v.chance(j),
 		"CanOverride": preApply[j.Status] && gates.Failed > 0 && apply.HasDrafts(v.s, j), "OpenOverride": r.URL.Query().Get("override") != "",
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
 }

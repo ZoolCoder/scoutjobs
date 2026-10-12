@@ -1311,3 +1311,20 @@ main:focus{outline:none}
 .odds b{font-variant-numeric:tabular-nums}
 .outlook{margin:0 0 1rem}
 .outlook p{margin:.25rem 0}
+/* interview prep: company file, question bank, debrief, mock */
+.stack-form{display:grid;gap:10px;margin-top:8px}
+.stack-form label:not(.check){display:grid;gap:4px;font-size:13px;color:var(--fg)}
+.stack-form textarea{resize:vertical}
+.qbank{list-style:none;margin:0;padding:0}
+.qbank li{border-top:1px solid var(--line);padding:8px 0}
+.qbank li:first-child{border-top:0}
+.qbank li.done .qtext{color:var(--muted)}
+.qrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.qtext{flex:1 1 260px;display:grid;gap:2px;font-size:13.5px}
+.qrate{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.debrief{margin-top:6px}
+.mockq{border-top:1px solid var(--line);padding:12px 0}
+.mockq:first-of-type{border-top:0}
+.mockq h3{font-size:14px;margin:0 0 6px}
+.mockq textarea{width:100%;resize:vertical}
+.mockq .rate{margin-top:6px;font-size:12.5px}

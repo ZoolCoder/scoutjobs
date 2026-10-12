@@ -1,0 +1,42 @@
+{{template "head" .}}
+{{with .Data}}{{$j := .Job}}{{$m := .M}}
+<header class="top job">
+<div><a class="crumb" href="/jobs/{{$j.ID}}?tab=interviews#questions">← {{$j.Company}} · {{$j.Title}}</a>
+<div class="jobhead"><h1>Mock interview {{$m.N}}<small>{{$m.Answered}} of {{len $m.Questions}} answered · started {{when $m.Started}}</small></h1></div></div>
+<span class="now">{{$.Now}}</span>
+</header>
+<div class="grid-3">
+<div class="stack span-2">
+{{with .Err}}<p class="callout bad">{{.}}</p>{{end}}{{with .Msg}}<p class="callout" role="status">{{.}}</p>{{end}}
+{{with $m.Result}}<section class="panel" id="result">
+  <div class="panel-h"><h2>Feedback</h2><span class="badge ready">{{.Overall}}/5 overall</span></div>
+  {{with .Summary}}<p>{{.}}</p>{{end}}
+  {{with $.Data.Feedback}}<article class="paper">{{.}}</article>{{end}}
+</section>{{end}}
+<section class="panel">
+  <div class="panel-h"><h2>Your answers</h2><span class="act muted">write them as you would say them</span></div>
+  <form method="post" action="/jobs/{{$j.ID}}/mock/{{$m.N}}" data-busy="Saving…">
+  {{range $i, $q := $m.Questions}}<div class="mockq">
+    <h3><label for="a{{$q.ID}}">{{add $i 1}}. {{$q.Text}}</label></h3>
+    <textarea id="a{{$q.ID}}" name="a{{$q.ID}}" rows="6" spellcheck="true">{{$q.Answer}}</textarea>
+    {{with $m.Rating $q.ID}}{{if .Rating}}<p class="rate"><span class="badge {{if ge .Rating 4}}ready{{else if ge .Rating 3}}filled{{else}}stale{{end}}">{{.Rating}}/5</span> {{.Note}}</p>{{end}}{{end}}
+  </div>{{end}}
+  <div class="runbar"><button type="submit">Save answers</button>
+  {{if .CanScore}}{{if .Scoring}}<span class="badge in_progress">Scoring…</span>{{else}}<button class="go" type="submit" name="score" value="1">Save and score with AI</button>{{end}}{{end}}</div>
+  <p class="small muted">Scoring sends your answers to your AI assistant, which rates each one 1–5 and writes feedback. It updates the ratings in the question bank.</p>
+  </form>
+</section>
+</div>
+<div class="stack">
+<section class="panel">
+  <div class="panel-h"><h2>How to practise</h2></div>
+  <ul class="small">
+    <li>Give yourself about two minutes per question.</li>
+    <li>Use one story per answer: the situation, what you did, and the result with a number.</li>
+    <li>Read your answer aloud once before you score it.</li>
+  </ul>
+</section>
+</div>
+</div>
+{{end}}
+{{template "foot" .}}

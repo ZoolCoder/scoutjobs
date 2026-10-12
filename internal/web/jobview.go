@@ -42,6 +42,9 @@ var stepLabels = map[string]string{
 	"check":  "Run the final checks",
 	"draft":  "Prepare the e-mail",
 	"prep":   "Build the interview prep pack",
+	"intel":  "Research the company",
+	"mock":   "Score the mock interview",
+	"offer":  "Prepare the offer talk",
 }
 
 func stepLabel(name string) string {
