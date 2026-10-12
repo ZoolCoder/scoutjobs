@@ -48,6 +48,8 @@ All notable changes to ScoutJobs. The format follows
 ### Fixed
 - The calendar's interview card stopped drawing after *Reschedule*: the
   prep checklist and outcome form were missing.
+- A prep pack ticked the prep items of an interview that was already over
+  but had no outcome yet, instead of the one still to come.
 
 ## [0.7.0] - 2026-10-12
 
