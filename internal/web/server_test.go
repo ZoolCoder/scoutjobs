@@ -648,3 +648,11 @@ func TestFriendlyWhen(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestSplitPast(t *testing.T) {
+	now := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	ahead, past := splitPast([]store.Interview{{At: "2026-10-11T16:00"}, {At: "2026-10-12T08:00"}, {At: ""}, {At: "2026-10-13T14:00"}}, now)
+	if len(ahead) != 3 || len(past) != 1 || past[0].At != "2026-10-11T16:00" {
+		t.Errorf("ahead %v past %v", ahead, past)
+	}
+}

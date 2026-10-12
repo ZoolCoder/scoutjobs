@@ -139,7 +139,7 @@ var funcs = template.FuncMap{
 		}
 		return ""
 	},
-	"day": day,
+	"day":  day,
 	"date": func(s string) string { return friendlyDay(s, time.Now()) },
 	"host": func(u string) string {
 		if p, err := url.Parse(u); err == nil && p.Host != "" {
@@ -179,7 +179,7 @@ var funcs = template.FuncMap{
 		}
 		return ""
 	},
-	"ago": ago,
+	"ago":  ago,
 	"when": func(s string) string { return friendlyWhen(s, time.Now()) },
 	"fit": func(n int64) string {
 		if n < 0 {
@@ -618,13 +618,28 @@ func (v *server) overview(w http.ResponseWriter, r *http.Request) {
 		weekly = append(weekly, weekBar{c, int(c*100/wmax) / 5 * 5, label})
 	}
 	d := overviewData{Stats: st, Funnel: funnel, Weekly: weekly, Target: v.cfg.WeeklyApplyTarget}
-	d.Upcoming, _ = v.s.Interviews(0, true)
+	open, _ := v.s.Interviews(0, true)
+	var waiting []store.Interview
+	d.Upcoming, waiting = splitPast(open, time.Now().UTC())
 	d.Recent, _ = v.s.Events(0, 8)
 	d.Learning, _ = v.s.LearningItems()
 	d.TodoJobs, _ = v.s.ListJobs(store.JobFilter{Status: "drafted", Limit: 5})
 	d.Checks, _ = v.s.CVChecks(1)
-	d.Today = v.today(st, d.Upcoming)
+	d.Today = v.today(st, d.Upcoming, waiting)
 	v.render(w, r, "overview.html", "overview", d)
+}
+
+// splitPast parts interviews still to come, today's included, from those already behind us.
+func splitPast(is []store.Interview, now time.Time) (ahead, past []store.Interview) {
+	today := now.Format("2006-01-02")
+	for _, i := range is {
+		if i.At == "" || i.At >= today {
+			ahead = append(ahead, i)
+		} else {
+			past = append(past, i)
+		}
+	}
+	return ahead, past
 }
 
 // dueJobs keeps what needs a hand this week: a deadline within 7 days (or passed) on an open job, or a follow-up due.

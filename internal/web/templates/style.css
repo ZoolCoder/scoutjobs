@@ -598,6 +598,7 @@ ul.todo b{font-weight:550;color:var(--fg)}
 ul.todo small{display:block;font-size:12.5px}
 .tk{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;text-align:center;border-radius:999px;line-height:20px;background:var(--subtle);color:var(--muted)}
 .t-deadline .tk{background:var(--warn-sub);color:var(--warn)}
+.t-outcome .tk{background:var(--acc-sub);color:var(--acc)}
 .tact{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.tact form{display:inline-flex}
 @media (max-width:720px){ul.todo>li{grid-template-columns:1fr}.tk{justify-self:start;padding:0 8px}.tact{justify-content:flex-start}}
 .issue.still{animation:none}

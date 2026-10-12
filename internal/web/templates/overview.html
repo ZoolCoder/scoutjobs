@@ -100,7 +100,7 @@
 
 <section class="panel c3">
   <div class="panel-h"><h2>Recent activity</h2><a class="act" href="/activity">Full log</a></div>
-  <ul class="feed">{{range .Recent}}<li><span>{{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a> · {{end}}{{.Note}}</span><small><span class="mono">{{when .At}}</span> · {{title .Kind}}</small></li>{{else}}<li><span class="muted">Empty. Add a job: <code>scoutjobs search --remote --add</code></span></li>{{end}}</ul>
+  <ul class="feed">{{range .Recent}}{{$e := evrow .}}<li><span>{{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a> · {{end}}{{or $e.Note .Note}}</span><small><span class="mono">{{when .At}}</span> · {{$e.Name}}</small></li>{{else}}<li><span class="muted">Empty. Add a job: <code>scoutjobs search --remote --add</code></span></li>{{end}}</ul>
 </section>
 </div>
 {{end}}
