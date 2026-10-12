@@ -783,6 +783,10 @@ func runInterview(s *store.Store, rest []string, out io.Writer) error {
 			return err
 		}
 		i.JobID = j.ID
+		if dup := sameInterview(s, i); dup != nil { // a sync may find the same invitation again
+			fmt.Fprintf(out, "interview #%d already on %s for #%d %s\n", dup.ID, dup.At, j.ID, j.Company)
+			return nil
+		}
 		id, err := s.AddInterview(i)
 		if err != nil {
 			return err
@@ -1090,4 +1094,15 @@ func errOrNil(err error) string {
 		return ""
 	}
 	return "(" + err.Error() + ")"
+}
+
+// sameInterview is the job's interview already at that time, if any.
+func sameInterview(s *store.Store, i store.Interview) *store.Interview {
+	all, _ := s.Interviews(i.JobID, false)
+	for _, have := range all {
+		if have.At == i.At {
+			return &have
+		}
+	}
+	return nil
 }
