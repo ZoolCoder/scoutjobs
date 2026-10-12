@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/autopilot"
 	"github.com/zoolcoder/scoutjobs/internal/mail"
 	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -271,4 +272,78 @@ func (v *server) autoPrepareLoop(ctx context.Context, every time.Duration) {
 			v.autoPrepareOnce()
 		}
 	}
+}
+
+// autopilotLoop does the daily chores (see autopilot.Daily) once at start and then every hour while the dashboard runs.
+func (v *server) autopilotLoop(ctx context.Context, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		v.autopilotOnce(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+func (v *server) autopilotOnce(ctx context.Context) autopilot.Report {
+	o := autopilot.Options{FollowUpDays: v.cfg.FollowUpDays, BaseURL: v.cfg.SearchBaseURL}
+	if v.cfg.Runner != nil {
+		o.Prep = func(j store.Job) bool {
+			return v.cfg.Runner.Queue([]store.Job{j}, runner.Request{Steps: []string{"prep"}}) > 0
+		}
+	}
+	return autopilot.Daily(ctx, v.s, o, time.Now())
+}
+
+// automationSettings maps the switches on the Automation panel to their settings.
+var automationSettings = map[string]string{"followups": autopilot.FollowUpsSetting, "prep": autopilot.PrepSetting}
+
+func (v *server) automation() map[string]any {
+	saved, _ := v.s.SavedSearches()
+	daily := 0
+	for _, x := range saved {
+		if x.Daily {
+			daily++
+		}
+	}
+	return map[string]any{"Daily": daily, "FollowUps": v.s.Setting(autopilot.FollowUpsSetting) == "on",
+		"Prep": v.s.Setting(autopilot.PrepSetting) == "on", "Agent": v.cfg.Runner != nil}
+}
+
+func (v *server) setAutomation(w http.ResponseWriter, r *http.Request) {
+	if sameOrigin(r) != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	key, ok := automationSettings[r.FormValue("key")]
+	if !ok {
+		http.Error(w, "unknown switch", http.StatusBadRequest)
+		return
+	}
+	val := "off"
+	if r.FormValue("on") != "" {
+		val = "on"
+	}
+	if err := v.s.SetSetting(key, val); err != nil {
+		http.Redirect(w, r, withParam("/preferences", "err", err.Error())+"#automation", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/preferences#automation", http.StatusSeeOther)
+}
+
+// runAutomation does the due chores now instead of waiting for the hourly pass.
+func (v *server) runAutomation(w http.ResponseWriter, r *http.Request) {
+	if sameOrigin(r) != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	rep := v.autopilotOnce(r.Context())
+	msg := "Done: " + rep.Summary() + ". Nothing was sent."
+	if len(rep.Errors) > 0 {
+		msg += " Problems: " + strings.Join(rep.Errors, "; ")
+	}
+	http.Redirect(w, r, withParam("/preferences", "msg", msg)+"#automation", http.StatusSeeOther)
 }

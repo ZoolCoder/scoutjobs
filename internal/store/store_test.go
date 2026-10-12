@@ -231,3 +231,28 @@ func TestPreferencesAndMail(t *testing.T) {
 		t.Error("recorded inbox mail not seen")
 	}
 }
+
+func TestSearchDailyAndLastRun(t *testing.T) {
+	s := open(t)
+	id, err := s.SaveSearch(SavedSearch{Name: "go remote", Queries: "go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSearchDaily(id, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.MarkSearchRun(id, "2026-10-12T08:00:00Z"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.SavedSearches()
+	if len(got) != 1 || !got[0].Daily || got[0].LastRun != "2026-10-12T08:00:00Z" {
+		t.Fatalf("%+v", got)
+	}
+	// saving the search again keeps the daily switch
+	if _, err := s.SaveSearch(SavedSearch{Name: "go remote", Queries: "golang"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = s.SavedSearches(); !got[0].Daily || got[0].Queries != "golang" {
+		t.Fatalf("resave: %+v", got)
+	}
+}

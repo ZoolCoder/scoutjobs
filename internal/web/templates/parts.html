@@ -73,6 +73,7 @@
 {{define "ico-shrink"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>{{end}}
 {{define "ico-rows"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>{{end}}
 
+{{define "prep-pack"}}<form class="preppack" method="post" action="/jobs/{{.}}/run" data-busy="Starting your agent…"><input type="hidden" name="redo" value="prep"><button class="mini go" type="submit">Build prep pack</button><small class="muted">Your AI assistant researches the company and writes likely questions and the stories to tell, into the job's files. Costs agent tokens.</small></form>{{end}}
 {{define "prep-check"}}{{$i := .I}}<form class="prepcheck" method="post" action="/interviews/{{$i.ID}}"><input type="hidden" name="back" value="{{.Back}}"><input type="hidden" name="prep_form" value="1">
   {{range prepItems}}<label class="check"><input type="checkbox" name="prep" value="{{.Key}}" {{if $i.PrepDone .Key}}checked{{end}}> {{.Label}}</label>{{end}}
   <button class="mini primary">Save prep</button></form>{{end}}

@@ -339,3 +339,32 @@ func TestRunSavesThePostingBeforeTheAgentReadsIt(t *testing.T) {
 		t.Errorf("a saved posting is kept: %q, fetched %d times", b, fetched)
 	}
 }
+
+const prepAgent = `#!/bin/sh
+cat > prompt.txt
+grep -q "Step 1, interview prep pack" prompt.txt && printf '# Prep\n' > interview-prep.md
+echo "wrote the prep"
+`
+
+func TestPrepStepIsAskedForByName(t *testing.T) {
+	all, _ := Parse("all")
+	if strings.Contains(strings.Join(all, ","), "prep") {
+		t.Fatalf("all includes prep: %v", all)
+	}
+	rn, j := setup(t, prepAgent)
+	id, err := rn.Store.AddInterview(store.Interview{JobID: j.ID, Stage: "hr", At: "2099-01-02T10:00"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := run(t, rn, j, Request{Steps: []string{"prep"}})
+	if got.State != Done || states(got) != "prep=done" {
+		t.Fatalf("%s %s %s %v", got.State, got.Error, states(got), got.Log)
+	}
+	ivs, _ := rn.Store.Interviews(j.ID, false)
+	if len(ivs) != 1 || ivs[0].ID != id || ivs[0].Prep != "company,posting,questions" || ivs[0].PrepStatus != "in_progress" {
+		t.Fatalf("prep items not ticked: %+v", ivs)
+	}
+	if got = run(t, rn, j, Request{Steps: []string{"prep"}}); states(got) != "prep=skipped" {
+		t.Errorf("second run: %s", states(got))
+	}
+}

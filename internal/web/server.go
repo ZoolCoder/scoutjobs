@@ -273,6 +273,7 @@ func ServeListener(ctx context.Context, l net.Listener, s *store.Store, cfg Conf
 	if cfg.Runner != nil {
 		go srv.autoPrepareLoop(ctx, 10*time.Minute)
 	}
+	go srv.autopilotLoop(ctx, time.Hour)
 	hs := &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
 	go func() { errc <- hs.Serve(l) }()
@@ -309,6 +310,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /search", srv.searchPage)
 	mux.HandleFunc("POST /search", srv.runSearch)
 	mux.HandleFunc("POST /search/saved/{id}/delete", srv.deleteSearch)
+	mux.HandleFunc("POST /search/saved/{id}/daily", srv.dailySearch)
 	mux.HandleFunc("GET /jobs/{id}", srv.job)
 	mux.HandleFunc("GET /jobs/{id}/files/{name}", srv.jobFile)
 	mux.HandleFunc("POST /jobs/{id}/files/{name}", srv.saveFile)
@@ -360,6 +362,8 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /profile/prepare/cancel", srv.cancelMaster)
 	mux.HandleFunc("GET /profile/prepare", srv.masterState)
 	mux.HandleFunc("POST /settings/auto-prepare", srv.setAutoPrepare)
+	mux.HandleFunc("POST /settings/automation", srv.setAutomation)
+	mux.HandleFunc("POST /settings/automation/run", srv.runAutomation)
 	mux.HandleFunc("GET /connections", srv.connections)
 	mux.HandleFunc("POST /connections/agent", srv.setDefaultAgent)
 	mux.HandleFunc("POST /connections/calendar", srv.setCalendarVia)
@@ -1016,7 +1020,8 @@ func (v *server) preferences(w http.ResponseWriter, r *http.Request) {
 			rejected = append(rejected, p)
 		}
 	}
-	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds, "Pending": pending, "Rejected": rejected})
+	v.render(w, r, "preferences.html", "preferences", map[string]any{"Prefs": prefs, "Summary": ds, "Pending": pending, "Rejected": rejected, "Auto": v.automation(),
+		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err")})
 }
 
 // reviewForm confirms, edits (confirm with the user's wording) or rejects one proposal.

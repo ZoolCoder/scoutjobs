@@ -80,7 +80,7 @@
     <label class="span-2">What you learned<textarea name="feedback" rows="3">{{.Feedback}}</textarea></label>
     <div class="row span-2"><button class="primary">Save</button></div>
   </form>
-  <p class="small muted">Run <code class="cmd">/scoutjobs:interview {{.JobID}}</code> in your agent to build the prep pack.</p>
+  {{if $.Cfg.Runner}}{{template "prep-pack" .JobID}}{{else}}<p class="small muted">Run <code class="cmd">/scoutjobs:interview {{.JobID}}</code> in your agent to build the prep pack.</p>{{end}}
   {{end}}
 </section>
 {{end}}

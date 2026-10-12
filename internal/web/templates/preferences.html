@@ -53,6 +53,18 @@
 {{else}}<p class="empty">Nothing learned yet. Skip or apply to a few jobs, or add what you want yourself.</p>{{end}}
 </section>
 <div class="stack">
+{{with .Auto}}<section class="panel automation" id="automation" aria-labelledby="auto-h">
+<div class="panel-h"><h2 id="auto-h">Automation</h2><form class="act" method="post" action="/settings/automation/run" data-busy="Running…"><button class="mini" type="submit">Run now</button></form></div>
+{{with $.Data.Err}}<p class="callout bad">{{.}}</p>{{end}}{{with $.Data.Msg}}<p class="callout">{{.}}</p>{{end}}
+<p class="muted small">ScoutJobs does these chores every hour while the dashboard runs, or when you run <code>scoutjobs daily</code>. It never sends an e-mail or an application.</p>
+<ul class="autolist">
+  <li><div><b>Daily searches</b><small class="muted">{{if .Daily}}{{.Daily}} saved {{if eq .Daily 1}}search runs{{else}}searches run{{end}} every day and add good matches to your pipeline.{{else}}None yet. Press <i>Run daily</i> on a saved search.{{end}}</small></div><a class="btn mini" href="/search">Searches</a></li>
+  <li><div><b>Draft follow-ups</b><small class="muted">Writes the follow-up e-mail when an application goes quiet, and the thank-you after an interview, for you to review.</small></div>
+    <form method="post" action="/settings/automation"><input type="hidden" name="key" value="followups"><label class="switch"><input type="checkbox" name="on" value="1"{{if .FollowUps}} checked{{end}} data-autosubmit aria-label="Draft follow-ups"><i aria-hidden="true"></i></label><noscript><button class="mini">Save</button></noscript></form></li>
+  <li><div><b>Interview prep packs</b><small class="muted">{{if .Agent}}Your AI assistant researches the company and writes a prep sheet for each interview in the coming week. Costs agent tokens.{{else}}Needs an AI assistant. <a href="/connections#ai">Connect one</a>.{{end}}</small></div>
+    <form method="post" action="/settings/automation"><input type="hidden" name="key" value="prep"><label class="switch"><input type="checkbox" name="on" value="1"{{if .Prep}} checked{{end}}{{if not .Agent}} disabled{{end}} data-autosubmit aria-label="Interview prep packs"><i aria-hidden="true"></i></label><noscript><button class="mini">Save</button></noscript></form></li>
+</ul>
+</section>{{end}}
 <section class="panel">
 <div class="panel-h"><h2>Decision signals</h2>{{with $s.Decisions}}<span class="n">{{len .}}</span>{{end}}</div>
 {{if $s.Decisions}}{{$total := len $s.Decisions}}

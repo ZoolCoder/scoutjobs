@@ -33,7 +33,7 @@
 </form>
 {{if .Saved}}<div class="saved">
   <span class="muted small">Your saved searches:</span>
-  {{range .Saved}}<span class="savedchip"><form method="post" action="/search" data-busy="Searching…"><input type="hidden" name="saved" value="{{.ID}}"><button class="chip acc" title="{{.Queries}}">{{.Name}}</button></form><form method="post" action="/search/saved/{{.ID}}/delete"><button class="x" aria-label="Delete {{.Name}}" title="Delete">×</button></form></span>{{end}}
+  {{range .Saved}}<span class="savedchip"><form method="post" action="/search" data-busy="Searching…"><input type="hidden" name="saved" value="{{.ID}}"><button class="chip acc" title="{{.Queries}}">{{.Name}}</button></form><form method="post" action="/search/saved/{{.ID}}/daily"><input type="hidden" name="on" value="{{if .Daily}}0{{else}}1{{end}}"><button class="daily{{if .Daily}} on{{end}}" aria-pressed="{{if .Daily}}true{{else}}false{{end}}" title="{{if .Daily}}Runs every day and adds the good matches to your pipeline. Press to stop{{else}}Run every day and add the good matches to your pipeline{{end}}">{{if .Daily}}Daily{{else}}Run daily{{end}}</button></form><form method="post" action="/search/saved/{{.ID}}/delete"><button class="x" aria-label="Delete {{.Name}}" title="Delete">×</button></form></span>{{end}}
 </div>{{end}}
 </section>
 {{if .Ran}}

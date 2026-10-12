@@ -56,8 +56,56 @@ func (rn *Runner) done(j store.Job, name string) (bool, string) {
 		return true, fmt.Sprintf("ATS %d, content %d", k.ATS.ATSScore, k.ATS.Score)
 	case "draft":
 		return exists(dir, apply.DraftName), apply.DraftName
+	case "prep":
+		return rn.prepDone(j, dir)
 	}
 	return false, ""
+}
+
+// PrepName is the prep sheet the prep step writes in the application folder.
+const PrepName = "interview-prep.md"
+
+// prepItems are the checklist keys a finished prep pack covers.
+var prepItems = []string{"company", "posting", "questions"}
+
+// prepDone reports whether the prep sheet was written for the job's next open interview.
+func (rn *Runner) prepDone(j store.Job, dir string) (bool, string) {
+	st, err := os.Stat(filepath.Join(dir, PrepName))
+	if err != nil {
+		return false, PrepName
+	}
+	iv, ok := nextInterview(rn.Store, j.ID)
+	if ok && st.ModTime().UTC().Format(time.RFC3339) < iv.CreatedAt {
+		return false, PrepName + " for the " + iv.Stage + " interview"
+	}
+	return true, PrepName
+}
+
+// nextInterview is the job's earliest interview without an outcome.
+func nextInterview(s *store.Store, jobID int64) (store.Interview, bool) {
+	ivs, _ := s.Interviews(jobID, true)
+	for _, iv := range ivs {
+		if iv.Outcome == "" {
+			return iv, true
+		}
+	}
+	return store.Interview{}, false
+}
+
+// tickPrep marks the checklist items a prep pack covers on the job's next interview.
+func (rn *Runner) tickPrep(j store.Job) {
+	iv, ok := nextInterview(rn.Store, j.ID)
+	if !ok {
+		return
+	}
+	done := iv.Prep
+	for _, k := range prepItems {
+		if !iv.PrepDone(k) {
+			done += "," + k
+		}
+	}
+	done = strings.TrimPrefix(done, ",")
+	_ = rn.Store.UpdateInterview(iv.ID, store.InterviewPatch{Prep: &done})
 }
 
 // exported reports whether resume.pdf is the one to send: rendered from the current resume.md, or

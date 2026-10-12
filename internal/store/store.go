@@ -342,7 +342,8 @@ func (s *Store) migrate() error {
 		`ALTER TABLE mail ADD COLUMN thread TEXT NOT NULL DEFAULT ''`, `ALTER TABLE mail ADD COLUMN source TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE mail ADD COLUMN kind TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE interviews ADD COLUMN google_id TEXT NOT NULL DEFAULT ''`, `ALTER TABLE interviews ADD COLUMN google_mode TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE interviews ADD COLUMN google_sig TEXT NOT NULL DEFAULT ''`} {
+		`ALTER TABLE interviews ADD COLUMN google_sig TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE saved_searches ADD COLUMN daily INTEGER NOT NULL DEFAULT 0`, `ALTER TABLE saved_searches ADD COLUMN last_run TEXT NOT NULL DEFAULT ''`} {
 		if _, err := s.DB.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
 		}

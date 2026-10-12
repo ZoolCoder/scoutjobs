@@ -48,6 +48,13 @@ var Steps = []Step{
 	{"draft", "E-mail draft", "", ""},
 }
 
+// ExtraSteps run only when asked for by name; "all" leaves them out.
+var ExtraSteps = []Step{
+	{"prep", "Interview prep pack", "interview-prep", "Prepare for the next interview of job #{id} that has no outcome yet (see `scoutjobs interview list`), following the interview-prep skill unattended: write research.md, stories.md and interview-prep.md in the application folder. Do not run the story-extraction interview or a mock interview: where no story in stories/ fits a likely question, list the question under `## Gaps to cover before the day`."},
+}
+
+func allSteps() []Step { return append(append([]Step{}, Steps...), ExtraSteps...) }
+
 // Parse turns "tailor,cover" into steps; "" or "safe" selects every step.
 func Parse(list string) ([]string, error) {
 	list = strings.TrimSpace(list)
@@ -70,7 +77,7 @@ func Parse(list string) ([]string, error) {
 }
 
 func step(name string) (Step, bool) {
-	for _, s := range Steps {
+	for _, s := range allSteps() {
 		if s.Name == name {
 			return s, true
 		}
@@ -80,7 +87,7 @@ func step(name string) (Step, bool) {
 
 func names() string {
 	var n []string
-	for _, s := range Steps {
+	for _, s := range allSteps() {
 		n = append(n, s.Name)
 	}
 	return strings.Join(n, ",")
@@ -231,7 +238,7 @@ func (rn *Runner) Plan(j store.Job, req Request) (*Run, Agent, error) {
 	for _, n := range req.Steps {
 		want[n] = true
 	}
-	for _, s := range Steps {
+	for _, s := range allSteps() {
 		if !want[s.Name] {
 			continue
 		}
@@ -424,6 +431,9 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 		}
 		run.set(i, Done, why)
 		_ = rn.Store.AddEvent(j.ID, "run:"+s.Name, ag.Name+": "+why)
+		if s.Name == "prep" {
+			rn.tickPrep(j)
+		}
 	}
 	return nil
 }

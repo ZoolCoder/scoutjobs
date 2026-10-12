@@ -47,6 +47,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   learn add|list|set
   stats                      funnel, weekly numbers, follow-ups due
   brief [--compact]          everything the daily briefing needs (json)
+  daily [--json]             daily searches, follow-up drafts, prep packs: what serve does every hour (sends nothing)
   export                     full json dump
   serve [--addr 127.0.0.1:7070]   dashboard, calendar feed, JSON API, MCP over HTTP on /mcp (needs api_token)
                              restarts itself when the binary is upgraded (--no-restart to opt out; kill -HUP <pid> to force)
@@ -120,6 +121,8 @@ func Run(args []string, out io.Writer) error {
 		return runStats(s, rest, out)
 	case "brief":
 		return runBrief(s, rest, out)
+	case "daily":
+		return runDaily(s, cfg, rest, out)
 	case "export":
 		return runExport(s, out)
 	case "serve":

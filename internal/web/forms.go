@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -91,7 +90,7 @@ type searchForm struct {
 	BoardNames      []string
 	Saved           []store.SavedSearch
 	Name            string // the saved search this form came from or is saved as
-	Filter          resultFilter
+	Filter          search.Filter
 	Hidden          int // postings the result filter dropped
 	Mismatched      int // postings hidden because they break a must in the profile
 	Ranked          bool
@@ -103,66 +102,6 @@ type searchForm struct {
 type tagCount struct {
 	Tag string
 	N   int
-}
-
-// resultFilter narrows what the boards return; it is stored with a saved search as url-encoded values.
-type resultFilter struct {
-	RemoteOnly   bool
-	Exclude      string // comma separated words; a title containing any of them is dropped
-	Days         int    // posted within the last N days; undated postings stay
-	MinSalary    int64  // drops postings whose top of range is below it; postings without a salary stay
-	Location     string // comma separated cities, countries or regions; see search.LocationMatch
-	HideMismatch bool   // drops postings that break a must in the profile: place, engagement, salary floor
-}
-
-func filterFromValues(q url.Values) resultFilter {
-	f := resultFilter{RemoteOnly: q.Get("remote_only") != "", Exclude: strings.TrimSpace(q.Get("exclude")),
-		Location: strings.TrimSpace(q.Get("location")), HideMismatch: q.Get("hide_mismatch") != ""}
-	f.Days, _ = strconv.Atoi(q.Get("days"))
-	f.MinSalary, _ = strconv.ParseInt(q.Get("min_salary"), 10, 64)
-	return f
-}
-
-func (f resultFilter) encode() string {
-	q := url.Values{}
-	if f.RemoteOnly {
-		q.Set("remote_only", "1")
-	}
-	if f.Exclude != "" {
-		q.Set("exclude", f.Exclude)
-	}
-	if f.Days > 0 {
-		q.Set("days", strconv.Itoa(f.Days))
-	}
-	if f.MinSalary > 0 {
-		q.Set("min_salary", strconv.FormatInt(f.MinSalary, 10))
-	}
-	if f.Location != "" {
-		q.Set("location", f.Location)
-	}
-	if f.HideMismatch {
-		q.Set("hide_mismatch", "1")
-	}
-	return q.Encode()
-}
-
-func (f resultFilter) keep(p search.Posting, now time.Time) bool {
-	if f.RemoteOnly && !strings.Contains(strings.ToLower(p.Remote), "remote") {
-		return false
-	}
-	title := strings.ToLower(p.Title)
-	for _, w := range splitList(f.Exclude) {
-		if strings.Contains(title, strings.ToLower(w)) {
-			return false
-		}
-	}
-	if f.Days > 0 && len(p.PostedAt) >= 10 && p.PostedAt[:10] < now.AddDate(0, 0, -f.Days).Format("2006-01-02") {
-		return false
-	}
-	if ok, _ := search.LocationMatch(p, splitList(f.Location)); !ok {
-		return false
-	}
-	return f.MinSalary <= 0 || p.SalaryMax == 0 || p.SalaryMax >= f.MinSalary
 }
 
 // searchRow is a posting plus the tracked job it already matches, if any, and how well it fits the
@@ -241,17 +180,16 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := searchForm{Queries: strings.TrimSpace(r.FormValue("queries")), Boards: strings.TrimSpace(r.FormValue("boards")),
-		Remote: r.FormValue("remote") != "", Ran: true, BoardNames: search.Boards, Filter: filterFromValues(r.Form), Name: strings.TrimSpace(r.FormValue("name"))}
+		Remote: r.FormValue("remote") != "", Ran: true, BoardNames: search.Boards, Filter: search.FilterFromValues(r.Form), Name: strings.TrimSpace(r.FormValue("name"))}
 	if id, err := strconv.ParseInt(r.FormValue("saved"), 10, 64); err == nil {
 		x, err := v.s.SavedSearch(id)
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		fq, _ := url.ParseQuery(x.Filters)
-		f.Queries, f.Boards, f.Remote, f.Filter, f.Name = x.Queries, x.Boards, x.Remote, filterFromValues(fq), x.Name
+		f.Queries, f.Boards, f.Remote, f.Filter, f.Name = x.Queries, x.Boards, x.Remote, search.ParseFilter(x.Filters), x.Name
 	} else if r.FormValue("save") != "" && f.Name != "" {
-		if _, err := v.s.SaveSearch(store.SavedSearch{Name: f.Name, Queries: f.Queries, Boards: f.Boards, Remote: f.Remote, Filters: f.Filter.encode()}); err != nil {
+		if _, err := v.s.SaveSearch(store.SavedSearch{Name: f.Name, Queries: f.Queries, Boards: f.Boards, Remote: f.Remote, Filters: f.Filter.Encode()}); err != nil {
 			fail(w, err)
 			return
 		}
@@ -277,7 +215,7 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	opts.Keep = func(p search.Posting) bool {
 		switch {
-		case !f.Filter.keep(p, now):
+		case !f.Filter.Keep(p, now):
 			f.Hidden++
 		case f.Filter.HideMismatch && f.Ranked && len(pr.Score(p).Hard) > 0:
 			f.Mismatched++
@@ -352,15 +290,21 @@ func (v *server) deleteSearch(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/search", http.StatusSeeOther)
 }
 
-func splitList(s string) []string {
-	var out []string
-	for _, x := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == '\n' }) {
-		if x = strings.TrimSpace(x); x != "" {
-			out = append(out, x)
-		}
+// dailySearch switches a saved search's daily run on or off; the dashboard and `scoutjobs daily` run it.
+func (v *server) dailySearch(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		fail(w, err)
+		return
 	}
-	return out
+	if err := v.s.SetSearchDaily(id, r.FormValue("on") == "1"); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/search", http.StatusSeeOther)
 }
+
+func splitList(s string) []string { return search.SplitList(s) }
 
 // remoteOff lists the remote boards turned off on the Connections page.
 func (v *server) remoteOff() []string { return splitList(v.s.Setting(search.OffSetting)) }

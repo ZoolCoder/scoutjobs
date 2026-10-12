@@ -147,6 +147,9 @@ func mcpDenied(args []string) bool {
 	switch args[0] {
 	case "serve", "mcp", "update":
 		return true
+	case "daily":
+		// it starts agent runs, which must not nest
+		return os.Getenv("SCOUTJOBS_RUNNER") != ""
 	case "gmail":
 		// an unattended job run gets no Google access at all
 		return os.Getenv("SCOUTJOBS_RUNNER") != "" || len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
