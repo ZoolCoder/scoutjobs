@@ -31,6 +31,23 @@ All notable changes to ScoutJobs. The format follows
   band and month applied, and `GET /api/funnel`.
 - Command palette: `Ctrl K` / `⌘K` jumps to any page, job or action; `g`
   then a letter goes to a page and `?` lists every shortcut.
+- Write and edit stories on the dashboard: *New story* asks for the STAR
+  parts and saves them in the template the interview skills read.
+- Prep pack status on the calendar event and the Interviews page: ready,
+  being written, or a *Rebuild* button.
+- Scores weigh what works: a source that answers you much more or less than
+  average moves a job's fit by 5 points, with the reason shown.
+- *What works* shows how many days each source usually takes to answer, and
+  *Today* flags an application quiet for twice that as likely lost.
+- *Today* lists drafted thank-you notes to review.
+- Take a job out of the apply queue before it starts.
+- Browser notifications, off by default: turn them on under Preferences →
+  Automation to hear about new jobs, drafts and finished AI runs.
+- `scoutjobs stats --funnel [--json]`, and the `daily` and `funnel` MCP tools.
+
+### Fixed
+- The calendar's interview card stopped drawing after *Reschedule*: the
+  prep checklist and outcome form were missing.
 
 ## [0.7.0] - 2026-10-12
 
