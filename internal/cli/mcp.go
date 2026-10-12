@@ -116,6 +116,8 @@ var mcpTools = []mcpTool{
 		p("format", "string", "phone|video|onsite", "format"), p("interviewer", "string", "", "interviewer"),
 		p("duration", "integer", "minutes, default 60", "duration"), p("location", "string", "meeting link or address", "location")}, false},
 	{"calendar_sync", "Sync interviews with the user's Google Calendar both ways: scheduled interviews are added there (no guests, nobody is invited), moves and deletions there come back, and events naming a tracked company become interviews.", []string{"calendar", "sync"}, nil, true},
+	{"calendar_save", "Save the events you listed from the user's calendar so ScoutJobs shows them; replaces the last list. Pass titles, times and locations only, never descriptions or guests.", []string{"calendar", "save"}, []mcpProp{
+		req("events", "string", `JSON array of {"id","title","start","end","all_day","location"}; times as YYYY-MM-DDTHH:MM in the user's time`, "events")}, false},
 	{"interview_set", "Update an interview: outcome, feedback, prep status, time.", []string{"interview", "set"}, []mcpProp{req("id", "integer", "interview id", ""),
 		p("at", "string", "", "at"), p("format", "string", "", "format"), p("interviewer", "string", "", "interviewer"), p("prep_status", "string", "todo|in_progress|ready", "prep-status"),
 		p("outcome", "string", "passed|failed|pending|cancelled", "outcome"), p("feedback", "string", "", "feedback"), p("stage", "string", "", "stage"),
@@ -149,7 +151,7 @@ func mcpDenied(args []string) bool {
 		// an unattended job run gets no Google access at all
 		return os.Getenv("SCOUTJOBS_RUNNER") != "" || len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
 	case "calendar":
-		return os.Getenv("SCOUTJOBS_RUNNER") != ""
+		return os.Getenv("SCOUTJOBS_RUNNER") != "" && (len(args) < 2 || args[1] != "save")
 	case "job":
 		return len(args) > 1 && args[1] == "run"
 	case "email":

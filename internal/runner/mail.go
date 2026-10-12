@@ -285,7 +285,7 @@ func calendarPrompt(b *strings.Builder, t MailTask) {
 		b.WriteString("\n")
 	}
 	b.WriteString(`
-1. List the calendar events from today to ` + strconv.Itoa(days) + ` days ahead in one call (page only if needed). Look at nothing outside that window. Work from that list; do not search event by event.
+1. List the calendar events from today to ` + strconv.Itoa(days) + ` days ahead in one call (page only if needed). Look at nothing outside that window. Work from that list; do not search event by event. Then call scoutjobs calendar_save once with every listed event that is not cancelled: id, title, start, end, all_day, location.
 2. ScoutJobs to calendar: for each interview above with no "Interview: <company>" event at its time, create one: that title, the interview's time and length, its location or link in the location, no guests, no notifications. Description, one item per line: the role, the stage and format, "Prep: read the job posting again, research the company, prepare two questions to ask", "Added by ScoutJobs".
 3. Calendar to ScoutJobs: for each listed event that is plainly a job interview with a tracked company (its title or description names the company, or says interview, screen or recruiter call next to it) and has no interview above at that time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, duration, format, location when given). Skip "Interview: <company>" events and events you cannot tie to one tracked job; call scoutjobs job_list only to find a job's id.
 End with one line: how many events you created and interviews you added, naming each.

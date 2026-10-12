@@ -436,8 +436,11 @@ func calendarState(c *gmail.Client) string {
 
 // runCalendar syncs interviews with Google Calendar both ways; the dashboard does the same every few minutes.
 func runCalendar(s *store.Store, cfg Config, args []string, out io.Writer) error {
+	if len(args) > 0 && args[0] == "save" {
+		return runCalendarSave(s, args[1:], out)
+	}
 	if len(args) == 0 || args[0] != "sync" {
-		return errors.New("usage: calendar sync [--json]")
+		return errors.New("usage: calendar sync [--json] | calendar save --events <json>")
 	}
 	fs := flag.NewFlagSet("calendar sync", flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "")
@@ -458,4 +461,19 @@ func runCalendar(s *store.Store, cfg Config, args []string, out io.Writer) error
 		fmt.Fprintln(os.Stderr, "calendar is read-only: interviews are read from it, not added; scoutjobs gmail connect again to allow that")
 	}
 	return err
+}
+
+// runCalendarSave keeps the events the AI agent listed from the user's calendar, for the dashboard.
+func runCalendarSave(s *store.Store, args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("calendar save", flag.ContinueOnError)
+	events := fs.String("events", "", "JSON array of {id,title,start,end,all_day,location}")
+	if _, err := parse(fs, args); err != nil {
+		return err
+	}
+	n, err := calsync.SaveAgentEvents(s, *events)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "saved %d calendar events\n", n)
+	return nil
 }

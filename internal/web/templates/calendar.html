@@ -109,7 +109,7 @@
   <ul class="legend">
     <li><i class="dot c-screen"></i>Screens</li><li><i class="dot c-tech"></i>Technical</li><li><i class="dot c-behav"></i>Behavioral</li><li><i class="dot c-final"></i>Onsite and final</li>
     <li><i class="dot c-deadline"></i>Deadlines<span class="n">{{index .Counts "deadline"}}</span></li><li><i class="dot c-follow"></i>Follow-ups<span class="n">{{index .Counts "followup"}}</span></li>
-    {{if eq .GoogleCal "on"}}<li><i class="dot c-google"></i>Google Calendar<span class="n">{{index .Counts "google"}}</span></li>{{end}}
+    {{if eq .GoogleCal "on"}}<li><i class="dot c-google"></i>Google Calendar<span class="n">{{index .Counts "google"}}</span></li>{{else if .AgentCal}}<li><i class="dot c-google"></i>Your calendar<span class="n">{{index .Counts "google"}}</span></li>{{end}}
   </ul>
   {{if .GoogleErr}}<p class="callout bad small">Google Calendar: {{.GoogleErr}}</p>{{end}}
   {{if eq .GoogleCal "on"}}<form class="row" method="post" action="/calendar/sync"><input type="hidden" name="back" value="/calendar?view={{.View}}&amp;d={{.D}}"><button class="mini">Sync now</button>
@@ -119,7 +119,7 @@
   {{else if eq .GoogleCal "reconnect"}}<div class="small"><p>Sync your interviews with your Google Calendar. Enable the <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">Calendar API</a> in your Google Cloud project, then reconnect and allow Calendar.</p>
   <form method="post" action="/gmail/connect"><input type="hidden" name="for" value="calendar"><button class="mini primary">Reconnect Google</button></form></div>
   {{else if .AgentCal}}<form class="row" method="post" action="/connections/calendar/sync"><input type="hidden" name="back" value="/connections"><button class="mini">Sync now</button>
-  <span class="small muted">Your AI assistant syncs your interviews with your calendar, both ways. <a href="/connections#calendar">Settings</a></span></form>
+  <span class="small muted">Your AI assistant syncs your interviews with your calendar, both ways, and brings your other events here to see. <a href="/connections#calendar">Settings</a></span></form>
   {{else}}<p class="small muted"><a href="/connections#calendar">Connect your calendar</a>: through your AI assistant or your Google account, so your interviews sync both ways.</p>{{end}}
   <p class="small muted">{{index .Counts "interview"}} interviews ahead.</p>
 </section>

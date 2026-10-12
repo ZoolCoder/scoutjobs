@@ -119,4 +119,7 @@ func TestMCPDeniesGoogleToTheRunner(t *testing.T) {
 	if !mcpDenied([]string{"gmail", "draft", "3"}) {
 		t.Error("a job run reaches Gmail")
 	}
+	if !mcpDenied([]string{"calendar", "sync"}) || mcpDenied([]string{"calendar", "save", "--events", "[]"}) {
+		t.Error("a run may only save the events it listed, not sync Google Calendar")
+	}
 }
