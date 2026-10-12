@@ -1,10 +1,14 @@
 package apply
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
 // Story is one canonical story in the story bank, stories/<id>.md, as the interview-prep skill writes it.
@@ -182,3 +186,76 @@ func words(s string) map[string]bool {
 func wordRune(r rune) bool {
 	return r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '+' || r == '#'
 }
+
+// StoryDraft is what the story form on the dashboard asks for; the rest of the template is left for the agent or the user.
+type StoryDraft struct {
+	Title, Context, Role, Timeline  string
+	Themes, Metrics                 []string
+	Facts                           string
+	Situation, Task, Action, Result string
+}
+
+// NewStory writes a story in the template the interview-prep skill reads, under a file name no other story uses.
+func NewStory(home string, d StoryDraft, now time.Time) (string, error) {
+	d.Title = strings.TrimSpace(d.Title)
+	if d.Title == "" {
+		return "", fmt.Errorf("a story needs a title")
+	}
+	id := store.Slug(d.Title)
+	if id == "" {
+		id = "story"
+	}
+	dir := filepath.Join(home, "stories")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	name := id + ".md"
+	for n := 2; exists(filepath.Join(dir, name)); n++ {
+		name = fmt.Sprintf("%s-%d.md", id, n)
+	}
+	var b strings.Builder
+	b.WriteString("---\n")
+	fmt.Fprintf(&b, "id: %s\ntitle: %s\n", strings.TrimSuffix(name, ".md"), oneLine(d.Title))
+	for _, kv := range [][2]string{{"company_context", d.Context}, {"role", d.Role}, {"timeline", d.Timeline}} {
+		if v := oneLine(kv[1]); v != "" {
+			fmt.Fprintf(&b, "%s: %s\n", kv[0], v)
+		}
+	}
+	fmt.Fprintf(&b, "themes: [%s]\n", strings.Join(clean(d.Themes), ", "))
+	if m := clean(d.Metrics); len(m) > 0 {
+		b.WriteString("metrics:\n")
+		for _, x := range m {
+			fmt.Fprintf(&b, "  - %s\n", x)
+		}
+	}
+	fmt.Fprintf(&b, "last_modified: %s\n---\n\n## Core Facts\n%s\n\n## Variants\n\n### Variant: star\n", now.Format("2006-01-02"), strings.TrimSpace(d.Facts))
+	for _, kv := range [][2]string{{"Situation", d.Situation}, {"Task", d.Task}, {"Action", d.Action}, {"Result", d.Result}} {
+		fmt.Fprintf(&b, "**%s:** %s\n", kv[0], strings.TrimSpace(kv[1]))
+	}
+	_, err := WriteFile(dir, name, []byte(b.String()))
+	return name, err
+}
+
+// StoryBody is a story file without its front matter, for the preview.
+func StoryBody(md string) string {
+	md = strings.ReplaceAll(md, "\r\n", "\n")
+	if strings.HasPrefix(md, "---\n") {
+		if end := strings.Index(md[4:], "\n---"); end >= 0 {
+			return strings.TrimLeft(md[4+end+4:], "\n")
+		}
+	}
+	return md
+}
+
+// clean trims list items to one line each, without the commas and brackets the front matter list uses.
+func clean(items []string) []string {
+	var out []string
+	for _, x := range items {
+		if x = strings.Trim(oneLine(x), " ,[]"); x != "" {
+			out = append(out, strings.ReplaceAll(x, ",", ";"))
+		}
+	}
+	return out
+}
+
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }

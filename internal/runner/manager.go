@@ -247,6 +247,20 @@ func (m *Manager) Waiting() []int64 {
 	return out
 }
 
+// Unqueue takes a job out of the queue before it starts; false when it was not waiting.
+func (m *Manager) Unqueue(jobID int64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, q := range m.queue {
+		if q.job.ID == jobID {
+			m.queue = append(m.queue[:i], m.queue[i+1:]...)
+			delete(m.queued, jobID)
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Manager) drain() {
 	for {
 		m.mu.Lock()

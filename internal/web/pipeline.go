@@ -434,8 +434,14 @@ func (v *server) preparePicked(w http.ResponseWriter, r *http.Request) {
 
 // queueState is what the AI assistant is preparing now and what waits, for the strip above the list.
 type queueState struct {
-	Running []string `json:"running"`
-	Waiting int      `json:"waiting"`
+	Running []string   `json:"running"`
+	Waiting int        `json:"waiting"`
+	Next    []queueJob `json:"next"` // the waiting jobs, in order
+}
+
+type queueJob struct {
+	ID      int64  `json:"id"`
+	Company string `json:"company"`
 }
 
 func (q queueState) Busy() bool { return len(q.Running) > 0 || q.Waiting > 0 }
@@ -451,8 +457,27 @@ func (v *server) queueState() queueState {
 		}
 	}
 	sort.Strings(q.Running)
-	q.Waiting = len(v.cfg.Runner.Waiting())
+	for _, id := range v.cfg.Runner.Waiting() {
+		if j, err := v.s.JobByID(id); err == nil {
+			q.Next = append(q.Next, queueJob{j.ID, j.Company})
+		}
+	}
+	q.Waiting = len(q.Next)
 	return q
+}
+
+// unqueue takes a job out of the AI assistant's queue before it starts.
+func (v *server) unqueue(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if v.cfg.Runner == nil || sameOrigin(r) != nil || err != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	msg := "That job had already started or left the queue."
+	if v.cfg.Runner.Unqueue(id) {
+		msg = "Taken out of the queue."
+	}
+	http.Redirect(w, r, withParam(back(r, "/pipeline?view=list"), "msg", msg), http.StatusSeeOther)
 }
 
 func (v *server) queueJSON(w http.ResponseWriter, r *http.Request) {

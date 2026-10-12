@@ -518,12 +518,14 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
         strip.textContent = 'Your assistant finished the queue. Reload to see the drafts.';
         return;
       }
-      var text = (running.length ? 'Preparing ' + running.join(', ') : 'Starting the next job') + (q.waiting ? ' · ' + q.waiting + ' waiting' : '') + ' · ';
-      strip.textContent = text;
-      var a = document.createElement('a');
-      a.href = '/activity';
-      a.textContent = 'Activity';
-      strip.appendChild(a);
+      var text = strip.querySelector('[data-queue-text]');
+      if (text) text.textContent = (running.length ? 'Preparing ' + running.join(', ') : 'Starting the next job') + (q.waiting ? ' · ' + q.waiting + ' waiting' : '');
+      var left = {};
+      (q.next || []).forEach(function (j) { left[j.id] = true; });
+      strip.querySelectorAll('[data-queue-next] form').forEach(function (f) {
+        var id = f.getAttribute('action').split('/')[3];
+        if (!left[id]) f.remove();
+      });
     }).catch(function () {});
   }, 4000);
 })();
@@ -694,4 +696,48 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
       gAt = 0;
     }
   });
+})();
+
+// Browser notifications: off until turned on in Preferences, then polled while a dashboard tab is open.
+(function () {
+  if (!('Notification' in window)) return;
+  var KEY = 'scoutjobs-notify', AFTER = 'scoutjobs-notify-after';
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function put(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function on() { return get(KEY) === '1' && Notification.permission === 'granted'; }
+
+  var row = document.querySelector('[data-notify-row]');
+  var btn = document.querySelector('[data-notify]');
+  function paint() {
+    if (!btn) return;
+    row.hidden = false;
+    btn.setAttribute('aria-pressed', on() ? 'true' : 'false');
+    btn.textContent = on() ? 'Turn off' : 'Turn on';
+    btn.disabled = Notification.permission === 'denied';
+    if (btn.disabled) document.querySelector('[data-notify-hint]').textContent = 'Notifications are blocked for this site in your browser settings.';
+  }
+  if (btn) {
+    paint();
+    btn.addEventListener('click', function () {
+      if (on()) { put(KEY, null); put(AFTER, null); paint(); return; }
+      Notification.requestPermission().then(function (p) {
+        if (p === 'granted') { put(KEY, '1'); poll(); }
+        paint();
+      });
+    });
+  }
+
+  function poll() {
+    if (!on()) return;
+    var after = get(AFTER) || '';
+    fetch('/notify.json?after=' + encodeURIComponent(after), { cache: 'no-store', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (after) (d.items || []).forEach(function (n) {
+        var note = new Notification(n.title, { body: n.body || '', tag: 'scoutjobs-' + n.href });
+        note.onclick = function () { window.focus(); location.href = n.href; note.close(); };
+      });
+      if (d.last) put(AFTER, String(d.last));
+    }).catch(function () {});
+  }
+  poll();
+  setInterval(poll, 120000);
 })();

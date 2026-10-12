@@ -25,7 +25,7 @@
 <div class="pipe-body">
 <div class="pipe-main">
 {{with .Msg}}<p class="callout">{{.}}</p>{{end}}
-{{if .Queue.Busy}}<p class="queuestrip" data-queue role="status">{{template "queue-text" .Queue}}</p>{{end}}
+{{if .Queue.Busy}}<div class="queuestrip" data-queue>{{template "queue-text" .Queue}}</div>{{end}}
 {{if eq $f.View "list"}}
 {{if .Batch}}<form id="batch" class="batchbar" method="post" action="/pipeline/prepare" data-busy="Queuing…"><input type="hidden" name="back" value="{{$.Path}}"><button class="mini go" type="submit">Prepare selected with AI</button><small class="muted">Tick new or ranked jobs. Your AI assistant tailors the CV and writes the cover letter for each, one at a time. Nothing is sent.</small></form>{{end}}
 <div class="panel tight listview"><table class="issues">

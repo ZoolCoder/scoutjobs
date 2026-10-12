@@ -12,7 +12,7 @@ import (
 
 // todo is one row of the overview's Today list: what to do, and buttons that do it.
 type todo struct {
-	Kind    string // outcome | interview | reply | followup | send | deadline | score | digest
+	Kind    string // outcome | interview | reply | followup | thanks | quiet | send | deadline | score | digest
 	Title   string
 	Detail  string
 	Href    string // the row itself
@@ -78,6 +78,18 @@ func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []to
 				Href: href, Links: []todoLink{{"Review draft", href, false}}, JobID: j.ID, Status: "no_response", StatusL: "No response"})
 		}
 	}
+	if met, err := v.s.ListJobs(store.JobFilter{Status: "interview"}); err == nil {
+		n := 0
+		for _, j := range met {
+			if n == 3 || !apply.PendingProposal(v.s, j, "thanks") {
+				continue
+			}
+			n++
+			href := fmt.Sprintf("/jobs/%d?tab=mail#emails", j.ID)
+			out = append(out, todo{Kind: "thanks", Title: "Review thank-you to " + j.Company, Detail: j.Title + " · drafted for you, not sent",
+				Href: href, Links: []todoLink{{"Review draft", href, false}}})
+		}
+	}
 	n = 0
 	for _, j := range st.DueFollowUps {
 		if n == 4 {
@@ -86,11 +98,13 @@ func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []to
 		if drafted[j.ID] {
 			continue
 		}
+		drafted[j.ID] = true
 		n++
 		out = append(out, todo{Kind: "followup", Title: "Follow up with " + j.Company, Detail: j.Title + " · quiet since " + day(j.UpdatedAt),
 			Href:  fmt.Sprintf("/pipeline?job=%d", j.ID),
 			Links: []todoLink{{"Write in Gmail", composeFollowUp(j), true}}, JobID: j.ID, Status: "no_response", StatusL: "No response"})
 	}
+	out = append(out, v.quiet(now, drafted)...)
 	if n := v.digestCount(now); n > 0 {
 		out = append(out, todo{Kind: "digest", Title: fmt.Sprintf("%d new %s from your daily searches", n, plural(n, "job", "jobs")),
 			Detail: "found in the last 24 hours · best fit first", Href: "/pipeline?sort=fit",
@@ -120,6 +134,37 @@ func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []to
 	if unscored > 0 {
 		out = append(out, todo{Kind: "score", Title: fmt.Sprintf("Score %d new %s", unscored, plural(unscored, "job", "jobs")),
 			Detail: "run /scoutjobs:fit or the fit-scorer agent", Href: "/pipeline?sort=updated"})
+	}
+	return out
+}
+
+// quietFactor is how many times a source's usual wait an application may stay quiet before it is likely lost.
+// quietFloor keeps fast-answering sources from flagging a job after a few days.
+const quietFactor, quietFloor = 2, 14
+
+// quiet lists applications silent for well past their source's usual wait for an answer, so the user can
+// close them; jobs already on the list for a follow-up are left out.
+func (v *server) quiet(now time.Time, listed map[int64]bool) []todo {
+	f, err := v.s.Funnel()
+	if err != nil {
+		return nil
+	}
+	applied, _ := v.s.ListJobs(store.JobFilter{Status: "applied"})
+	var out []todo
+	for _, j := range applied {
+		usual, ok := f.AnswerDays(j.Source)
+		since, _, known := parseAt(j.UpdatedAt)
+		if listed[j.ID] || !ok || !known || len(out) == 3 {
+			continue
+		}
+		if days := int(now.Sub(since).Hours() / 24); days > max(quietFactor*usual, quietFloor) {
+			src := strings.TrimSpace(j.Source)
+			if src == "" {
+				src = "manual"
+			}
+			out = append(out, todo{Kind: "quiet", Title: j.Company + " has likely moved on", JobID: j.ID, Href: fmt.Sprintf("/jobs/%d", j.ID),
+				Detail: fmt.Sprintf("quiet %d days; %s jobs usually answer in %d %s", days, src, usual, plural(usual, "day", "days")), Status: "no_response", StatusL: "No response"})
+		}
 	}
 	return out
 }

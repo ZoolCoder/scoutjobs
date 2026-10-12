@@ -333,6 +333,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /jobs/prepare-all", srv.prepareAll)
 	mux.HandleFunc("POST /pipeline/prepare", srv.preparePicked)
 	mux.HandleFunc("GET /pipeline/queue", srv.queueJSON)
+	mux.HandleFunc("POST /pipeline/queue/{id}/remove", srv.unqueue)
 	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
 	mux.HandleFunc("GET /gmail/detect", srv.gmailDetect)
 	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
@@ -354,6 +355,10 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /calendar/event/{key}", srv.calendarEvent)
 	mux.HandleFunc("GET /learning", srv.learning)
 	mux.HandleFunc("GET /stories", srv.stories)
+	mux.HandleFunc("GET /stories/new", srv.newStory)
+	mux.HandleFunc("POST /stories", srv.createStory)
+	mux.HandleFunc("GET /stories/{name}", srv.storyFile)
+	mux.HandleFunc("POST /stories/{name}", srv.saveStory)
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
 	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
@@ -389,6 +394,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 		writeJSON(w, http.StatusOK, Health{App: "scoutjobs", Version: cfg.Version, PID: os.Getpid(), Exe: exe, Home: s.Home})
 	})
 	mux.HandleFunc("GET /palette.json", srv.paletteJSON)
+	mux.HandleFunc("GET /notify.json", srv.notifyJSON)
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
@@ -934,7 +940,13 @@ func (v *server) interviews(w http.ResponseWriter, r *http.Request) {
 			past = append(past, i)
 		}
 	}
-	v.render(w, r, "interviews.html", "interviews", map[string]any{"Upcoming": up, "NeedsOutcome": open, "Past": past, "Outcomes": []string{"passed", "failed", "pending", "cancelled"}})
+	data := map[string]any{"Upcoming": up, "NeedsOutcome": open, "Past": past, "Outcomes": []string{"passed", "failed", "pending", "cancelled"}}
+	if len(up) > 0 {
+		if j, err := v.s.JobByID(up[0].JobID); err == nil {
+			data["Pack"] = v.prepPack(j)
+		}
+	}
+	v.render(w, r, "interviews.html", "interviews", data)
 }
 
 func (v *server) setInterview(w http.ResponseWriter, r *http.Request) {

@@ -63,6 +63,8 @@
     <form method="post" action="/settings/automation"><input type="hidden" name="key" value="followups"><label class="switch"><input type="checkbox" name="on" value="1"{{if .FollowUps}} checked{{end}} data-autosubmit aria-label="Draft follow-ups"><i aria-hidden="true"></i></label><noscript><button class="mini">Save</button></noscript></form></li>
   <li><div><b>Interview prep packs</b><small class="muted">{{if .Agent}}Your AI assistant researches the company and writes a prep sheet for each interview in the coming week. Costs agent tokens.{{else}}Needs an AI assistant. <a href="/connections#ai">Connect one</a>.{{end}}</small></div>
     <form method="post" action="/settings/automation"><input type="hidden" name="key" value="prep"><label class="switch"><input type="checkbox" name="on" value="1"{{if .Prep}} checked{{end}}{{if not .Agent}} disabled{{end}} data-autosubmit aria-label="Interview prep packs"><i aria-hidden="true"></i></label><noscript><button class="mini">Save</button></noscript></form></li>
+  <li class="notifyrow" data-notify-row hidden><div><b>Notify me</b><small class="muted" data-notify-hint>A notification in this browser when daily searches add jobs, a draft is ready or your assistant finishes a job, while a dashboard tab is open.</small></div>
+    <button class="mini" type="button" data-notify aria-pressed="false">Turn on</button></li>
 </ul>
 </section>{{end}}
 <section class="panel">

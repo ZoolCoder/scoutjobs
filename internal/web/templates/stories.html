@@ -1,15 +1,15 @@
 {{template "head" .}}
 {{with .Data}}
 <section class="panel">
-<div class="panel-h"><h2>Story bank</h2><span class="n">{{len .Stories}}</span><span class="act muted">your interview stories, matched to the jobs you are chasing</span></div>
+<div class="panel-h"><h2>Story bank</h2><span class="n">{{len .Stories}}</span><span class="act muted">your interview stories, matched to the jobs you are chasing</span><a class="btn mini primary" href="/stories/new">New story</a></div>
 {{if .Stories}}<ul class="irows storylist">{{range .Stories}}<li>
-  <div class="who"><b>{{.Title}}</b>{{with .Context}} <span class="muted">{{.}}</span>{{end}}
+  <div class="who"><a href="/stories/{{.File}}"><b>{{.Title}}</b></a>{{with .Context}} <span class="muted">{{.}}</span>{{end}}
   {{with .Meta}}<small>{{.}}</small>{{end}}
   {{with .Themes}}<span class="themes">{{range .}}<span>{{.}}</span>{{end}}</span>{{end}}
   <small class="used">{{if .Jobs}}Used for: {{range $i, $j := .Jobs}}{{if $i}}, {{end}}<a href="/jobs/{{$j.ID}}?tab=interviews#stories">{{$j.Company}}</a>{{end}}{{else}}No open job asks for this yet{{end}}</small></div>
 </li>{{end}}</ul>
 {{if .Uncovered}}<p class="small muted">{{.Uncovered}} must-have {{if eq .Uncovered 1}}requirement has{{else}}requirements have{{end}} no story yet. Open a job's Interviews tab to see which.</p>{{end}}
-{{else}}<p class="empty">No stories yet<small>A story is one experience told in STAR form, saved in <code>stories/</code> in your data folder. Run <code>/scoutjobs:interview</code> in your AI assistant: the interview-prep skill and the behavioral-story-extractor agent ask you about a project and write the story for you.</small></p>{{end}}
+{{else}}<p class="empty">No stories yet<small>A story is one experience told in STAR form, saved in <code>stories/</code> in your data folder. Press <a href="/stories/new">New story</a> to write one, or run <code>/scoutjobs:interview</code> in your AI assistant: the interview-prep skill and the behavioral-story-extractor agent ask you about a project and write the story for you.</small></p>{{end}}
 </section>
 {{end}}
 {{template "foot" .}}

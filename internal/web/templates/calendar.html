@@ -70,7 +70,7 @@
     <label>Time<input type="time" name="time" value="{{$e.Start}}"></label>
     <label>Length<select name="duration">{{$d := printf "%d" .Duration}}{{range $v.Mins}}<option value="{{.}}" {{if eq . $d}}selected{{end}}>{{.}} min</option>{{end}}</select></label>
     <label>Where<input name="location" value="{{.Location}}" placeholder="Meet link, address"></label>
-    <div class="row span-2"><button class="primary">Save</button>{{if not $.Detail.Synced}}<span class="muted">Re-add it to Google Calendar after moving it.</span>{{end}}</div>
+    <div class="row span-2"><button class="primary">Save</button>{{if not $v.Detail.Synced}}<span class="muted">Re-add it to Google Calendar after moving it.</span>{{end}}</div>
   </form>
   <h3 class="sec">Prep checklist</h3>
   {{template "prep-check" (prepArgs . (printf "/calendar?view=%s&d=%s&ev=%s" $v.View $v.D $e.Key))}}
@@ -80,7 +80,7 @@
     <label class="span-2">What you learned<textarea name="feedback" rows="3">{{.Feedback}}</textarea></label>
     <div class="row span-2"><button class="primary">Save</button></div>
   </form>
-  {{if $.Cfg.Runner}}{{template "prep-pack" .JobID}}{{else}}<p class="small muted">Run <code class="cmd">/scoutjobs:interview {{.JobID}}</code> in your agent to build the prep pack.</p>{{end}}
+  {{template "prep-pack" $v.Detail.Pack}}
   {{end}}
 </section>
 {{end}}
