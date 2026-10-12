@@ -154,6 +154,11 @@ func tool(name string, in map[string]any) string {
 	if p, ok := in["file_path"].(string); ok {
 		return name + " " + filepath.Base(p)
 	}
+	for _, k := range []string{"query", "q"} { // what a mail or calendar search looked for
+		if q, ok := in[k].(string); ok && q != "" {
+			return name + " " + strconv.Quote(clip(q))
+		}
+	}
 	if strings.HasPrefix(name, "mcp__scoutjobs__") {
 		name = "scoutjobs " + strings.TrimPrefix(name, "mcp__scoutjobs__")
 		if args, ok := in["args"].([]any); ok {
@@ -169,8 +174,8 @@ func tool(name string, in map[string]any) string {
 
 func clip(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > 240 {
-		return string(r[:240]) + "…"
+	if r := []rune(s); len(r) > 400 {
+		return string(r[:400]) + "…"
 	}
 	return s
 }

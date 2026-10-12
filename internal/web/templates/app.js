@@ -108,13 +108,23 @@
     }).catch(function () { /* next tick */ });
   }
 
-  // calendar sync: the agent's tool calls tell how far it got
-  var phases = [
-    [/interview_add|interview_set/, 'Saving new interviews…', 85],
-    [/create|update|insert/i, 'Adding interviews to your calendar…', 70],
-    [/calendar|event/i, 'Reading your calendar…', 45],
-    [/interview_list|job_list/, 'Reading your interviews…', 25]
-  ];
+  // mail and calendar sync: the agent's tool calls tell how far it got
+  var phaseSets = {
+    calendar: [
+      [/interview_add|interview_set/, 'Saving new interviews…', 85],
+      [/create|update|insert/i, 'Adding interviews to your calendar…', 70],
+      [/calendar|event/i, 'Reading your calendar…', 45],
+      [/interview_list|job_list/, 'Reading your interviews…', 25]
+    ],
+    mail: [
+      [/interview_add|interview_set/, 'Saving interviews…', 90],
+      [/email_log|job_set/, 'Logging the replies…', 75],
+      [/get_thread|get_message|read_/i, 'Reading the replies…', 60],
+      [/search/i, 'Searching your mail…', 40],
+      [/job_list/, 'Reading your applications…', 20]
+    ]
+  };
+  var phases = phaseSets[panel.dataset.phases] || phaseSets.calendar;
   function phase(log) {
     var text = 'Starting your AI assistant…', pct = 5;
     log.forEach(function (line) {

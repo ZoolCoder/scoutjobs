@@ -6,9 +6,11 @@
   {{if .CanSync}}<form method="post" action="/inbox/sync"><input type="hidden" name="back" value="/inbox"><button class="primary"{{with .AI}}{{if .Active}} disabled{{end}}{{end}}>Sync now</button></form>{{end}}
 </div>
 {{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
-{{with .AI}}{{with .Run}}<section class="panel" id="agent"{{if eq .State "running"}} data-run="/mail/agent/run"{{end}}>
+{{with .AI}}{{with .Run}}<section class="panel" id="agent"{{if eq .State "running"}} data-run="/mail/agent/run" data-phases="mail"{{end}}>
 <div class="panel-h"><h2>Inbox agent</h2><span class="badge {{.State}}">{{.State}}</span><span class="n">{{.Agent}}</span>{{if eq .State "running"}}<form class="inline act" method="post" action="/mail/agent/cancel"><button class="mini">Cancel</button></form>{{end}}</div>
-{{template "runprog" .}}
+<div class="runprog{{if eq .State "running"}} live{{end}}" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="{{.Ended}}">
+  <progress max="100" value="{{if eq .State "running"}}5{{else}}100{{end}}" aria-label="sync progress"></progress>
+  <p class="runnow">{{if eq .State "running"}}<span class="spin" aria-hidden="true"></span><b data-now role="status">Starting your AI assistant…</b>{{else}}<b>{{if eq .State "done"}}Synced{{else}}{{title .State}}{{end}}</b>{{end}} <span class="muted" data-elapsed></span></p></div>
 {{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
 {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
 {{end}}</pre></details>{{end}}

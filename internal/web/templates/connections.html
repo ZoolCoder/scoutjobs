@@ -61,7 +61,7 @@
 
 </div>
 
-{{with .Sync}}<dialog class="syncdlg" open data-modal data-run="/mail/agent/run" data-phases data-done="/connections?synced=1#calendar" aria-labelledby="sync-title">
+{{with .Sync}}<dialog class="syncdlg" open data-modal data-run="/mail/agent/run" data-phases="calendar" data-done="/connections?synced=1#calendar" aria-labelledby="sync-title">
   <div class="synchead"><span class="connico">{{template "ico-calendar"}}</span>
     <div><h2 id="sync-title">Syncing your calendar</h2><p class="muted">{{title .Agent}} is reading your calendar and adding your interviews, both ways. It looks {{$.Data.CalDays}} days ahead and usually takes under a minute.</p></div></div>
   <div class="runprog live" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="">
