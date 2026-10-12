@@ -65,6 +65,8 @@ All notable changes to ScoutJobs. The format follows
 ### Fixed
 - The overview no longer cuts panels off on laptop screens; it scrolls.
 - Interviews already past no longer show as upcoming.
+- On Mondays the weekly applications chart counts the day's applications in
+  the new week.
 - Adding an interview at a time that already has one skips the duplicate.
 - A page reloads when a sync ends on it, and mail sync passes the interview
   length on.
