@@ -125,7 +125,7 @@ func (v *server) cancelAgent(w http.ResponseWriter, r *http.Request) {
 
 // startAgentSync has the agent read the mail since the last sync, at most two weeks back.
 func (v *server) startAgentSync(agent string) error {
-	since := time.Now().AddDate(0, 0, -14)
+	since := time.Now().AddDate(0, 0, -7)
 	if t, err := time.Parse(time.RFC3339, v.s.Setting(agentSynced)); err == nil && t.AddDate(0, 0, -1).After(since) {
 		since = t.AddDate(0, 0, -1)
 	}

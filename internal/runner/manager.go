@@ -151,19 +151,7 @@ func (m *Manager) StartMail(t MailTask, agent string) (*Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	conns, err := m.Connectors(context.Background(), ag, false)
-	if err != nil {
-		return nil, err
-	}
-	if mb, cal := ReadyConnectors(conns); len(mb) == 0 || t.Kind == "calendar" && len(cal) == 0 { // signed in since the last look?
-		if conns, err = m.Connectors(context.Background(), ag, true); err != nil {
-			return nil, err
-		}
-	}
-	run, err := PlanMail(t, ag, conns)
-	if err != nil {
-		return nil, err
-	}
+	run := newMailRun(t, ag)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if r := m.latest[MailID]; r != nil && r.Snapshot().State == Running {
@@ -172,11 +160,32 @@ func (m *Manager) StartMail(t MailTask, agent string) (*Run, error) {
 	m.runs[run.ID], m.latest[MailID] = run, run
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancels[run.ID] = cancel
-	go func() {
+	go func() { // looking up the connectors starts the agent once, so it is done here, not before the reply
 		defer cancel()
+		run.logf("checking %s's mail and calendar connectors", ag.Name)
+		conns, err := m.mailConnectors(ctx, ag, t)
+		if err != nil {
+			finish(ctx, run, nil, func(context.Context) error {
+				run.set(0, Failed, err.Error())
+				return err
+			})
+			return
+		}
 		m.ExecMail(ctx, run, ag, conns, t, nil)
 	}()
 	return run, nil
+}
+
+// mailConnectors are the agent's connectors, looked up again when the cached ones cannot do t.
+func (m *Manager) mailConnectors(ctx context.Context, ag Agent, t MailTask) ([]Connector, error) {
+	conns, err := m.Connectors(ctx, ag, false)
+	if err == nil && checkMail(t, ag, conns) != nil { // signed in since the last look?
+		conns, err = m.Connectors(ctx, ag, true)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return conns, checkMail(t, ag, conns)
 }
 
 // Candidates are the open jobs worth a draft: new or ranked, no veto, fit score at or above floor,

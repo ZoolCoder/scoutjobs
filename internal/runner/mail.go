@@ -38,6 +38,9 @@ type Connector struct {
 	Tools    []string `json:"tools,omitempty"` // the tools the inbox agent may call; nil when the agent cannot list them (Codex)
 }
 
+// MailTimeout stops an inbox agent that is still working: a sync should take a minute or two.
+const MailTimeout = 5 * time.Minute
+
 // MailTask is one job for the inbox agent: read new replies, put one e-mail into the drafts, or
 // sync the interviews with the calendar.
 type MailTask struct {
@@ -253,15 +256,11 @@ func MailPrompt(t MailTask, mailboxes, calendars []Connector) string {
 	default:
 		fmt.Fprintf(&b, `Task: bring the user's job search up to date from their mail since %s.
 1. Call scoutjobs job_list: the tracked companies, titles and contacts.
-2. Search the mailbox for messages received since then, not sent by the user, from those companies, their recruiters or hiring systems (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR, Workday and the like). Read at most 40 messages; skip newsletters and job alerts.
+2. Search the mailbox for messages received since then, not sent by the user, from those companies, their recruiters or hiring systems (Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee, BambooHR, Workday and the like). Use one or two searches, read at most 20 messages, and skip newsletters and job alerts.
 3. For each message about one tracked application, call scoutjobs email_log with job, from, subject, a one-line snippet, date (RFC3339), thread, message_id and kind (interview, offer, rejected, request or ack). Pass status only when the message plainly says so: rejected for a rejection, interview for an invitation, offer for an offer. Repeats are ignored, so logging a message twice is harmless.
 4. For an invitation with a fixed date and time, call scoutjobs interview_add (job, stage, at as YYYY-MM-DDTHH:MM in the user's time, format, location when given).
 `, t.Since.Format("2006-01-02"))
-		if len(calendars) > 0 {
-			b.WriteString(`5. Call scoutjobs interview_list. For each upcoming interview with a time, look in the calendar for an event "Interview: <company>" at that time; when there is none, create it: that title, the interview's time and length, its location or link, no guests, no notifications.
-`)
-		}
-		b.WriteString("End with one line: how many messages you logged, interviews you added and events you created.\n")
+		b.WriteString("Do not touch the calendar: the calendar sync adds the interviews there. End with one line: how many messages you logged and interviews you added.\n")
 	}
 	return b.String()
 }
@@ -306,22 +305,33 @@ func connectorNames(cs []Connector) string {
 
 // PlanMail makes the run for a mail task. It fails when the agent has no signed-in mailbox.
 func PlanMail(t MailTask, ag Agent, conns []Connector) (*Run, error) {
+	if err := checkMail(t, ag, conns); err != nil {
+		return nil, err
+	}
+	return newMailRun(t, ag), nil
+}
+
+// checkMail says what to connect when the agent cannot do t with conns.
+func checkMail(t MailTask, ag Agent, conns []Connector) error {
 	mb, cal := ReadyConnectors(conns)
-	label := "Read new replies"
 	switch {
 	case t.Kind == "calendar" && len(cal) == 0:
-		return nil, errors.New(NoCalendar(ag.Name, conns))
-	case t.Kind == "calendar":
-		label = "Sync the calendar"
-	case len(mb) == 0:
-		return nil, errors.New(NoMailbox(ag.Name, conns))
-	case t.Kind == "draft":
-		label = "File the draft"
+		return errors.New(NoCalendar(ag.Name, conns))
+	case t.Kind != "calendar" && len(mb) == 0:
+		return errors.New(NoMailbox(ag.Name, conns))
+	}
+	return nil
+}
+
+func newMailRun(t MailTask, ag Agent) *Run {
+	label := map[string]string{"calendar": "Sync the calendar", "draft": "File the draft"}[t.Kind]
+	if label == "" {
+		label = "Read new replies"
 	}
 	run := newRun(fmt.Sprintf("mail-%d", time.Now().UnixMilli()), MailID, false)
 	run.Agent = ag.Name
 	run.Steps = []StepState{{Step: Step{Name: "mail-" + t.Kind, Label: label}, State: Pending}}
-	return run, nil
+	return run
 }
 
 // NoMailbox explains what to connect when the agent has no signed-in mailbox.
@@ -388,6 +398,8 @@ func (rn *Runner) calendarFacts(until time.Time) ([]store.Interview, []string) {
 
 func (rn *Runner) ExecMail(ctx context.Context, run *Run, ag Agent, conns []Connector, t MailTask, echo io.Writer) {
 	finish(ctx, run, echo, func(ctx context.Context) error {
+		ctx, cancel := context.WithTimeout(ctx, MailTimeout)
+		defer cancel()
 		argv, err := ag.mailCommand(rn.Exe, rn.Store.Home, os.TempDir(), conns)
 		if err != nil {
 			run.set(0, Failed, err.Error())

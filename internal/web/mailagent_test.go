@@ -142,8 +142,11 @@ func TestConnections(t *testing.T) {
 	if loc := post("/connections/calendar/days", "days=365"); !strings.Contains(loc, "err=") || s.Setting(calendarDays) != "7" {
 		t.Errorf("odd sync period accepted: %s", loc)
 	}
-	if loc := post("/connections/calendar/sync", ""); !strings.Contains(loc, "calendar+server") && !strings.Contains(loc, "calendar%20server") {
-		t.Errorf("sync without a calendar connector: %s", loc)
+	post("/connections/calendar/sync", "")
+	if run := m.Latest(runner.MailID); run == nil {
+		t.Error("sync did not start")
+	} else if run.Wait(); !strings.Contains(run.Snapshot().Error, "calendar server") {
+		t.Errorf("sync without a calendar connector: %q", run.Snapshot().Error)
 	}
 	if post("/connections/calendar", "via=off"); s.Setting(runner.CalendarVia) != "" {
 		t.Error("calendar via agent not turned off")
