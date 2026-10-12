@@ -155,10 +155,11 @@ var funcs = template.FuncMap{
 		}
 		return strconv.FormatInt(n, 10)
 	},
-	"pct":   func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
-	"f1":    func(f float64) string { return fmt.Sprintf("%.1f", f) },
-	"title": func(s string) string { return strings.ReplaceAll(s, "_", " ") },
-	"lower": strings.ToLower,
+	"pct":        func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
+	"f1":         func(f float64) string { return fmt.Sprintf("%.1f", f) },
+	"title":      func(s string) string { return strings.ReplaceAll(s, "_", " ") },
+	"agentTitle": agentTitle,
+	"lower":      strings.ToLower,
 	"split": func(s string) []string {
 		if strings.TrimSpace(s) == "" {
 			return nil

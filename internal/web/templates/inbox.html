@@ -6,7 +6,14 @@
   {{if .CanSync}}<form method="post" action="/inbox/sync"><input type="hidden" name="back" value="/inbox"><button class="primary"{{with .AI}}{{if .Active}} disabled{{end}}{{end}}>Sync now</button></form>{{end}}
 </div>
 {{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
-{{with .AI}}{{with .Run}}<section class="panel" id="agent"{{if eq .State "running"}} data-run="/mail/agent/run" data-phases="mail"{{end}}>
+{{with .AI}}{{with .Run}}{{if eq .State "running"}}<dialog class="syncdlg" open data-modal data-run="/mail/agent/run" data-phases="mail" data-done="/inbox#agent" aria-labelledby="sync-title">
+  <div class="synchead"><span class="connico">{{template "ico-inbox"}}</span>
+    <div><h2 id="sync-title">Syncing your mail</h2><p class="muted">{{agentTitle .Agent}} is reading the replies to your applications and adding your interviews. It usually takes under a minute.</p></div></div>
+  <div class="runprog live" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="">
+    <progress max="100" value="5" aria-label="sync progress"></progress>
+    <p class="runnow"><span class="spin" aria-hidden="true"></span><b data-now role="status">Starting your AI assistant…</b><span class="muted" data-elapsed></span></p></div>
+  <form class="dlgfoot" method="post" action="/mail/agent/cancel"><input type="hidden" name="back" value="/inbox#agent"><button type="submit" autofocus>Cancel</button></form>
+</dialog>{{else}}<section class="panel" id="agent">
 <div class="panel-h"><h2>Inbox agent</h2><span class="badge {{.State}}">{{.State}}</span><span class="n">{{.Agent}}</span>{{if eq .State "running"}}<form class="inline act" method="post" action="/mail/agent/cancel"><button class="mini">Cancel</button></form>{{end}}</div>
 <div class="runprog{{if eq .State "running"}} live{{end}}" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="{{.Ended}}">
   <progress max="100" value="{{if eq .State "running"}}5{{else}}100{{end}}" aria-label="sync progress"></progress>
@@ -14,7 +21,7 @@
 {{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
 {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
 {{end}}</pre></details>{{end}}
-</section>{{end}}{{end}}
+</section>{{end}}{{end}}{{end}}
 {{with .Google}}{{if and .Offered .Connected}}{{if .Problem}}<div class="callout bad">{{.Problem}}. <form class="inline" method="post" action="/gmail/connect"><button class="mini primary">Connect Google again</button></form></div>{{end}}
 {{with .Missing}}<div class="callout bad">Google was not allowed {{join . ", "}}. <form class="inline" method="post" action="/gmail/connect"><button class="mini primary">Connect Google again</button></form> and tick every box.</div>{{end}}
 {{if .Testing}}<p class="callout">Your Google Cloud app is in Testing mode, so Google disconnects ScoutJobs on {{.Ends.Format "Jan 2"}}. <a href="https://console.cloud.google.com/auth/audience" rel="noopener noreferrer" target="_blank">Publish it</a> (Audience &rsaquo; Publish app), then connect Google again.</p>{{end}}
