@@ -393,3 +393,14 @@ document.querySelectorAll('[data-test]').forEach(function (btn) {
     document.cookie = 'side=' + (mini ? 'mini' : 'full') + '; path=/; max-age=31536000; samesite=lax';
   });
 })();
+
+// "Show all details": open or close every disclosure the button names.
+document.querySelectorAll('[data-expand]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var all = document.querySelectorAll(btn.dataset.expand);
+    var open = btn.dataset.open !== '1';
+    all.forEach(function (d) { d.open = open; });
+    btn.dataset.open = open ? '1' : '';
+    btn.textContent = open ? 'Hide details' : 'Show all details';
+  });
+});

@@ -643,7 +643,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		self += "?tab=" + tab
 	}
 	p := v.panel(j, self, "/pipeline")
-	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "FileGroups": fileGroups(dir, files), "HasResumeMD": hasMD,
+	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Kind": r.URL.Query().Get("kind"), "EvGroups": eventGroupsOf(events), "Interviews": ivs, "Dir": dir, "Files": files, "FileGroups": fileGroups(dir, files), "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),

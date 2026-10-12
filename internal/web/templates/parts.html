@@ -7,6 +7,8 @@
   <div class="mact">{{if .Open}}<a href="{{.Open}}" rel="noopener noreferrer" target="_blank">Open in Gmail</a>{{end}}{{if .Reply}}<a href="{{.Reply}}" rel="noopener noreferrer" target="_blank">Reply</a>{{end}}</div></div>
 </li>{{end}}</ul>{{end}}{{end}}
 
+{{define "evdata"}}{{if or .Items .Detail}}<details class="evdata"><summary>Details</summary>{{with .Items}}<ul>{{range .}}<li>{{with .Label}}<b>{{.}}</b>{{end}}<span>{{.Text}}</span></li>{{end}}</ul>{{end}}{{with .Detail}}<p class="pre">{{.}}</p>{{end}}</details>{{end}}{{end}}
+
 {{define "issue"}}{{$j := .Job}}
 <div class="modal-wrap">
 <a class="backdrop" href="{{.Close}}" data-close tabindex="-1" aria-hidden="true"></a>
@@ -17,19 +19,26 @@
   <div class="issue-main">
     <h2 id="issue-title">{{$j.Title}}</h2>
     <div class="issue-acts">
-      {{if $j.URL}}<a class="btn mini" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}Posting</a>{{end}}
-      <a class="btn mini" href="{{.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
+      <a class="btn mini primary" href="/jobs/{{$j.ID}}">{{template "ico-spark"}}Prepare with AI</a>
+      {{if $j.URL}}<a class="btn mini" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}View posting</a>{{end}}
       <a class="btn mini" href="/calendar?new={{today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a>
-      {{if .CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Back}}"><button class="mini go">{{.DraftLabel}}</button></form>{{end}}
+      <details class="jobmenu prep-pop"><summary class="btn mini">More ▾</summary><div class="menu-list">
+        <a href="{{.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
+        {{if .CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Back}}"><button>{{template "ico-mail"}}{{.DraftLabel}}</button></form>{{end}}
+      </div></details>
     </div>
     {{template "stepper" .Steps}}
     {{if $j.FitNotes}}<section><h3>Why it fits</h3><p class="pre clamp">{{$j.FitNotes}}</p></section>{{end}}
     {{if $j.Veto}}<p class="callout bad"><b>Veto:</b> {{$j.Veto}}</p>{{end}}
-    <section><h3>Mail <span class="n">{{len .Mails}}</span><a class="act" href="{{.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail</a></h3>
-    {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="muted small">No messages logged. Replies appear after <code>scoutjobs email sync</code> or the inbox-triage skill.</p>{{end}}</section>
-    <section><h3>Activity</h3>
+    <section><h3>E-mails <span class="n">{{len .Mails}}</span><a class="act" href="/jobs/{{$j.ID}}?tab=mail">See all</a></h3>
+    {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="muted small">No e-mails yet. Replies from {{$j.Company}} show up here once your mail is <a href="/connections#mail">connected</a>.</p>{{end}}</section>
+    <section><h3>Activity <span class="n">{{.EventCount}}</span>{{if gt .EventCount (len .Events)}}<a class="act" href="/jobs/{{$j.ID}}?tab=activity">See all</a>{{end}}</h3>
     <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Back}}"><input name="note" placeholder="Add a note" aria-label="note"><button class="mini primary">Add</button></form>
-    <ul class="timeline compact">{{range .Events}}<li><span class="mono">{{when .At}}</span><span><span class="tag">{{.Kind}}</span> {{.Note}}</span></li>{{end}}</ul></section>
+    {{if .Events}}<ul class="evrows tl">{{range .Events}}{{$e := evrow .}}<li>
+      <span class="evico {{$e.Group}}" aria-hidden="true">{{template "evico" $e.Group}}</span>
+      <div class="what"><b>{{$e.Name}}</b><small class="muted">{{when $e.At}}</small>{{if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}{{template "evdata" $e}}</div>
+      {{if $e.Tone}}<span class="badge {{$e.Tone}}">{{if eq $e.Tone "ok"}}Done{{else if eq $e.Tone "warn"}}Needs you{{else}}Failed{{end}}</span>{{end}}
+    </li>{{end}}</ul>{{else}}<p class="muted small">Nothing yet.</p>{{end}}</section>
   </div>
   <aside class="issue-side">
     <div class="side-status"><span class="badge {{$j.Status}}">{{title $j.Status}}</span>{{if $j.Veto}}<span class="badge bad" title="{{$j.Veto}}">veto</span>{{else}}{{template "gauge-lg" $j.FitScore}}{{end}}</div>
@@ -48,7 +57,7 @@
     </dl></section>
     <section><h3>Application kit <span class="n">{{.KitDone}}/4</span></h3>
     <ul class="kitmini">{{range .Kit}}<li class="{{if .Done}}done{{end}}">{{.Label}}</li>{{end}}</ul>
-    {{if .Files}}<p class="files">{{$id := $j.ID}}{{range .Files}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}">{{.}}</a> {{end}}</p>{{end}}</section>
+    {{if .Files}}<p class="files">{{$id := $j.ID}}{{range .Files}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}" title="{{.}}">{{filelabel .}}</a> {{end}}</p>{{end}}</section>
     <section><h3>Interviews <span class="n">{{len .Interviews}}</span></h3>
     {{range .Interviews}}<p class="ivrow"><a href="/calendar?view=week&amp;d={{day .At}}&amp;ev=i{{.ID}}">{{when .At}}</a><span>{{title .Stage}} · <span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span>{{if .Outcome}} <span class="badge {{.Outcome}}">{{.Outcome}}</span>{{end}}</span></p>{{else}}<p class="muted small">None scheduled.</p>{{end}}</section>
   </aside>

@@ -147,14 +147,15 @@
 {{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export" data-busy="Making the PDF…"><button class="mini" type="submit">Make resume PDF again</button></form>{{end}}
 {{else}}{{$today := today}}
 <section class="panel">
-  <div class="panel-h"><h2>Activity</h2><span class="n">{{len .Events}}</span></div>
+  <div class="panel-h"><h2>Activity</h2><span class="n">{{len .Events}}</span><button class="act mini" type="button" data-expand=".evdata">Show all details</button></div>
+  {{if gt (len .EvGroups) 1}}<div class="chips evfilter">{{$k := .Kind}}<a href="/jobs/{{$j.ID}}?tab=activity" {{if eq $k ""}}class="on" aria-current="true"{{end}}>All</a>{{range .EvGroups}}<a href="/jobs/{{$j.ID}}?tab=activity&amp;kind={{.}}" {{if eq . $k}}class="on" aria-current="true"{{end}}>{{title .}}</a>{{end}}</div>{{end}}
   <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Self}}"><input name="note" placeholder="Add a note, e.g. called the recruiter, they liked my background" aria-label="note"><button class="primary">Add note</button></form>
-  {{$d := ""}}{{range .Events}}{{$e := evrow .}}{{if ne (day $e.At) $d}}{{if $d}}</ul>{{end}}{{$d = day $e.At}}<h3 class="evday-h">{{if eq $d $today}}Today{{else}}{{$d}}{{end}}</h3><ul class="evrows tl">{{end}}<li>
+  {{$d := ""}}{{$k := .Kind}}{{range .Events}}{{$e := evrow .}}{{if or (eq $k "") (eq $k $e.Group)}}{{if ne (day $e.At) $d}}{{if $d}}</ul>{{end}}{{$d = day $e.At}}<h3 class="evday-h">{{if eq $d $today}}Today{{else}}{{$d}}{{end}}</h3><ul class="evrows tl">{{end}}<li>
     <span class="mono muted">{{hm $e.At}}</span>
     <span class="evico {{$e.Group}}" aria-hidden="true">{{template "evico" $e.Group}}</span>
-    <div class="what"><b>{{$e.Name}}</b>{{if $e.Long}}<details class="evnote"><summary>{{$e.Note}}</summary><p>{{$e.Note}}</p></details>{{else if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}</div>
+    <div class="what"><b>{{$e.Name}}</b>{{if $e.Long}}<details class="evnote"><summary>{{$e.Note}}</summary><p>{{$e.Note}}</p></details>{{else if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}{{template "evdata" $e}}</div>
     <span class="badge {{$e.Tone}}">{{title $e.Group}}</span>
-  </li>{{end}}{{if $d}}</ul>{{else}}<p class="empty">Nothing yet<small>Status changes, drafts, e-mails and interviews for this job show up here.</small></p>{{end}}
+  </li>{{end}}{{end}}{{if $d}}</ul>{{else}}<p class="empty">Nothing yet<small>Status changes, drafts, e-mails and interviews for this job show up here.</small></p>{{end}}
 </section>
 {{end}}
 </div>

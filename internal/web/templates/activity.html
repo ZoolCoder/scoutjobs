@@ -10,7 +10,7 @@
     <span class="mono muted">{{hm $e.At}}</span>
     <div class="what"><b>{{$e.Name}}</b>
       {{if $e.JobID}}<small><a href="/jobs/{{$e.JobID}}">{{$e.Company}}</a>{{with $e.Title}} · {{.}}{{end}}</small>{{end}}
-      {{if $e.Long}}<details class="evnote"><summary>{{$e.Note}}</summary><p>{{$e.Note}}</p></details>{{else if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}</div>
+      {{if $e.Long}}<details class="evnote"><summary>{{$e.Note}}</summary><p>{{$e.Note}}</p></details>{{else if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}{{template "evdata" $e}}</div>
     <span class="badge {{$e.Tone}}">{{title $e.Group}}</span>
   </li>{{end}}</ul>
 </section>{{end}}

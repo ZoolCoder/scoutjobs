@@ -612,7 +612,7 @@ func TestActivityPlainWords(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/activity", nil))
 	body := rec.Body.String()
-	for _, want := range []string{"Assistant tailored your CV", "drafted → applied", `class="evnote"`, `href="/activity?kind=assistant"`} {
+	for _, want := range []string{"Assistant tailored your CV", "From Drafted to Applied.", `class="evnote"`, `href="/activity?kind=assistant"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("activity page lacks %q", want)
 		}

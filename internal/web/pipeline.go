@@ -346,6 +346,7 @@ type jobPanel struct {
 	Steps      []step
 	OffPath    bool // rejected, skipped, withdrawn...: shown as a badge after the stepper
 	Events     []store.Event
+	EventCount int // all events, Events holds the newest few
 	Interviews []store.Interview
 	Mails      []mailRow
 	Files      []string
@@ -372,9 +373,9 @@ func (v *server) panel(j store.Job, backURL, closeURL string) *jobPanel {
 		p.OffPath = p.OffPath || s == j.Status
 	}
 	p.OffPath = !p.OffPath
-	p.Events = events
-	if len(p.Events) > 8 {
-		p.Events = p.Events[:8]
+	p.Events, p.EventCount = events, len(events)
+	if len(p.Events) > 5 {
+		p.Events = p.Events[:5]
 	}
 	p.Interviews, _ = v.s.Interviews(j.ID, false)
 	p.Mails = v.mailRows(j.ID, 5)
