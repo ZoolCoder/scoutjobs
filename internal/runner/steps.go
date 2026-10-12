@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -300,4 +301,29 @@ func (rn *Runner) Finished(j store.Job) map[string]string {
 		}
 	}
 	return out
+}
+
+// fetchPosting is search.FetchPosting; tests point it at a fake.
+var fetchPosting = func(ctx context.Context, u string) (search.Posting, error) {
+	return search.FetchPosting(ctx, u, nil, nil)
+}
+
+// ensurePosting saves the posting from the job's URL to posting.md before the agent reads it, so
+// the fit review and the draft review check the drafts against the posting, not the board's tags.
+func (rn *Runner) ensurePosting(ctx context.Context, run *Run, j store.Job) {
+	if j.URL == "" || apply.HasPosting(rn.Store, j) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	p, err := fetchPosting(ctx, j.URL)
+	if err == nil {
+		err = apply.SavePosting(rn.Store, j, p.Description)
+	}
+	switch {
+	case err != nil:
+		run.logf("posting.md: %v", err)
+	case apply.HasPosting(rn.Store, j):
+		run.logf("posting.md: saved from %s", j.URL)
+	}
 }

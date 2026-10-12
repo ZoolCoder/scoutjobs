@@ -31,7 +31,7 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 	base := fmt.Sprintf("/jobs/%d", j.ID)
 	file := func(name string) string { return base + "/files/" + name }
 	items := []checkItem{
-		item("Fit scored", j.FitScore >= 0, fmt.Sprintf("fit %d", j.FitScore), "", ""),
+		item("Fit checked", j.FitScore >= 0, fmt.Sprintf("fit %d", j.FitScore), "", ""),
 		item("Tailored resume", kit.Resume, "resume.md", file("resume.md"), "Preview"),
 		item("Cover letter", kit.Cover, "cover-letter.md", file("cover-letter.md"), "Preview"),
 	}
@@ -83,9 +83,9 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 		pdf.Files = covered(e.Files)
 	}
 	items = append(items, pdf)
-	ats := checkItem{Label: "ATS check"}
+	ats := checkItem{Label: "Hiring software check"}
 	if c := kit.ATS; c != nil {
-		ats.State, ats.Detail = "done", fmt.Sprintf("ATS %d, content %d", c.ATSScore, c.Score)
+		ats.State, ats.Detail = "done", fmt.Sprintf("readable %d of 100, content %d of 100", c.ATSScore, c.Score)
 		if c.ATSScore < 70 {
 			ats.State = "warn"
 			if c.Gaps != "" {
@@ -103,15 +103,15 @@ func jobChecklist(j store.Job, kit apply.Kit, gates apply.Report, events []store
 		}
 	}
 	items = append(items, ats)
-	gate := checkItem{Label: "Quality gates", State: "done", Detail: "all pass", Href: base + "#gates", Act: "Details"}
+	gate := checkItem{Label: "Final checks", State: "done", Detail: "all pass", Href: base + "#gates", Act: "Details"}
 	if !gates.OK() {
 		var names []string
 		for _, g := range gates.Gates {
 			if g.State == apply.Fail {
-				names = append(names, g.Name)
+				names = append(names, strings.ToLower(gateLabel(g.Name)))
 			}
 		}
-		gate.State, gate.Detail = "blocked", "sending blocked: "+strings.Join(names, ", ")
+		gate.State, gate.Detail = "blocked", "to fix: "+strings.Join(names, "; ")
 	}
 	items = append(items, gate)
 	draft := checkItem{Label: "Application e-mail"}

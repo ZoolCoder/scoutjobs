@@ -84,7 +84,7 @@ func (v *server) cvDownload(w http.ResponseWriter, r *http.Request) {
 	download(w, r, filepath.Join(v.s.Home, "cv"), r.PathValue("name"))
 }
 
-// saveEmail keeps an edited proposal, and with action=gmail also puts it in Gmail's drafts. Nothing is sent.
+// saveEmail keeps an edited proposal, and with action=gmail also puts it in the mailbox's drafts. Nothing is sent.
 func (v *server) saveEmail(w http.ResponseWriter, r *http.Request) {
 	j, ok := v.formJob(w, r)
 	if !ok {
@@ -105,16 +105,15 @@ func (v *server) saveEmail(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, withParam(dest, "msg", "E-mail saved. It is not sent."), http.StatusSeeOther)
 		return
 	}
-	if v.cfg.Mail.Draft == nil {
-		http.Redirect(w, r, withParam(dest, "err", "gmail is not connected"), http.StatusSeeOther)
-		return
-	}
-	link, err := v.cfg.Mail.Draft(j.ID, kind)
-	if err != nil {
+	link, note, err := v.fileDraft(j.ID, kind)
+	switch {
+	case err != nil:
 		http.Redirect(w, r, withParam(dest, "err", err.Error()), http.StatusSeeOther)
-		return
+	case note != "":
+		http.Redirect(w, r, withParam(dest, "msg", note), http.StatusSeeOther)
+	default:
+		http.Redirect(w, r, withParam(dest, "drafted", link), http.StatusSeeOther)
 	}
-	http.Redirect(w, r, withParam(dest, "drafted", link), http.StatusSeeOther)
 }
 
 // ---- main CV and cover letter ----
@@ -140,9 +139,7 @@ func (v *server) masterPanel() masterPanel {
 		p.Disabled = true
 		return p
 	}
-	for _, a := range m.Agents() {
-		p.Agents = append(p.Agents, a.Name)
-	}
+	p.Agents = v.agentNames()
 	if r := m.Latest(runner.MasterID); r != nil {
 		snap := r.Snapshot()
 		if n := len(snap.Log); n > 60 {

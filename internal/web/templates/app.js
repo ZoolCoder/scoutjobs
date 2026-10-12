@@ -77,7 +77,13 @@
     }).then(function (run) {
       if (!run) return;
       if (panel.dataset.queued) { if (run.state !== 'queued') location.reload(); return; }
-      if (run.state !== 'running') { location.reload(); return; }
+      if (run.state !== 'running') {
+        // a link that only changes the #hash does not reload, so reload when the page stays the same
+        var done = panel.dataset.done && new URL(panel.dataset.done, location.href);
+        if (done && done.pathname + done.search !== location.pathname + location.search) location.href = done.href;
+        else location.reload();
+        return;
+      }
       var done = 0, now = [];
       (run.steps || []).forEach(function (s) {
         if (s.state !== 'pending' && s.state !== 'running') done++;
@@ -94,6 +100,7 @@
         set('[data-count]', done + '/' + (run.steps || []).length);
         set('[data-now]', now.length ? now.join(' + ') : 'Starting');
       }
+      if (panel.dataset.phases) phase(run.log || []);
       if (run.last) last = Date.parse(run.last);
       clock();
       var pre = panel.querySelector('details.runlog pre');
@@ -102,6 +109,35 @@
         pre.scrollTop = pre.scrollHeight;
       }
     }).catch(function () { /* next tick */ });
+  }
+
+  // mail and calendar sync: the agent's tool calls tell how far it got
+  var phaseSets = {
+    calendar: [
+      [/interview_add|interview_set/, 'Saving new interviews…', 85],
+      [/create|update|insert/i, 'Adding interviews to your calendar…', 70],
+      [/calendar|event/i, 'Reading your calendar…', 45],
+      [/interview_list|job_list/, 'Reading your interviews…', 25]
+    ],
+    mail: [
+      [/interview_add|interview_set/, 'Saving interviews…', 90],
+      [/email_log|job_set/, 'Logging the replies…', 75],
+      [/get_thread|get_message|read_/i, 'Reading the replies…', 60],
+      [/search/i, 'Searching your mail…', 40],
+      [/job_list/, 'Reading your applications…', 20]
+    ]
+  };
+  var phases = phaseSets[panel.dataset.phases] || phaseSets.calendar;
+  function phase(log) {
+    var text = 'Starting your AI assistant…', pct = 5;
+    log.forEach(function (line) {
+      for (var i = 0; i < phases.length; i++) {
+        if (phases[i][0].test(line) && phases[i][2] > pct) { text = phases[i][1]; pct = phases[i][2]; break; }
+      }
+    });
+    var bar = prog && prog.querySelector('progress');
+    if (bar) bar.value = pct;
+    set('[data-now]', text);
   }
 
   clock();
@@ -120,4 +156,352 @@
       btn.textContent = btn.dataset.busy || f.dataset.busy || 'Starting…';
     });
   });
+})();
+
+// Search results: the tag bar narrows the rows to those carrying every chosen tag.
+(function () {
+  var bar = document.querySelector('[data-tagbar]');
+  if (!bar) return;
+  var rows = document.querySelectorAll('ul.results > li');
+  var clear = bar.querySelector('[data-tag-clear]');
+  var none = bar.querySelector('[data-tag-none]');
+  var count = bar.closest('section').querySelector('.panel-h .n');
+
+  function apply() {
+    var on = [];
+    bar.querySelectorAll('[data-tag][aria-pressed="true"]').forEach(function (b) { on.push('|' + b.dataset.tag + '|'); });
+    var shown = 0;
+    rows.forEach(function (tr) {
+      var tags = tr.dataset.tags || '';
+      var ok = on.every(function (t) { return tags.indexOf(t) >= 0; });
+      tr.hidden = !ok;
+      if (ok) shown++;
+    });
+    clear.hidden = on.length === 0;
+    none.hidden = shown > 0;
+    if (count) count.textContent = on.length ? shown + ' of ' + rows.length : rows.length;
+  }
+
+  bar.addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    if (b === clear) {
+      bar.querySelectorAll('[data-tag]').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+    } else if (b.dataset.tag) {
+      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    }
+    apply();
+  });
+})();
+
+// The Connect Google wizard: reload when Google's client download lands, so the page offers to import it.
+(function () {
+  var box = document.querySelector('[data-gmail-detect]');
+  if (!box || box.querySelector('form')) return;
+  var tries = 0;
+  var giveUp = function (text) {
+    clearInterval(timer);
+    box.querySelector('p').textContent = text;
+    var manual = document.querySelector('#google details.manual');
+    if (manual) manual.open = true;
+  };
+  var timer = setInterval(function () {
+    if (++tries > 200) return giveUp('No client file arrived in Downloads. Add it below.'); // ten minutes
+    fetch('/gmail/detect', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.blind) return giveUp('ScoutJobs cannot look in Downloads (macOS privacy). Add the file below.');
+      if (d.file || d.client) { clearInterval(timer); location.reload(); }
+    }).catch(function () {});
+  }, 3000);
+})();
+
+// Inbox › Connect and Connections: show which mail and calendar connectors each AI agent can reach.
+(function () {
+  var rows = document.querySelectorAll('[data-mail-check]');
+  if (!rows.length) return;
+  var add = function (parent, tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    el.textContent = text;
+    parent.appendChild(el);
+    return el;
+  };
+  var check = function (row, fresh) {
+    var out = row.querySelector('.conns');
+    out.textContent = fresh ? 'checking again…' : 'looking for mail connectors…';
+    fetch(row.dataset.mailCheck + (fresh ? '&fresh=1' : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      out.textContent = '';
+      if (d.error) return add(out, 'span', 'auth', d.error);
+      var list = (d.connectors || []);
+      if (!list.length) add(out, 'span', '', 'no mail connector yet');
+      list.forEach(function (c, i) {
+        if (i) out.appendChild(document.createTextNode(', '));
+        add(out, 'span', c.ready ? 'ready' : 'auth', c.name + (c.ready ? ' ✓' : ' (sign in)'));
+      });
+      if (d.hint) add(out, 'span', 'hint', d.hint);
+    }).catch(function () { out.textContent = 'could not ask the agent'; });
+  };
+  rows.forEach(function (row) {
+    if (!('lazy' in row.dataset)) check(row, false); // on Connections, only when Test is pressed
+    var again = row.querySelector('[data-recheck]');
+    if (again) again.addEventListener('click', function () { check(row, true); });
+  });
+})();
+
+// Inbox › Connect: the option cards open their setup details.
+document.querySelectorAll('[data-open]').forEach(function (a) {
+  var d = document.getElementById(a.dataset.open);
+  if (!d) return;
+  if (!d.open) d.classList.add('folded');
+  a.addEventListener('click', function (e) {
+    e.preventDefault();
+    d.classList.remove('folded');
+    d.open = true;
+    d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
+// Job page: a link to a folded section opens it.
+(function () {
+  var open = function () {
+    var d = location.hash && document.getElementById(location.hash.slice(1));
+    if (d && d.tagName === 'DETAILS') d.open = true;
+  };
+  open();
+  window.addEventListener('hashchange', open);
+})();
+
+// Every page: a thin bar at the top while the next page loads, and the clicked button spins and
+// stays disabled, so a slow answer never looks like nothing happened and nothing is sent twice.
+(function () {
+  var bar = document.createElement('div');
+  bar.className = 'loadbar';
+  bar.setAttribute('role', 'progressbar');
+  bar.setAttribute('aria-label', 'Loading');
+  bar.hidden = true;
+  document.body.appendChild(bar);
+  var delay, safety;
+
+  // fast answers skip the bar; a download never unloads the page, so give up after a while
+  function start() {
+    clearTimeout(delay);
+    clearTimeout(safety);
+    delay = setTimeout(function () {
+      bar.hidden = false;
+      document.body.setAttribute('aria-busy', 'true');
+    }, 150);
+    safety = setTimeout(stop, 15000);
+  }
+
+  function stop() {
+    clearTimeout(delay);
+    clearTimeout(safety);
+    bar.hidden = true;
+    document.body.removeAttribute('aria-busy');
+    document.querySelectorAll('button.working').forEach(function (b) {
+      b.classList.remove('working');
+      b.disabled = false;
+    });
+  }
+
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (e.defaultPrevented || (f.target && f.target !== '_self')) return;
+    start();
+    var btn = e.submitter;
+    if (!btn || btn.classList.contains('busy')) return;
+    btn.classList.add('working');
+    setTimeout(function () { btn.disabled = true; }, 0); // after the form has read the button's value
+  });
+
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if ((a.target && a.target !== '_self') || a.hasAttribute('download')) return;
+    var u = new URL(a.href, location.href);
+    if (u.origin !== location.origin) return;
+    if (u.pathname === location.pathname && u.search === location.search && u.hash) return;
+    start();
+  });
+
+  window.addEventListener('pageshow', stop); // back/forward restores the page as it was left
+})();
+
+// Dropdowns built on <details>: close on a click outside or on Escape, like a native menu.
+(function () {
+  var open = function () { return document.querySelectorAll('details.prep-pop[open]'); };
+  document.addEventListener('click', function (e) {
+    open().forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    open().forEach(function (d) {
+      d.open = false;
+      d.querySelector('summary').focus();
+    });
+  });
+})();
+
+// Job e-mails: mark the e-mail shown in the pane, the first one when none is picked.
+(function () {
+  var list = document.querySelector('.maillist');
+  if (!list) return;
+  function mark() {
+    var links = list.querySelectorAll('a');
+    var on = list.querySelector('a[href="' + location.hash + '"]') || links[0];
+    links.forEach(function (a) { a.classList.toggle('on', a === on); });
+  }
+  window.addEventListener('hashchange', mark);
+  mark();
+})();
+
+// Blocking dialogs: the page waits behind them; Escape does not close them.
+document.querySelectorAll('dialog[data-modal]').forEach(function (d) {
+  if (!d.showModal) return;
+  if (d.open) d.close();
+  d.showModal();
+  d.addEventListener('cancel', function (e) { e.preventDefault(); });
+});
+
+// Switches that save as soon as they flip.
+document.querySelectorAll('[data-autosubmit]').forEach(function (el) {
+  el.addEventListener('change', function () { el.form.submit(); });
+});
+
+// Connections: Test connection asks the server and says the answer under the card.
+document.querySelectorAll('[data-test]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var out = btn.closest('section').querySelector('[data-test-out]');
+    var label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Testing…';
+    out.hidden = false;
+    out.className = 'testout';
+    out.textContent = 'Checking, this can take up to a minute…';
+    fetch('/connections/test?card=' + encodeURIComponent(btn.dataset.test), { cache: 'no-store', credentials: 'same-origin' })
+      .then(function (res) { return res.json(); })
+      .then(function (r) { out.className = 'testout ' + (r.ok ? 'ok' : 'bad'); out.textContent = r.text; })
+      .catch(function () { out.className = 'testout bad'; out.textContent = 'ScoutJobs did not answer. Is it still running?'; })
+      .then(function () { btn.disabled = false; btn.textContent = label; });
+  });
+});
+
+// Sidebar: fold it to icons and back; a cookie keeps the choice so the server draws it folded next time.
+(function () {
+  var btn = document.querySelector('[data-fold]');
+  var shell = document.querySelector('.shell');
+  if (!btn || !shell) return;
+  function titles(mini) {
+    document.querySelectorAll('.side nav a').forEach(function (a) {
+      if (mini) { a.dataset.tip = a.textContent.trim(); a.dataset.tipPos = 'right'; } else a.removeAttribute('data-tip');
+    });
+  }
+  titles(shell.classList.contains('mini'));
+  btn.addEventListener('click', function () {
+    var mini = shell.classList.toggle('mini');
+    var label = mini ? 'Expand menu' : 'Collapse menu';
+    btn.setAttribute('aria-expanded', String(!mini));
+    btn.setAttribute('aria-label', label);
+    btn.dataset.tip = label;
+    titles(mini);
+    document.cookie = 'side=' + (mini ? 'mini' : 'full') + '; path=/; max-age=31536000; samesite=lax';
+  });
+})();
+
+// "Show all details": open or close every disclosure the button names.
+document.querySelectorAll('[data-expand]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var all = document.querySelectorAll(btn.dataset.expand);
+    var open = btn.dataset.open !== '1';
+    all.forEach(function (d) { d.open = open; });
+    btn.dataset.open = open ? '1' : '';
+    btn.textContent = open ? 'Hide details' : 'Show all details';
+  });
+});
+
+// Tooltips: the templates write plain title attributes, so the hint is there without the script.
+// This swaps them for a tooltip that also opens on keyboard focus, stays while the pointer is on it,
+// closes with Escape, and is announced as the control's description.
+(function () {
+  var tip = document.createElement('div');
+  tip.id = 'tip';
+  tip.className = 'tip';
+  tip.setAttribute('role', 'tooltip');
+  tip.hidden = true;
+  document.body.appendChild(tip);
+  var host = null, timer = 0;
+  var interactive = 'a[href],button,input,select,textarea,summary,[tabindex]';
+
+  function adopt(root) {
+    root.querySelectorAll('[title]:not(iframe):not(svg *)').forEach(function (el) {
+      var text = el.getAttribute('title').trim();
+      el.removeAttribute('title');
+      if (!text) return;
+      el.dataset.tip = text;
+      // The title was this control's only name (an icon link or button): keep it as the label.
+      if (el.matches(interactive) && !el.getAttribute('aria-label') && !el.innerText.trim()) el.setAttribute('aria-label', text);
+      // A plain span cannot take focus, so screen readers get the hint as hidden text instead.
+      if (!el.matches(interactive) && el.textContent.indexOf(text) < 0) {
+        var sr = document.createElement('span');
+        sr.className = 'sr-only';
+        sr.textContent = ' (' + text + ')';
+        el.appendChild(sr);
+      }
+    });
+  }
+
+  function place() {
+    var r = host.getBoundingClientRect(), t = tip.getBoundingClientRect(), gap = 8;
+    var vw = document.documentElement.clientWidth, x, y;
+    if (host.dataset.tipPos === 'right') {
+      x = r.right + gap; y = r.top + (r.height - t.height) / 2;
+    } else {
+      x = r.left + (r.width - t.width) / 2; y = r.top - t.height - gap;
+      if (y < 4) y = r.bottom + gap;
+    }
+    x = Math.max(4, Math.min(x, vw - t.width - 4));
+    tip.style.left = Math.round(x) + 'px';
+    tip.style.top = Math.round(y) + 'px';
+  }
+
+  function show(el) {
+    clearTimeout(timer);
+    if (host && host !== el) hide();
+    host = el;
+    tip.textContent = el.dataset.tip;
+    tip.hidden = false;
+    place();
+    if (el.getAttribute('aria-label') !== el.dataset.tip && el.textContent.trim() !== el.dataset.tip) {
+      el.setAttribute('aria-describedby', 'tip');
+    }
+  }
+
+  function hide() {
+    clearTimeout(timer);
+    if (host && host.getAttribute('aria-describedby') === 'tip') host.removeAttribute('aria-describedby');
+    host = null;
+    tip.hidden = true;
+  }
+
+  function later(fn, ms) { clearTimeout(timer); timer = setTimeout(fn, ms); }
+  function target(e) { return e.target.closest && e.target.closest('[data-tip]'); }
+
+  adopt(document);
+  document.addEventListener('mouseover', function (e) {
+    if (tip.contains(e.target)) { clearTimeout(timer); return; }
+    var el = target(e);
+    if (el && el !== host) later(function () { show(el); }, 350);
+    else if (el) clearTimeout(timer);
+  });
+  document.addEventListener('mouseout', function (e) {
+    var to = e.relatedTarget;
+    if (to && (tip.contains(to) || (host && host.contains(to)))) return;
+    if (host || target(e)) later(hide, 120);
+  });
+  document.addEventListener('focusin', function (e) {
+    var el = target(e);
+    if (el && e.target.matches(':focus-visible')) show(el); else if (host) hide();
+  });
+  document.addEventListener('focusout', function () { if (host) hide(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && host) hide(); });
+  window.addEventListener('scroll', function () { if (host) hide(); }, true);
 })();

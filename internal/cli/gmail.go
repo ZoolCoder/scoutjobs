@@ -17,6 +17,7 @@ import (
 	"github.com/zoolcoder/scoutjobs/internal/calsync"
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
 	"github.com/zoolcoder/scoutjobs/internal/mail"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 	"github.com/zoolcoder/scoutjobs/internal/web"
 )
@@ -42,12 +43,14 @@ const gmailSteps = `Google setup: a Desktop OAuth client in your own Google Clou
   2. Enable the Gmail and Calendar APIs in it:
      ` + gmail.EnableAPIs + `
   3. Configure the consent screen: Get started, app name ScoutJobs, audience External, your e-mail:
-     https://console.cloud.google.com/auth/overview
-     Then Audience > Publish app. In Testing mode Google drops the connection every 7 days.
-  4. Create the client: Application type Desktop app, Create, then Download JSON:
+     https://console.cloud.google.com/auth/overview/create
+  4. Publish the app (Publish app). Do not skip it: in Testing mode Google disconnects you every 7 days.
+     https://console.cloud.google.com/auth/audience
+  5. Create the client: Application type Desktop app, Create, then Download JSON:
      https://console.cloud.google.com/auth/clients/create
 
 Google will say it has not verified the app: it is your own app, so choose Advanced > Go to ScoutJobs.
+Tick every box on Google's screen: mail, drafts and calendar.
 ScoutJobs reads inbox metadata and your calendar, and creates drafts.
 It never sends, labels or deletes mail, and in your calendar it writes only the interviews it adds.
 `
@@ -61,6 +64,9 @@ func setupGmail(s *store.Store, cfg Config, file string, wait time.Duration, out
 	if file == "" {
 		fmt.Fprint(out, gmailSteps)
 		dir := downloadsDir()
+		if _, err := os.ReadDir(dir); err != nil {
+			return fmt.Errorf("cannot read %s (on macOS, the terminal needs access to Downloads); rerun with --file <path to the downloaded JSON>", dir)
+		}
 		if file = gmail.FindDownload(dir, time.Time{}); file == "" {
 			fmt.Fprintf(out, "\nWaiting for client_secret_….json in %s (%s; or rerun with --file <path>)...\n", dir, wait)
 			deadline := time.Now().Add(wait)
@@ -106,11 +112,30 @@ func connectGmail(s *store.Store, cfg Config, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "gmail connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
-	if !gmail.HasScope(t.Scope, gmail.CalendarScope) && !gmail.HasScope(t.Scope, gmail.CalendarEventsScope) {
-		fmt.Fprintln(out, "calendar was not allowed: the dashboard calendar shows only ScoutJobs events (connect again and tick Calendar to add yours)")
-	}
+	fmt.Fprintf(out, "google connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
+	printGrant(out, gmailClient(s, cfg).Status())
 	return nil
+}
+
+// printGrant warns about boxes left unticked on Google's screen and about a Testing-mode app.
+func printGrant(out io.Writer, st gmail.State) {
+	var missing []string
+	if !st.Mail {
+		missing = append(missing, "reading mail")
+	}
+	if !st.Drafts {
+		missing = append(missing, "creating drafts")
+	}
+	if !st.CalendarWrite {
+		missing = append(missing, "calendar")
+	}
+	if len(missing) > 0 {
+		fmt.Fprintf(out, "not allowed: %s. Run scoutjobs gmail connect again and tick every box.\n", strings.Join(missing, ", "))
+	}
+	if st.Testing {
+		fmt.Fprintf(out, "your Google Cloud app is in Testing mode: Google disconnects it on %s. Publish it at "+
+			"https://console.cloud.google.com/auth/audience, then run scoutjobs gmail connect again\n", st.Ends.Format("Jan 2"))
+	}
 }
 
 // testGoogle checks mail and calendar separately, so one failing does not hide the other.
@@ -169,12 +194,17 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		if _, err := parse(fs, rest); err != nil {
 			return err
 		}
+		st := c.Status()
 		res := map[string]any{"client_id": c.ID != "", "connected": c.Connected(), "account": c.Account(), "calendar": c.HasCalendar(),
-			"calendar_sync": c.CanWriteCalendar(), "imap_host": cfg.IMAPHost}
+			"calendar_sync": c.CanWriteCalendar(), "imap_host": cfg.IMAPHost, "mail": st.Mail, "drafts": st.Drafts,
+			"testing": st.Testing, "problem": st.Problem}
 		return emit(out, *asJSON, res, func() {
 			switch {
+			case st.Problem != "":
+				fmt.Fprintf(out, "gmail: disconnected by Google: %s\n", st.Problem)
 			case c.Connected():
 				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), calendarState(c))
+				printGrant(out, st)
 			case c.ID == "":
 				fmt.Fprintln(out, "gmail: off (scoutjobs gmail setup connects it in a few minutes)")
 			default:
@@ -237,19 +267,25 @@ func gmailDraft(s *store.Store, cfg Config, j store.Job, kind string) (gmail.Dra
 	}
 	now := time.Now()
 	m.MessageID = mail.NewMessageID(m.From, now)
+	thread := ""
+	if kind != "" && kind != "application" { // a follow-up or thank-you answers the conversation so far
+		var ref string
+		thread, ref = s.JobThread(j.ID)
+		m.InReplyTo = ref
+	}
 	raw, err := mail.Build(m, now)
 	if err != nil {
 		return gmail.Draft{}, "", err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	d, err := c.CreateDraft(ctx, raw, "")
+	d, err := c.CreateDraft(ctx, raw, thread)
 	if err != nil {
 		return d, "", err
 	}
-	_ = s.RecordMail(m.MessageID, j.ID, "out", 0)
+	_ = s.RecordDraft(m.MessageID, j.ID, d.Thread)
 	_ = s.AddEvent(j.ID, "email:gmail_draft", "to "+m.To+": "+m.Subject)
-	return d, "https://mail.google.com/mail/#drafts?compose=" + d.MessageID, nil
+	return d, gmail.DraftURL(c.Account(), d.MessageID), nil
 }
 
 // proposal is the saved version of a proposed e-mail, else the one proposed now.
@@ -265,21 +301,30 @@ func proposal(s *store.Store, cfg Config, j store.Job, kind string) (mail.Messag
 	return mail.Message{}, fmt.Errorf("no %s e-mail is proposed for job %d now", kind, j.ID)
 }
 
-// mailSource picks where `email sync` reads: Gmail when connected, IMAP when imap_host is set.
+// mailSource picks where `email sync` reads: the AI agent when the user chose it on the dashboard,
+// else Gmail when connected, else IMAP when imap_host is set.
 func mailSource(s *store.Store, cfg Config, via string) (string, error) {
 	switch via {
-	case "gmail", "imap":
+	case "agent", "gmail", "imap":
 		return via, nil
 	case "", "auto":
+		switch s.Setting(runner.MailVia) {
+		case "agent":
+			return "agent", nil
+		case "imap":
+			if cfg.IMAPHost != "" {
+				return "imap", nil
+			}
+		}
 		if gmailClient(s, cfg).Connected() {
 			return "gmail", nil
 		}
 		if cfg.IMAPHost != "" {
 			return "imap", nil
 		}
-		return "", errors.New("no inbox to read: run scoutjobs gmail setup, or set imap_host in config.yaml")
+		return "", errors.New("no inbox to read: connect one on the dashboard's Inbox page, run scoutjobs gmail setup, or set imap_host in config.yaml")
 	}
-	return "", fmt.Errorf("--via %q: use gmail, imap or auto", via)
+	return "", fmt.Errorf("--via %q: use agent, gmail, imap or auto", via)
 }
 
 // fetchMail never reads mail from before the first tracked job: an older message cannot be a reply to
@@ -320,17 +365,38 @@ func sentSince(mails []mail.Mail, start time.Time) []mail.Mail {
 func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 	return web.MailHooks{
 		Status: func() (string, string) {
-			c := gmailClient(s, cfg)
-			if c.Connected() {
-				return "gmail", c.Account()
-			}
-			if cfg.IMAPHost != "" {
-				return "imap", imapAccount(cfg).User
+			src, _ := mailSource(s, cfg, "")
+			switch src {
+			case "agent":
+				return src, mailAgentName(s, cfg)
+			case "gmail":
+				return src, gmailClient(s, cfg).Account()
+			case "imap":
+				return src, imapAccount(cfg).User
 			}
 			return "", cfg.EmailFrom
 		},
+		Test: func() error {
+			src, err := mailSource(s, cfg, "")
+			switch src {
+			case "gmail":
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_, err = gmailClient(s, LoadConfig(s.Home)).Fetch(ctx, time.Now(), 1)
+			case "imap":
+				_, err = imapAccount(cfg).Fetch(time.Now(), 1)
+			}
+			return err
+		},
 		Sync:  func() (int, error) { return SyncMail(s, cfg) },
 		Gmail: func() *gmail.Client { return gmailClient(s, LoadConfig(s.Home)) }, // config.yaml edits apply without a restart
+		Compose: func(id int64, kind string) (runner.MailTask, error) {
+			j, err := s.JobByID(id)
+			if err != nil {
+				return runner.MailTask{}, err
+			}
+			return draftTask(s, cfg, j, kind)
+		},
 		Draft: func(id int64, kind string) (string, error) {
 			j, err := s.JobByID(id)
 			if err != nil {
@@ -370,8 +436,11 @@ func calendarState(c *gmail.Client) string {
 
 // runCalendar syncs interviews with Google Calendar both ways; the dashboard does the same every few minutes.
 func runCalendar(s *store.Store, cfg Config, args []string, out io.Writer) error {
+	if len(args) > 0 && args[0] == "save" {
+		return runCalendarSave(s, args[1:], out)
+	}
 	if len(args) == 0 || args[0] != "sync" {
-		return errors.New("usage: calendar sync [--json]")
+		return errors.New("usage: calendar sync [--json] | calendar save --events <json>")
 	}
 	fs := flag.NewFlagSet("calendar sync", flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "")
@@ -392,4 +461,19 @@ func runCalendar(s *store.Store, cfg Config, args []string, out io.Writer) error
 		fmt.Fprintln(os.Stderr, "calendar is read-only: interviews are read from it, not added; scoutjobs gmail connect again to allow that")
 	}
 	return err
+}
+
+// runCalendarSave keeps the events the AI agent listed from the user's calendar, for the dashboard.
+func runCalendarSave(s *store.Store, args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("calendar save", flag.ContinueOnError)
+	events := fs.String("events", "", "JSON array of {id,title,start,end,all_day,location}")
+	if _, err := parse(fs, args); err != nil {
+		return err
+	}
+	n, err := calsync.SaveAgentEvents(s, *events)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "saved %d calendar events\n", n)
+	return nil
 }

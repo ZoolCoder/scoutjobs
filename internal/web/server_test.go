@@ -127,7 +127,7 @@ func TestDraftEditDueAndReviews(t *testing.T) {
 		t.Errorf("edit event missing")
 	}
 	// due filter: job 1 has no deadline and is "new", so nothing is due; a deadline this week puts it back
-	if rec := get("/pipeline?due=1"); !strings.Contains(rec.Body.String(), "No match here") || !strings.Contains(rec.Body.String(), "Due this week ×") {
+	if rec := get("/pipeline?due=1"); !strings.Contains(rec.Body.String(), "No match here") || !strings.Contains(rec.Body.String(), `Due this week <span aria-hidden="true">×</span>`) {
 		t.Errorf("due filter should hide job 1: %s", rec.Body.String())
 	}
 	dl := time.Now().AddDate(0, 0, 3).Format("2006-01-02")
@@ -142,10 +142,10 @@ func TestDraftEditDueAndReviews(t *testing.T) {
 	os.MkdirAll(filepath.Join(s.Home, "reviews"), 0o755)
 	os.WriteFile(filepath.Join(s.Home, "reviews", "2026-41.md"), []byte("# Week 41\n\nApplied 4 of 5."), 0o600)
 	os.WriteFile(filepath.Join(s.Home, "reviews", "2026-40.md"), []byte("# Week 40"), 0o600)
-	if rec := get("/reviews"); !strings.Contains(rec.Body.String(), "Applied 4 of 5") || !strings.Contains(rec.Body.String(), "2026-40.md") || !strings.Contains(rec.Body.String(), "<meter") {
+	if rec := get("/reviews"); !strings.Contains(rec.Body.String(), "Applied 4 of 5") || !strings.Contains(rec.Body.String(), "Week 40 · 28 Sep – 4 Oct 2026") || !strings.Contains(rec.Body.String(), "<meter") {
 		t.Errorf("reviews page: %s", rec.Body.String())
 	}
-	if rec := get("/reviews?f=2026-40.md"); !strings.Contains(rec.Body.String(), "# Week 40") {
+	if rec := get("/reviews?f=2026-40.md"); !strings.Contains(rec.Body.String(), `href="/reviews?f=2026-41.md" title="Newer week"`) {
 		t.Errorf("pick review: %s", rec.Body.String())
 	}
 	if rec := get("/reviews?f=..%2Fprofile.md"); strings.Contains(rec.Body.String(), "Name") && !strings.Contains(rec.Body.String(), "Applied 4 of 5") {
@@ -438,7 +438,7 @@ func TestSearchForm(t *testing.T) {
 	}
 	// a careers URL works as a board, and a tracked posting shows its stage instead of an Add button
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://boards.greenhouse.io/acme/"}})
-	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "tracked · new") || strings.Contains(b, `name="company" value="acme"`) {
+	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "In pipeline · new") || strings.Contains(b, `name="company" value="acme"`) {
 		t.Errorf("tracked mark: %d %s", rec.Code, b)
 	}
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://www.linkedin.com/jobs/"}})
@@ -566,7 +566,7 @@ func TestPipelineAtScale(t *testing.T) {
 	if !strings.Contains(list, "Page 2 of 2") || strings.Count(list, `class="row-job"`) != 11 || !strings.Contains(list, `href="/pipeline?view=list">← Prev</a>`) {
 		t.Error("list page 2 should hold the last 11 jobs and a Prev link")
 	}
-	if !strings.Contains(get("/pipeline?view=list&page=2&src=manual"), `href="/pipeline?due=1&amp;src=manual&amp;view=list">Due this week</a>`) {
+	if !strings.Contains(get("/pipeline?view=list&page=2&src=manual"), `href="/pipeline?due=1&amp;src=manual&amp;view=list" title="Only jobs with a deadline or follow-up in the next 7 days">Due this week</a>`) {
 		t.Error("filter links should drop the page")
 	}
 }
@@ -594,12 +594,65 @@ func TestJobPageGatesAndReview(t *testing.T) {
 		return rec.Body.String()
 	}
 	page := get("/jobs/1")
-	for _, want := range []string{"Ready to send?", "hard veto on the job: work permit: no sponsorship", "six years of Go", `class="badge direct"`, "Veto:", "blocking"} {
+	for _, want := range []string{"Ready to send?", "hard veto on the job: work permit: no sponsorship", "profile.md: Go since 2018", `class="badge direct"`, "Not a match:", "to fix"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("job page lacks %q", want)
 		}
 	}
 	if board := get("/pipeline"); !strings.Contains(board, `title="work permit: no sponsorship">veto<`) {
 		t.Error("pipeline card lacks the veto badge")
+	}
+}
+
+func TestActivityPlainWords(t *testing.T) {
+	s := testStore(t)
+	s.AddEvent(1, "run:tailor", strings.Repeat("long agent output ", 20))
+	s.AddEvent(1, "status", "drafted -> applied")
+	h, _ := Handler(s, Config{})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/activity", nil))
+	body := rec.Body.String()
+	for _, want := range []string{"Assistant tailored your CV", "From Drafted to Applied.", `class="evnote"`, `href="/activity?kind=assistant"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("activity page lacks %q", want)
+		}
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/activity?kind=status", nil))
+	if strings.Contains(rec.Body.String(), "Assistant tailored your CV") {
+		t.Errorf("status filter shows assistant events")
+	}
+}
+
+func TestFriendlyDay(t *testing.T) {
+	now := time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)
+	for in, want := range map[string]string{
+		"2026-10-12T09:00:00Z": "today",
+		"2026-10-11":           "yesterday",
+		"2026-03-04 08:00":     "4 Mar",
+		"2025-12-31":           "31 Dec 2025",
+		"soon":                 "soon",
+	} {
+		if got := friendlyDay(in, now); got != want {
+			t.Errorf("friendlyDay(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestFriendlyWhen(t *testing.T) {
+	now := time.Date(2026, 10, 12, 15, 0, 0, 0, time.UTC)
+	if got := friendlyWhen("2026-10-12T16:00:00Z", now); got != "today 16:00" {
+		t.Errorf("got %q", got)
+	}
+	if got := friendlyWhen("2026-10-01", now); got != "1 Oct" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestSplitPast(t *testing.T) {
+	now := time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
+	ahead, past := splitPast([]store.Interview{{At: "2026-10-11T16:00"}, {At: "2026-10-12T08:00"}, {At: ""}, {At: "2026-10-13T14:00"}}, now)
+	if len(ahead) != 3 || len(past) != 1 || past[0].At != "2026-10-11T16:00" {
+		t.Errorf("ahead %v past %v", ahead, past)
 	}
 }

@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/match"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -90,18 +93,31 @@ type searchForm struct {
 	Name            string // the saved search this form came from or is saved as
 	Filter          resultFilter
 	Hidden          int // postings the result filter dropped
+	Mismatched      int // postings hidden because they break a must in the profile
+	Ranked          bool
+	Suggestions     []match.Suggestion
+	TagCounts       []tagCount
+}
+
+// tagCount is a tag the results share, for the tag filter bar.
+type tagCount struct {
+	Tag string
+	N   int
 }
 
 // resultFilter narrows what the boards return; it is stored with a saved search as url-encoded values.
 type resultFilter struct {
-	RemoteOnly bool
-	Exclude    string // comma separated words; a title containing any of them is dropped
-	Days       int    // posted within the last N days; undated postings stay
-	MinSalary  int64  // drops postings whose top of range is below it; postings without a salary stay
+	RemoteOnly   bool
+	Exclude      string // comma separated words; a title containing any of them is dropped
+	Days         int    // posted within the last N days; undated postings stay
+	MinSalary    int64  // drops postings whose top of range is below it; postings without a salary stay
+	Location     string // comma separated cities, countries or regions; see search.LocationMatch
+	HideMismatch bool   // drops postings that break a must in the profile: place, engagement, salary floor
 }
 
 func filterFromValues(q url.Values) resultFilter {
-	f := resultFilter{RemoteOnly: q.Get("remote_only") != "", Exclude: strings.TrimSpace(q.Get("exclude"))}
+	f := resultFilter{RemoteOnly: q.Get("remote_only") != "", Exclude: strings.TrimSpace(q.Get("exclude")),
+		Location: strings.TrimSpace(q.Get("location")), HideMismatch: q.Get("hide_mismatch") != ""}
 	f.Days, _ = strconv.Atoi(q.Get("days"))
 	f.MinSalary, _ = strconv.ParseInt(q.Get("min_salary"), 10, 64)
 	return f
@@ -121,6 +137,12 @@ func (f resultFilter) encode() string {
 	if f.MinSalary > 0 {
 		q.Set("min_salary", strconv.FormatInt(f.MinSalary, 10))
 	}
+	if f.Location != "" {
+		q.Set("location", f.Location)
+	}
+	if f.HideMismatch {
+		q.Set("hide_mismatch", "1")
+	}
 	return q.Encode()
 }
 
@@ -137,19 +159,59 @@ func (f resultFilter) keep(p search.Posting, now time.Time) bool {
 	if f.Days > 0 && len(p.PostedAt) >= 10 && p.PostedAt[:10] < now.AddDate(0, 0, -f.Days).Format("2006-01-02") {
 		return false
 	}
+	if ok, _ := search.LocationMatch(p, splitList(f.Location)); !ok {
+		return false
+	}
 	return f.MinSalary <= 0 || p.SalaryMax == 0 || p.SalaryMax >= f.MinSalary
 }
 
-// searchRow is a posting plus the tracked job it already matches, if any.
+// searchRow is a posting plus the tracked job it already matches, if any, and how well it fits the
+// profile.
 type searchRow struct {
 	search.Posting
-	Job store.Job
+	Job     store.Job
+	Match   match.Result
+	Ranked  bool
+	TagList []string
 }
 
-func (v *server) searchRows(ps []search.Posting) []searchRow {
+// FitClass colours the match score: a strong fit plain, a partial one amber, a weak one or one that
+// breaks a must red.
+func (r searchRow) FitClass() string {
+	switch {
+	case len(r.Match.Hard) > 0 || r.Match.Score < 45:
+		return "lo"
+	case r.Match.Score < 70:
+		return "mid"
+	}
+	return ""
+}
+
+// DataTags is the row's tags for the tag filter, lower case and "|" separated.
+// MatchLabel says in words how well a ranked posting fits.
+func (r searchRow) MatchLabel() string {
+	switch {
+	case len(r.Match.Hard) > 0:
+		return "Breaks a must-have"
+	case r.Match.Score >= 70:
+		return "Great match"
+	case r.Match.Score >= 45:
+		return "Good match"
+	}
+	return "Weak match"
+}
+
+func (r searchRow) DataTags() string {
+	return "|" + strings.ToLower(strings.Join(r.TagList, "|")) + "|"
+}
+
+func (v *server) searchRows(ps []search.Posting, pr match.Profile, ranked bool) []searchRow {
 	rows := make([]searchRow, 0, len(ps))
 	for _, p := range ps {
-		row := searchRow{Posting: p}
+		row := searchRow{Posting: p, Ranked: ranked, TagList: splitList(p.AllTags())}
+		if ranked {
+			row.Match = pr.Score(p)
+		}
 		if j, err := v.s.JobByKey(store.JobKey(p.Company, p.Title)); err == nil {
 			row.Job = j
 		} else if j, ok := v.s.JobByURL(p.URL); ok {
@@ -165,6 +227,9 @@ func (v *server) searchPage(w http.ResponseWriter, r *http.Request) {
 		Queries: strings.Join(v.cfg.SearchQueries, ", "), Boards: strings.Join(v.cfg.SearchBoards, ", "),
 		Remote: v.cfg.SearchRemote, Limit: 50, BoardNames: search.Boards,
 	}
+	pr := match.Load(v.s)
+	f.Filter.Location = strings.Join(pr.Places, ", ")
+	f.Suggestions = pr.Suggest()
 	f.Saved, _ = v.s.SavedSearches()
 	v.render(w, r, "search.html", "search", f)
 }
@@ -202,31 +267,76 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 		v.render(w, r, "search.html", "search", f)
 		return
 	}
+	pr := match.Load(v.s)
+	f.Suggestions = pr.Suggest()
+	if f.Filter.Location != "" {
+		pr.Places = splitList(f.Filter.Location) // the place searched for is the place to score against
+	}
+	f.Ranked = !pr.Empty()
+	opts := search.Options{Queries: splitList(f.Queries), Boards: boards, Remote: f.Remote, Off: v.remoteOff(), Limit: f.Limit, BaseURL: v.cfg.SearchBaseURL}
+	now := time.Now()
+	opts.Keep = func(p search.Posting) bool {
+		switch {
+		case !f.Filter.keep(p, now):
+			f.Hidden++
+		case f.Filter.HideMismatch && f.Ranked && len(pr.Score(p).Hard) > 0:
+			f.Mismatched++
+		default:
+			return true
+		}
+		return false
+	}
+	if f.Ranked {
+		opts.Rank = func(p search.Posting) int { return pr.Score(p).Score }
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
-	res := search.Run(ctx, search.Options{Queries: splitList(f.Queries), Boards: boards, Remote: f.Remote, Limit: f.Limit, BaseURL: v.cfg.SearchBaseURL})
+	res := search.Run(ctx, opts)
 	f.Errors = res.Errors
-	kept := res.Postings[:0:0]
-	now := time.Now()
-	for _, p := range res.Postings {
-		if f.Filter.keep(p, now) {
-			kept = append(kept, p)
-		}
-	}
-	f.Hidden = len(res.Postings) - len(kept)
-	res.Postings = kept
 	if r.FormValue("add") != "" {
 		for _, p := range res.Postings {
-			if _, created, err := v.s.UpsertJob(p.Job()); err != nil {
+			j, created, err := v.s.UpsertJob(p.Job())
+			if err == nil {
+				err = apply.SavePosting(v.s, j, p.Description)
+			}
+			if err != nil {
 				fail(w, err)
 				return
-			} else if created {
+			}
+			if created {
 				f.Added++
 			}
 		}
 	}
-	f.Postings = v.searchRows(res.Postings)
+	f.Postings = v.searchRows(res.Postings, pr, f.Ranked)
+	f.TagCounts = tagCounts(f.Postings, 24)
 	v.render(w, r, "search.html", "search", f)
+}
+
+// tagCounts is the tags shared by two or more rows, most common first, at most n of them.
+func tagCounts(rows []searchRow, n int) []tagCount {
+	count := map[string]int{}
+	for _, r := range rows {
+		for _, t := range r.TagList {
+			count[strings.ToLower(t)]++
+		}
+	}
+	var out []tagCount
+	for t, c := range count {
+		if c >= 2 {
+			out = append(out, tagCount{t, c})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].N != out[j].N {
+			return out[i].N > out[j].N
+		}
+		return out[i].Tag < out[j].Tag
+	})
+	if len(out) > n {
+		out = out[:n]
+	}
+	return out
 }
 
 func (v *server) deleteSearch(w http.ResponseWriter, r *http.Request) {
@@ -251,3 +361,6 @@ func splitList(s string) []string {
 	}
 	return out
 }
+
+// remoteOff lists the remote boards turned off on the Connections page.
+func (v *server) remoteOff() []string { return splitList(v.s.Setting(search.OffSetting)) }

@@ -9,7 +9,7 @@ Skills find postings, score them against your profile, check and tailor your CV,
 --
 
 [.cta]
-xref:quickstart.adoc[Get started] xref:install.adoc[Install] https://github.com/zoolcoder/scoutjobs[GitHub]
+xref:getting-started.adoc[Get started] xref:install.adoc[Install] https://github.com/zoolcoder/scoutjobs[GitHub]
 
 == How it fits together
 
@@ -26,7 +26,7 @@ Markdown instructions in the Agent Skills standard. Claude Code gets them as a p
 * *CLI* +
 `scoutjobs` owns the data: jobs, events, decisions, preferences, interviews, sessions, learning items, CV checks, e-mail drafts. Every read takes `--json`, so an agent and a human see the same thing.
 * *Dashboard and API* +
-`scoutjobs serve` renders the same data as pages with no JavaScript, and exposes it as a JSON API with a bearer token for n8n, cron and agents that run somewhere else.
+`scoutjobs serve` renders the same data as pages that work without an account or a cloud service, and exposes it as a JSON API with a bearer token for n8n, cron and agents that run somewhere else.
 
 == What a week looks like
 
@@ -39,6 +39,7 @@ Every skip, apply, withdraw and declined offer is logged with your reason. `lear
 
 == Where to go next
 
+* xref:getting-started.adoc[Your first job search]: the whole flow in the dashboard, step by step with screenshots.
 * xref:quickstart.adoc[Quickstart]: from clone to first scored job in ten minutes.
 * xref:cv-and-cover-letter.adoc[CV and cover letter]: the adjustment loop, with the diagrams.
 * xref:apply-by-email.adoc[Apply by e-mail]: the only outbound path, and why it asks first.

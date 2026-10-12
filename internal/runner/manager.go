@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -20,6 +21,14 @@ type Manager struct {
 	queue    []queued
 	queued   map[int64]bool
 	draining bool
+	// Mail and calendar servers per agent, so a page load does not start the agent each time
+	conns map[string]connCache
+}
+
+type connCache struct {
+	at    time.Time
+	conns []Connector
+	err   error
 }
 
 type queued struct {
@@ -97,6 +106,86 @@ func (m *Manager) StartMaster(req Request) (*Run, error) {
 		m.ExecMaster(ctx, run, ag, nil)
 	}()
 	return run, nil
+}
+
+// MailAgent is the agent the inbox uses: the one named, else the first detected that can read mail.
+func (m *Manager) MailAgent(name string) (Agent, error) {
+	for _, a := range m.Agents() {
+		if a.Name == "custom" {
+			continue
+		}
+		if name == "" || name == "auto" || a.Name == name {
+			return a, nil
+		}
+	}
+	if name != "" && name != "auto" {
+		return Agent{}, fmt.Errorf("%s is not installed here", name)
+	}
+	return Agent{}, fmt.Errorf("no AI agent found: install Claude Code or Codex")
+}
+
+// Connectors lists the agent's mail and calendar servers, cached for five minutes unless fresh.
+func (m *Manager) Connectors(ctx context.Context, ag Agent, fresh bool) ([]Connector, error) {
+	m.mu.Lock()
+	c, ok := m.conns[ag.Name]
+	m.mu.Unlock()
+	if ok && !fresh && time.Since(c.at) < 30*time.Minute {
+		return c.conns, c.err
+	}
+	conns, err := ag.Connectors(ctx)
+	m.mu.Lock()
+	if m.conns == nil {
+		m.conns = map[string]connCache{}
+	}
+	m.conns[ag.Name] = connCache{time.Now(), conns, err}
+	m.mu.Unlock()
+	return conns, err
+}
+
+// StartMail starts the inbox agent on a task; one mail task runs at a time.
+func (m *Manager) StartMail(t MailTask, agent string) (*Run, error) {
+	if r := m.Latest(MailID); r != nil && r.Snapshot().State == Running {
+		return r, fmt.Errorf("the inbox agent is already working (%s)", r.ID)
+	}
+	ag, err := m.MailAgent(agent)
+	if err != nil {
+		return nil, err
+	}
+	run := newMailRun(t, ag)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if r := m.latest[MailID]; r != nil && r.Snapshot().State == Running {
+		return r, fmt.Errorf("the inbox agent is already working (%s)", r.ID)
+	}
+	m.runs[run.ID], m.latest[MailID] = run, run
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancels[run.ID] = cancel
+	go func() { // looking up the connectors starts the agent once, so it is done here, not before the reply
+		defer cancel()
+		run.logf("checking %s's mail and calendar connectors", ag.Name)
+		conns, err := m.mailConnectors(ctx, ag, t)
+		if err != nil {
+			finish(ctx, run, nil, func(context.Context) error {
+				run.set(0, Failed, err.Error())
+				return err
+			})
+			return
+		}
+		m.ExecMail(ctx, run, ag, conns, t, nil)
+	}()
+	return run, nil
+}
+
+// mailConnectors are the agent's connectors, looked up again when the cached ones cannot do t.
+func (m *Manager) mailConnectors(ctx context.Context, ag Agent, t MailTask) ([]Connector, error) {
+	conns, err := m.Connectors(ctx, ag, false)
+	if err == nil && checkMail(t, ag, conns) != nil { // signed in since the last look?
+		conns, err = m.Connectors(ctx, ag, true)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return conns, checkMail(t, ag, conns)
 }
 
 // Candidates are the open jobs worth a draft: new or ranked, no veto, fit score at or above floor,

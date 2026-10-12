@@ -109,3 +109,18 @@ func TestMailto(t *testing.T) {
 		t.Error(got)
 	}
 }
+
+func TestBuildThreadsReply(t *testing.T) {
+	m := Message{From: "me@x.test", To: "hr@acme.test", Subject: "Re: Interview", Body: "Thanks", InReplyTo: "<m1@acme.test>"}
+	raw, err := Build(m, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "In-Reply-To: <m1@acme.test>\r\nReferences: <m1@acme.test>\r\n") {
+		t.Errorf("no thread headers:\n%s", raw)
+	}
+	m.InReplyTo = "<a>\r\nBcc: x@y"
+	if raw, _ := Build(m, time.Now()); strings.Contains(string(raw), "Bcc") {
+		t.Error("header injection through InReplyTo")
+	}
+}

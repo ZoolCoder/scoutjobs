@@ -1,13 +1,27 @@
 {{template "head" .}}
 {{with .Data}}
-<section class="panel">
-<div class="panel-h"><h2>Event log</h2><span class="n">{{.Count}}</span>
-  <div class="chips">{{$k := .Kind}}<a href="/activity" {{if eq $k ""}}class="on"{{end}}>All</a>{{range .Kinds}}<a href="/activity?kind={{.}}" {{if eq . $k}}class="on"{{end}}>{{title .}}</a>{{end}}</div></div>
 {{if .Days}}
-<table class="log"><thead><tr><th>When</th><th>Kind</th><th>Job</th><th>Note</th></tr></thead><tbody>
-{{range .Days}}<tr class="sep"><td colspan="4">{{.Label}}</td></tr>
-{{range .Events}}<tr><td class="mono">{{day .At}}<br><span class="muted">{{hm .At}}</span></td><td><span class="badge {{kindcls .Kind}}">{{title .Kind}}</span></td><td>{{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a><br><small class="muted">{{.Title}}</small>{{else}}<span class="dim">—</span>{{end}}</td><td>{{.Note}}</td></tr>{{end}}{{end}}</tbody></table>
-{{else}}<p class="empty">Nothing recorded yet. Every status change, note, interview, decision and CV check lands here.</p>{{end}}
+<div class="chips evfilter">{{$k := .Kind}}<a href="/activity" {{if eq $k ""}}class="on"{{end}}>All</a>{{range .Groups}}<a href="/activity?kind={{.}}" {{if eq . $k}}class="on"{{end}}>{{title .}}</a>{{end}}</div>
+<div class="grid-3">
+<div class="stack span-2">
+{{range .Days}}<section class="panel evday">
+  <div class="panel-h"><h2>{{.Label}}</h2><span class="n">{{len .Events}} event{{if ne (len .Events) 1}}s{{end}}</span></div>
+  <ul class="evrows">{{range .Events}}{{$e := evrow .}}<li>
+    <span class="mono muted">{{hm $e.At}}</span>
+    <div class="what"><b>{{$e.Name}}</b>
+      {{if $e.JobID}}<small><a href="/jobs/{{$e.JobID}}">{{$e.Company}}</a>{{with $e.Title}} · {{.}}{{end}}</small>{{end}}
+      {{if $e.Long}}<details class="evnote"><summary>{{$e.Note}}</summary><p>{{$e.Note}}</p></details>{{else if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}{{template "evdata" $e}}</div>
+    <span class="badge {{$e.Tone}}">{{title $e.Group}}</span>
+  </li>{{end}}</ul>
+</section>{{end}}
+{{if .Older}}<a class="btn evmore" href="/activity?n={{.More}}{{with .Kind}}&amp;kind={{.}}{{end}}">Show {{.Older}} older</a>{{end}}
+</div>
+<section class="panel evweek">
+  <div class="panel-h"><h2>This week</h2></div>
+  {{if .Week}}<ul class="funnel">{{range .Week}}<li><span class="lbl">{{title .Group}}</span><meter min="0" max="{{.Max}}" value="{{.Count}}"></meter><span class="n">{{.Count}}</span></li>{{end}}</ul>
+  {{else}}<p class="empty">Nothing in the last 7 days.</p>{{end}}
 </section>
+</div>
+{{else}}<section class="panel"><p class="empty">Nothing happened yet<small>Jobs you add, status changes, emails, interviews and the assistant's work all show up here.</small></p></section>{{end}}
 {{end}}
 {{template "foot" .}}

@@ -20,7 +20,7 @@
   {{else if .Active}}<form class="inline" method="post" action="/profile/prepare/cancel"><button class="mini" type="submit">Cancel</button></form>
   {{else if .Agents}}<form class="runform" method="post" action="/profile/prepare">
     <div class="runpick">{{range .Steps}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}</label>{{end}}</div>
-    <div class="runbar"><label>Agent <select name="agent">{{range .Agents}}<option value="{{.}}">{{.}}</option>{{end}}</select></label><label class="check"><input type="checkbox" name="force" value="1"> Rewrite existing</label><button class="primary" type="submit" data-busy="Starting your agent…">Prepare with AI</button></div>
+    <div class="runbar"><span class="agentnote small muted">Uses <b class="agentname">{{index .Agents 0}}</b> · <a href="/connections#ai">Change</a></span><label class="check"><input type="checkbox" name="force" value="1"> Rewrite existing</label><button class="primary" type="submit" data-busy="Starting your agent…">Prepare with AI</button></div>
     <small class="muted">Your agent writes them from profile.md, your stories and the CV files below. The previous version is kept as <code>*.prev.md</code>. Edit the files any time; tailored resumes and cover letters start from them.</small>
   </form>
   {{else}}<p class="callout">No agent CLI found. Install Claude Code or Codex, or set <code>agent_command</code> in config.yaml.</p>{{end}}
@@ -42,19 +42,15 @@
   {{with index .Checks 0}}
   <div class="cv">
     <div class="score">{{template "gauge-lg" .ATSScore}}<small>ATS score</small></div>
-    <div><div class="file"><span><b>{{.File}}</b><small>content {{fit .Score}} · checked {{day .At}}{{if .JobID}} · <a href="/jobs/{{.JobID}}">vs job #{{.JobID}}</a>{{end}}</small></span></div>
-    <p class="callout">{{.Summary}}</p>
-    {{if .Gaps}}<p>{{range split .Gaps}}<span class="chip warn">{{.}}</span> {{end}}</p>{{end}}</div>
+    <div><div class="file"><span><b>{{.File}}</b><small>content {{fit .Score}} · checked {{date .At}}{{if .JobID}} · <a href="/jobs/{{.JobID}}">vs job #{{.JobID}}</a>{{end}}</small></span></div>
+    <p class="cvsum">{{.Summary}}</p>
+    {{with gaps .Gaps}}<details class="cvgaps"><summary>{{len .}} suggested fixes</summary><ul>{{range .}}<li>{{.}}</li>{{end}}</ul></details>{{end}}</div>
   </div>
   {{end}}
   {{if gt (len .Checks) 1}}<h3>Earlier checks</h3>
   <table><thead><tr><th>Date</th><th>File</th><th>ATS</th><th>Content</th></tr></thead><tbody>
   {{range $i, $c := .Checks}}{{if gt $i 0}}<tr><td class="mono">{{when $c.At}}</td><td>{{$c.File}}{{if $c.JobID}} <a class="small" href="/jobs/{{$c.JobID}}">vs job #{{$c.JobID}}</a>{{end}}</td><td><span class="fit{{if lt $c.ATSScore 70}} mid{{end}}">{{fit $c.ATSScore}}</span></td><td><span class="fit{{if lt $c.Score 70}} mid{{end}}">{{fit $c.Score}}</span></td></tr>{{end}}{{end}}</tbody></table>{{end}}
   {{else}}<p class="empty">No checks yet. <code>/scoutjobs:cv</code> scores ATS readiness and content quality, lists gaps against your target roles, and logs the result here.</p>{{end}}
-</section>
-<section class="panel">
-  <div class="panel-h"><h2>Preferences in use</h2><a class="act" href="/preferences">Edit preferences →</a></div>
-  {{if .Prefs}}<dl class="prefs">{{range .Prefs}}<dt>{{title .Key}}</dt><dd>{{.Value}}</dd><dd class="src"><span class="badge {{.Source}}">{{.Source}}</span></dd>{{end}}</dl>{{else}}<p class="empty">None stated yet. <code>scoutjobs pref set remote remote --source stated</code></p>{{end}}
 </section>
 </div>
 </div>

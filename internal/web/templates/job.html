@@ -2,160 +2,253 @@
 {{with .Data}}{{$j := .Job}}{{$p := .P}}{{$tab := .Tab}}
 <header class="top job">
 <div class="jobtop"><a class="crumb" href="/pipeline">← Pipeline</a>
-<div class="jobhead">{{template "gauge-lg" $j.FitScore}}<h1>{{$j.Company}}<small>{{$j.Title}}</small></h1><span class="badge {{$j.Status}}">{{title $j.Status}}</span>{{if $j.Veto}}<span class="badge bad" title="{{$j.Veto}}">veto</span>{{end}}<span class="key mono">SJ-{{$j.ID}}</span></div>
-<div class="issue-acts">
-  {{if $j.URL}}<a class="btn mini" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}Posting</a>{{end}}
-  <a class="btn mini" href="{{$p.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
-  <a class="btn mini" href="/calendar?new={{today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a>
-  {{if $p.CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Self}}"><button class="mini go">Draft in Gmail</button></form>{{end}}
-  <a class="btn mini" href="/pipeline?job={{$j.ID}}">Show on board</a>
+<div class="jobhead">{{template "gauge-lg" $j.FitScore}}
+  <div class="jobname"><h1>{{$j.Company}}<small>{{$j.Title}}</small></h1>
+    <p class="jobmeta">{{if or $j.Location $j.Remote}}<span>{{template "ico-pin"}}{{$j.Location}}{{if and $j.Location $j.Remote}} · {{end}}{{title $j.Remote}}</span>{{end}}{{if $j.SalaryMax}}<span>{{$j.SalaryMin}}–{{$j.SalaryMax}} {{$j.Currency}}</span>{{end}}{{if $j.Deadline}}<span>{{template "ico-clock"}}apply by {{$j.Deadline}}</span>{{end}}</p></div>
+  <span class="badge {{$j.Status}}">{{title $j.Status}}</span>{{if $j.Veto}}<span class="badge bad" title="{{$j.Veto}}">Not a match</span>{{end}}
+<div class="jobacts">
+  {{if $j.URL}}<a class="btn" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{template "ico-doc"}}View posting</a>{{end}}
+  <details class="jobmenu prep-pop"><summary class="btn">More ▾</summary><div class="menu-list">
+    <a href="{{$p.Compose}}" rel="noopener noreferrer" target="_blank">{{template "ico-mail"}}Write in Gmail</a>
+    <a href="/calendar?new={{today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a>
+    {{if $p.CanDraft}}<form method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="{{.Self}}"><button>{{template "ico-mail"}}{{$p.DraftLabel}}</button></form>{{end}}
+    <a href="/pipeline?job={{$j.ID}}">{{template "ico-columns"}}Show on board</a>
+  </div></details>
+</div>
 </div>
 {{template "stepper" $p.Steps}}
+<nav class="tabs" aria-label="job sections">
+  <a {{if eq $tab "overview"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}">Overview</a>
+  <a {{if eq $tab "mail"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=mail">Emails{{with .Mails}} <span class="n">{{len .}}</span>{{end}}</a>
+  <a {{if eq $tab "interviews"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=interviews">Interviews{{with .Interviews}} <span class="n">{{len .}}</span>{{end}}</a>
+  <a {{if eq $tab "files"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=files">Files</a>
+  <a {{if eq $tab "activity"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=activity">Activity</a>
+</nav>
 </div>
 <span class="now">{{$.Now}}</span>
 </header>
-<nav class="tabs" aria-label="job sections">
-  <a {{if eq $tab "overview"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}">Overview</a>
-  <a {{if eq $tab "mail"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=mail">Mail <span class="n">{{len .Mails}}</span></a>
-  <a {{if eq $tab "interviews"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=interviews">Interviews <span class="n">{{len .Interviews}}</span></a>
-  <a {{if eq $tab "files"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=files">Files <span class="n">{{len .Files}}</span></a>
-  <a {{if eq $tab "activity"}}class="on" aria-current="page" {{end}}href="/jobs/{{$j.ID}}?tab=activity">Activity <span class="n">{{len .Events}}</span></a>
-</nav>
 <div class="grid-3">
-<div class="stack span-2">
+<div class="stack span-2 jobmain">
 {{with .Err}}<p class="callout bad">{{.}}</p>{{end}}{{with .Msg}}<p class="callout">{{.}}</p>{{end}}
 {{with .Drafted}}<p class="callout">Draft saved in Gmail. <a href="{{.}}" rel="noopener noreferrer" target="_blank">Open it</a>, review, and send it from there.</p>{{end}}
 {{if eq $tab "overview"}}
-{{with .Checklist}}<section class="panel" id="checklist">
-  <div class="panel-h"><h2>Checklist</h2><span class="n">{{.Done}}/{{len .Items}}</span><span class="act muted">nothing is sent without you</span></div>
-  <ol class="checklist">{{range .Items}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Label}}</b>{{if .Detail}}<small title="{{.Detail}}">{{.Detail}}</small>{{end}}{{with .Files}}<small class="prov" title="SHA-256 of the files this result covered">{{.}}</small>{{end}}</div><span class="state">{{if eq .State "next"}}next{{else if eq .State "blocked"}}blocked{{else if eq .State "warn"}}check{{else if eq .State "done"}}done{{end}}</span>{{if .Href}}<a class="btn mini" href="{{.Href}}">{{.Act}}</a>{{end}}</li>{{end}}</ol>
-</section>{{end}}
-{{with .RunP}}<section class="panel" id="run"{{if .Active}} data-run="/jobs/{{$j.ID}}/run"{{else if .Queued}} data-run="/jobs/{{$j.ID}}/run" data-queued="1"{{end}}>
-  <div class="panel-h"><h2>Prepare application</h2>{{with .Run}}<span class="badge {{.State}}">{{.State}}</span>{{if .Agent}}<span class="n">{{.Agent}}</span>{{end}}{{end}}<span class="act muted">nothing is sent</span></div>
-  {{with $.Data.RunErr}}<p class="callout bad">{{.}}</p>{{end}}
-  {{with $.Data.RunP.Queued}}<p class="callout"><span class="spin" aria-hidden="true"></span> Waiting in the Prepare all queue, position {{.}}. It starts when the job before it finishes.</p>{{end}}
-  {{if .Recovered}}<p class="callout">The last run stopped at <b>{{.Recovered}}</b>; that step is done now.{{with .Todo}} Next: {{(index . 0).Label}}.{{end}}</p>
-  {{with .Run}}<details class="runlog"><summary>Last run</summary><ol class="runsteps">{{range .Steps}}{{$n := .Name}}<li data-step="{{$n}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}{{with index $.Data.RunP.Now $n}}<small><span class="badge {{.}}">now {{.}}</span>{{with index $.Data.RunP.Stale $n}} {{.}}{{end}}</small>{{end}}</div></li>{{end}}</ol>{{if .Error}}<p class="small muted">{{.Error}}</p>{{end}}</details>{{end}}
-  {{else}}  {{with .Run}}{{template "runprog" .}}<ol class="runsteps">{{range .Steps}}{{$n := .Name}}<li data-step="{{$n}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Label}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}{{with index $.Data.RunP.Now $n}}<small><span class="badge {{.}}">now {{.}}</span>{{with index $.Data.RunP.Stale $n}} {{.}}{{end}}</small>{{end}}</div></li>{{end}}</ol>
-  {{if .Error}}<p class="callout bad"><b>Stopped:</b> {{.Error}}</p>{{end}}
-  {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
-{{end}}</pre></details>{{end}}{{end}}{{end}}
-  {{if .Active}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run/cancel"><button class="mini" type="submit">Cancel run</button></form>
-  {{else if .Agents}}<form class="runform" method="post" action="/jobs/{{$j.ID}}/run">
-    {{if .Todo}}<div class="runpick">{{range .Todo}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}{{with index $.Data.RunP.Stale .Name}} <small class="muted">stale: {{.}}</small>{{end}}</label>{{end}}</div>
-    {{else}}<p class="callout">Every step is done. Review the documents below, or redo a step.</p>{{end}}
-    {{if .Done}}<p class="muted small">Already done: {{range $i, $d := .Done}}{{if $i}}, {{end}}{{$d.Label}}{{end}}.</p>
-    <details class="redo"{{if not .Todo}} open{{end}}><summary>Redo a finished step</summary><div class="runpick">{{range .Done}}<label class="check"><input type="checkbox" name="redo" value="{{.Name}}"> {{.Label}}</label>{{end}}</div><small class="muted">Picked steps are written again; the previous file is replaced.</small></details>{{end}}
-    <div class="runbar"><label>Agent <select name="agent">{{range .Agents}}<option value="{{.}}">{{.}}</option>{{end}}</select></label><label class="check" title="A fix verdict from the draft review is recorded as a warning and the PDF, gates and e-mail draft are still prepared. Sending stays blocked."><input type="checkbox" name="keep" value="1"> Keep going if the review asks for fixes</label><button class="primary" type="submit" data-busy="Starting your agent…">{{if .Todo}}Prepare application{{else}}Redo picked steps{{end}}</button></div>
-    <small class="muted">Your agent writes the fit review, resume and cover letter from profile.md, reviews them, then ScoutJobs exports the PDF, runs the quality gates and saves an e-mail draft. Quality gates never stop preparation; they only block sending. Nothing is sent: you review and send.</small>
-  </form>
-  {{else}}<p class="callout">No agent CLI found on this machine. Install <a href="https://docs.anthropic.com/en/docs/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or <a href="https://github.com/openai/codex" rel="noopener noreferrer" target="_blank">Codex</a>, or set <code>agent_command</code> in config.yaml to any agent that reads a prompt on stdin, then reload.</p>{{end}}
-</section>{{end}}
+{{with .Emails}}<p class="callout">{{template "ico-mail"}}{{len .}} suggested {{if eq (len .) 1}}e-mail is{{else}}e-mails are{{end}} ready for you to check. <a href="/jobs/{{$j.ID}}?tab=mail#emails">Open {{if eq (len .) 1}}it{{else}}them{{end}}</a></p>{{end}}
+{{template "aipanel" .}}
 <section class="panel" id="docs">
-  <div class="panel-h"><h2>Documents</h2><span class="act muted">starts from your main CV on the Profile page</span></div>
-  <table><thead><tr><th>Document</th><th>Updated</th><th></th></tr></thead><tbody>
-  {{range .Docs}}<tr{{if not .Exists}} class="missing"{{end}}><td><span class="file">{{template "ico-doc"}}{{if and .Exists .Preview}}<a href="/jobs/{{$j.ID}}/files/{{.Name}}"><b>{{.Label}}</b></a>{{else}}<b>{{.Label}}</b>{{end}}</span> <code class="small">{{.Name}}</code></td>
-  {{if .Exists}}<td class="mono">{{.Mod}} · {{kb .Size}}</td><td class="acts">{{if .Preview}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}">Preview</a> {{end}}{{if .Editable}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}?edit=1">Edit</a> {{end}}<a class="btn mini" href="/jobs/{{$j.ID}}/download/{{.Name}}">Download</a></td>
-  {{else}}<td class="muted">not written yet</td><td class="acts">{{if eq .Name "resume.pdf"}}{{if $.Data.HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export" data-busy="Exporting…"><button class="mini" type="submit">Export PDF</button></form>{{end}}{{else if $.Data.RunP}}{{if not $.Data.RunP.Active}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run" data-busy="Starting…"><input type="hidden" name="step" value="{{if eq .Name "resume.md"}}tailor{{else}}cover{{end}}"><button class="mini go" type="submit">Write with AI</button></form>{{end}}{{end}}</td>{{end}}</tr>{{end}}
-  </tbody></table>
-  {{with .CoverBuild}}{{with .Cover}}<p class="small cover-build"><span class="badge {{if $.Data.CoverBuild.CoverChanged}}stale{{else}}{{.State}}{{end}}">{{if $.Data.CoverBuild.CoverChanged}}stale{{else}}template {{.State}}{{end}}</span> Cover letter built from <code>{{base .Template}}</code> {{day .At}}{{if .Rendered}}, {{.Pages}} of {{.TemplatePages}} {{if eq .TemplatePages 1}}page{{else}}pages{{end}}{{end}}. {{.Summary}}{{if $.Data.CoverBuild.CoverChanged}} Changed since: {{join $.Data.CoverBuild.CoverChanged ", "}}; run <code>scoutjobs cv cover {{$j.ID}}</code>.{{end}}</p>
+  <div class="panel-h"><h2>Drafts</h2><span class="act muted">review and edit before you send</span></div>
+  <div class="dcards">
+  {{range .Cards}}{{$d := .Main}}{{$step := .Step}}<article class="dcard{{if not $d.Exists}} missing{{end}}">
+    <div class="dhead">{{template "ico-doc"}}<b>{{.Label}}</b></div>
+    {{if $d.Exists}}<small class="muted">Updated {{$d.Mod}}</small>
+    <div class="dacts"><a class="btn mini" href="/jobs/{{$j.ID}}/files/{{$d.Name}}">Preview</a><a class="btn mini" href="/jobs/{{$j.ID}}/files/{{$d.Name}}?edit=1">Edit</a></div>
+    {{else}}<small class="muted">Not written yet</small>
+    <div class="dacts">{{with $.Data.RunP}}{{if and .Agents (not .Active)}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run" data-busy="Starting…"><input type="hidden" name="step" value="{{$step}}"><button class="mini go" type="submit">Write with AI</button></form>{{end}}{{end}}</div>{{end}}
+    {{if .Extras}}<div class="dfiles">{{range .Extras}}<span>{{if .Preview}}<a href="/jobs/{{$j.ID}}/files/{{.Name}}">{{.Label}}</a>{{else}}{{.Label}}{{end}} <a class="dl" href="/jobs/{{$j.ID}}/download/{{.Name}}" title="Download {{.Label}}" aria-label="Download {{.Label}}">↓</a></span>{{end}}</div>{{end}}
+  </article>{{end}}
+  <article class="dcard{{if not .Draft}} missing{{end}}">
+    <div class="dhead">{{template "ico-mail"}}<b>E-mail</b></div>
+    {{with .Draft}}<small class="muted" title="{{.Subject}}">To {{if .To}}{{.To}}{{else}}no recipient yet{{end}}</small>
+    <div class="dacts"><a class="btn mini" href="/jobs/{{$j.ID}}?tab=mail#draft">Preview</a><a class="btn mini" href="{{mailto .}}">Mail app</a></div>
+    {{else}}<small class="muted">Not written yet</small>{{end}}
+  </article>
+  </div>
+  {{if and .HasResumeMD (not (index .Cards 0).Extras)}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export" data-busy="Making the PDF…"><button class="mini" type="submit">Make resume PDF</button></form>{{end}}
+  {{with .CoverBuild}}{{with .Cover}}<p class="small cover-build"><span class="badge {{if $.Data.CoverBuild.CoverChanged}}stale{{else}}{{.State}}{{end}}">{{if $.Data.CoverBuild.CoverChanged}}stale{{else}}template {{.State}}{{end}}</span> Cover letter built from <code>{{base .Template}}</code> {{date .At}}{{if .Rendered}}, {{.Pages}} of {{.TemplatePages}} {{if eq .TemplatePages 1}}page{{else}}pages{{end}}{{end}}. {{.Summary}}{{if $.Data.CoverBuild.CoverChanged}} Changed since: {{join $.Data.CoverBuild.CoverChanged ", "}}; ask the assistant to write it again.{{end}}</p>
   {{if .Problems}}<ul class="gates-left">{{range .Problems}}<li>{{.}}</li>{{end}}</ul>{{end}}{{end}}{{end}}
-  {{if .Draft}}<p class="small">Application e-mail ready for {{.Draft.To}}: <b>{{.Draft.Subject}}</b>. <a href="{{mailto .Draft}}">Open in your mail app</a>{{if .CanGmail}} or{{end}}</p>{{if .CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="/jobs/{{$j.ID}}"><button class="mini go">Draft in Gmail</button></form>{{end}}{{end}}
 </section>
-{{if .Emails}}<section class="panel" id="emails">
-  <div class="panel-h"><h2>Proposed e-mails</h2><span class="n">{{len .Emails}}</span><span class="act muted">edit, save, draft; you send</span></div>
-  {{range .Emails}}<details class="proposal"{{if eq (len $.Data.Emails) 1}} open{{end}}><summary><b>{{.Label}}</b> <span class="muted small">{{.Why}}</span>{{if .Saved}} <span class="badge drafted">edited</span>{{end}}</summary>
-  <form class="mailform" method="post" data-busy="Saving…" action="/jobs/{{$j.ID}}/emails/{{.Kind}}">
-    <label>To <input name="to" value="{{.Msg.To}}" autocomplete="off"></label>
-    <label>Subject <input name="subject" value="{{.Msg.Subject}}" autocomplete="off"></label>
-    <label>Message <textarea name="body" rows="10">{{.Msg.Body}}</textarea></label>
-    <div class="runbar"><button class="mini" name="action" value="save">Save</button>{{if $.Data.CanGmail}}<button class="mini go" name="action" value="gmail">Save &amp; draft in Gmail</button>{{end}}<a class="btn mini" href="{{mailto .Msg}}">Open in mail app</a></div>
-  </form></details>{{end}}
-</section>{{end}}
+<div class="grid-2 jobpair">
 <section class="panel" id="gates">
-  <div class="panel-h"><h2>Ready to send?</h2><span class="n">{{if .Gates.OK}}clear{{else}}{{.Gates.Failed}} blocking{{end}}</span><span class="act muted">scoutjobs job check {{$j.ID}}</span></div>
-  <ul class="gates">{{range .Gates.Gates}}<li><span class="badge {{.State}}">{{.State}}</span><div><b>{{.Name}}</b><small>{{.Detail}}</small>{{if .Items}}<ul>{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{end}}</div></li>{{end}}</ul>
-  {{if not .Gates.OK}}<p class="callout">Sending is blocked until every failed gate passes. <code>scoutjobs email send {{$j.ID}} --yes --skip-checks</code> overrides it and logs the skip on the job.</p>{{end}}
-</section>
-{{with .Portal}}<section class="panel" id="portal">
-  <div class="panel-h"><h2>Apply with gaps</h2>{{if .Acked}}<span class="badge ack">acknowledged {{day .Acked}}</span>{{end}}<span class="act muted">for an employer portal</span></div>
+  <div class="panel-h"><h2>Ready to send?</h2>{{if .Gates.OK}}<span class="badge done">All good</span>{{else}}<span class="n">{{.Gates.Failed}} to fix</span>{{end}}</div>
+  <ul class="ready">{{range .Gates.Gates}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{gatelabel .Name}}</b>{{if ne .State "pass"}}{{if or .Items (gt (len .Detail) 140)}}<details class="gdet"><summary>{{plain .Detail}}</summary>{{if .Items}}<ul>{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{else}}<p>{{plain .Detail}}</p>{{end}}</details>{{else}}<small>{{plain .Detail}}</small>{{end}}{{end}}</div></li>{{end}}</ul>
+  {{if not .Gates.OK}}<p class="small muted">Sending is blocked until every check passes. Fix the drafts or let the assistant redo them.</p>
+  {{else if .Draft}}<div class="runbar">{{if .CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="/jobs/{{$j.ID}}"><button class="primary">{{template "ico-send"}}{{.DraftLabel}}</button></form>{{end}}<a class="btn" href="{{mailto .Draft}}">Open in mail app</a></div>
+  <p class="small muted">Nothing is sent without you.</p>{{end}}
+  {{with .Portal}}<div class="dlg-sec" id="portal"><p class="lbl">Applying on the company site{{if .Acked}} · gaps accepted {{date .Acked}}{{end}}</p>
   {{if .Gaps}}<p class="callout warn">{{len .Gaps}} must-have {{if gt (len .Gaps) 1}}gaps remain{{else}}gap remains{{end}}. Your documents do not claim this experience.</p>
-  <form method="post" action="/jobs/{{$j.ID}}/acknowledge" class="ackform">
+  <details class="gdet"><summary>Apply anyway with this gap</summary><form method="post" action="/jobs/{{$j.ID}}/acknowledge" class="ackform">
     <div class="runpick">{{range .Gaps}}<label class="check"><input type="checkbox" name="gap" value="{{.}}" required> I apply without evidence for: {{.}}</label>{{end}}</div>
     <label>Why you apply anyway <input type="text" name="notes" maxlength="300" placeholder="Applying with adjacent experience; no unsupported claims added"></label>
     <div class="runbar"><button class="primary" type="submit">Proceed with gaps</button></div>
-    <small class="muted">Recorded on the job as <code>check:acknowledged</code>. The fit review and its evidence stay as they are, and e-mail sending stays blocked. Hard requirements (veto, legal, certification, work authorisation) are never acknowledged away. CLI: <code>scoutjobs job acknowledge {{$j.ID}} --notes "…" --yes</code></small>
-  </form>
+    <small class="muted">Saved on the job. E-mail sending stays blocked; hard requirements such as a work permit can never be accepted away.</small>
+  </form></details>
   {{else}}{{with .Note}}<p class="muted">Your note: {{.}}</p>{{end}}
-  {{if .Blocked}}<p class="callout bad">Finish the application first; these still fail:</p><ul class="gates-left">{{range .Blocked}}<li>{{.}}</li>{{end}}</ul>
-  {{else if .Applied}}<p class="callout">Status is {{$j.Status}}.</p>
-  {{else}}<div class="runbar">{{if .URL}}<a class="btn primary" href="{{.URL}}" target="_blank" rel="noopener noreferrer">Proceed to official application</a>{{else}}<span class="muted">No posting URL on this job; apply where you found it.</span>{{end}}</div>
+  {{if .Blocked}}<p class="small muted">Finish the application first; these still fail: {{join .Blocked ", "}}.</p>
+  {{else if .Applied}}<p class="small muted">Status is {{$j.Status}}.</p>
+  {{else}}<div class="runbar">{{if .URL}}<a class="btn" href="{{.URL}}" target="_blank" rel="noopener noreferrer">Open the application form ↗</a>{{end}}</div>
   <form method="post" action="/jobs/{{$j.ID}}/applied" class="ackform">
-    <p><b>Did you submit the application?</b></p>
-    <label>Note <input type="text" name="note" maxlength="300" placeholder="optional, e.g. reference number"></label>
-    <div class="runbar"><button class="go" type="submit">Yes, mark applied</button><span class="muted small">No? Nothing to do; the job stays drafted. Nothing is submitted for you.</span></div>
-  </form>{{end}}{{end}}
-</section>{{end}}
-<section class="panel">
-  <div class="panel-h"><h2>Why this job fits</h2><span class="n">fit {{fit $j.FitScore}}</span></div>
-  {{if $j.Veto}}<p class="callout bad"><b>Veto:</b> {{$j.Veto}}. Hard failures stay outside the score; this job is not sendable until the veto is cleared with <code>scoutjobs job set {{$j.ID}} --veto ''</code>.</p>{{end}}
-  {{if .HasReview}}<table class="review"><thead><tr><th>Requirement</th><th>Kind</th><th>Evidence</th><th>Strength</th><th>Wording</th><th>Risk</th></tr></thead><tbody>{{range .Review.Requirements}}<tr><td>{{.Requirement}}</td><td class="muted">{{.Kind}}</td><td class="muted">{{.Evidence}}</td><td><span class="badge {{.Strength}}">{{.Strength}}</span>{{if .Confidence}} <span class="muted">{{.Confidence}}</span>{{end}}</td><td>{{.Wording}}</td><td class="muted">{{.Risk}}</td></tr>{{end}}</tbody></table>{{end}}
-  {{if $j.FitNotes}}<p class="pre">{{$j.FitNotes}}</p>{{else}}<p class="empty">Fit not scored yet. Run the <code>fit-review</code> skill or <code>/scoutjobs:fit {{$j.ID}}</code>.</p>{{end}}
+    <label>Sent it? Add a note <input type="text" name="note" maxlength="300" placeholder="optional, e.g. reference number"></label>
+    <div class="runbar"><button class="go" type="submit">Yes, mark applied</button></div>
+  </form>{{end}}{{end}}</div>{{end}}
+</section>
+<section class="panel" id="fit">
+  <div class="panel-h"><h2>Why this job fits</h2>{{if ge $j.FitScore 0}}<span class="n">fit {{fit $j.FitScore}}</span>{{end}}</div>
+  {{if $j.Veto}}<p class="callout bad"><b>Not a match:</b> {{$j.Veto}}. This job cannot be sent while that stands.</p>{{end}}
+  {{if .Points}}<ul class="fitpts">{{range .Points}}<li class="{{.Tone}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Text}}</b>{{with .Evidence}}<small>{{.}}</small>{{end}}</div></li>{{end}}</ul>
+  {{else if $j.FitNotes}}<p class="pre clamp">{{$j.FitNotes}}</p>
+  {{else}}<p class="empty">Not checked yet<small>Let the assistant prepare this application; it starts by checking your fit.</small></p>{{end}}
+  {{if or .HasReview $j.FitNotes}}<details class="more-fit"><summary>Full analysis</summary>
+  {{if .HasReview}}<table class="review"><thead><tr><th>Requirement</th><th>Evidence</th><th>Match</th></tr></thead><tbody>{{range .Review.Requirements}}<tr><td>{{.Requirement}}{{if eq .Kind "must"}} <span class="badge">must</span>{{end}}</td><td class="muted">{{.Evidence}}</td><td><span class="badge {{.Strength}}">{{.Strength}}</span></td></tr>{{end}}</tbody></table>{{end}}
+  {{if $j.FitNotes}}<p class="pre">{{$j.FitNotes}}</p>{{end}}
   {{if $j.Notes}}<h3>Notes</h3><p class="pre">{{$j.Notes}}</p>{{end}}
-  </section>
+  </details>{{end}}
+</section>
+</div>
 {{else if eq $tab "mail"}}
-<section class="panel">
-  <div class="panel-h"><h2>Mail</h2><span class="n">{{len .Mails}}</span><a class="act" href="{{$p.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail</a></div>
-  {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="empty">No messages logged for this job.<small>Replies land here after <code>scoutjobs email sync</code>, a Gmail sync on the <a href="/inbox">Inbox</a> page, or the inbox-triage skill.</small></p>{{end}}
+<section class="panel" id="emails">
+  <div class="panel-h"><h2>E-mails for this job</h2>{{if or .Emails .Draft}}<span class="n">{{if .Draft}}{{add (len .Emails) 1}}{{else}}{{len .Emails}}{{end}}</span>{{end}}<span class="act muted">written by the assistant; you review and send</span></div>
+  {{if or .Emails .Draft}}<div class="mailsplit">
+  <nav class="maillist" aria-label="suggested e-mails">
+    {{with .Draft}}<a href="#e-application"><span class="dot acc" aria-hidden="true"></span><span><b>Application e-mail</b><small>{{if .To}}To {{.To}}{{else}}No recipient yet{{end}}</small></span></a>{{end}}
+    {{range .Emails}}<a href="#e-{{.Kind}}"><span class="dot{{if .Saved}} ok{{end}}" aria-hidden="true"></span><span><b>{{.Label}}</b><small>{{.Why}}</small></span></a>{{end}}
+  </nav>
+  <div class="mailpane">
+    {{with .Draft}}<article id="e-application">
+      <h3>Application e-mail</h3>
+      <dl class="mailhead"><dt>To</dt><dd>{{if .To}}{{.To}}{{else}}<span class="muted">no recipient yet</span>{{end}}</dd><dt>Subject</dt><dd>{{.Subject}}</dd></dl>
+      <p class="pre mailbody">{{.Body}}</p>
+      <div class="runbar"><a class="btn" href="/jobs/{{$j.ID}}">Redo with AI on Overview</a><span class="grow"></span><a class="btn" href="{{mailto .}}">Open in mail app</a>{{if $.Data.CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft" data-busy="Saving…"><input type="hidden" name="back" value="{{$.Data.Self}}"><button class="primary">{{$.Data.DraftLabel}}</button></form>{{end}}</div>
+    </article>{{end}}
+    {{range .Emails}}<article id="e-{{.Kind}}">
+      <h3>{{.Label}}{{if .Saved}} <span class="badge drafted">edited</span>{{end}}</h3>
+      <form class="mailform" method="post" data-busy="Saving…" action="/jobs/{{$j.ID}}/emails/{{.Kind}}">
+        <label>To <input name="to" value="{{.Msg.To}}" autocomplete="off" placeholder="recruiter@company.com"></label>
+        <label>Subject <input name="subject" value="{{.Msg.Subject}}" autocomplete="off"></label>
+        <label>Message <textarea name="body" rows="11">{{.Msg.Body}}</textarea></label>
+        <div class="runbar"><button name="action" value="save">Save</button><span class="grow"></span><a class="btn" href="{{mailto .Msg}}">Open in mail app</a>{{if $.Data.CanGmail}}<button class="primary" name="action" value="gmail">Save as {{lower $.Data.DraftLabel}}</button>{{end}}</div>
+      </form>
+    </article>{{end}}
+  </div>
+  </div>
+  <p class="small muted">ScoutJobs never sends mail itself. Drafts go to your mailbox, and you press send.</p>
+  {{else}}<p class="empty">No e-mails to write yet<small>The assistant writes the application e-mail when it prepares this job, and suggests thank-you and follow-up notes later.</small></p>{{end}}
 </section>
-{{else if eq $tab "interviews"}}
 <section class="panel">
-  <div class="panel-h"><h2>Interviews</h2><span class="n">{{len .Interviews}}</span><a class="act" href="/calendar?new={{today}}&amp;job={{$j.ID}}">Schedule</a></div>
-  {{range .Interviews}}<article class="ivcard">
-    <div class="ivhead"><a class="mono" href="/calendar?view=week&amp;d={{day .At}}&amp;ev=i{{.ID}}">{{when .At}}</a><b>{{title .Stage}}</b>{{if .Format}}<span class="muted">{{.Format}}</span>{{end}}{{if .Interviewer}}<span class="muted">with {{.Interviewer}}</span>{{end}}<span class="badge {{.PrepStatus}}">prep {{.PrepCount}}/6</span>{{if .Outcome}}<span class="badge {{.Outcome}}">{{.Outcome}}</span>{{end}}</div>
-    {{template "prep-check" (prepArgs . $.Data.Self)}}
-    {{if .Feedback}}<p class="muted">{{.Feedback}}</p>{{end}}
-  </article>{{else}}<p class="empty">None yet. <a href="/calendar?new={{today}}&amp;job={{$j.ID}}">Schedule one</a> or run <code>scoutjobs interview add {{$j.ID}} --stage screen --at YYYY-MM-DD</code></p>{{end}}
+  <div class="panel-h"><h2>Messages</h2><span class="n">{{len .Mails}}</span><a class="act" href="{{$p.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail ↗</a></div>
+  {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="empty">No messages for this job yet<small>Replies show up here after you check your inbox on the <a href="/inbox">Inbox</a> page.</small></p>{{end}}
 </section>
+{{else if eq $tab "interviews"}}{{$today := today}}
+<section class="panel">
+  <div class="panel-h"><h2>Upcoming interviews</h2><a class="act btn mini primary" href="/calendar?new={{$today}}&amp;job={{$j.ID}}">{{template "ico-calendar"}}Schedule interview</a></div>
+  {{$up := 0}}{{range .Interviews}}{{if ge .At $today}}{{$up = 1}}{{template "ivcard" (prepArgs . $.Data.Self)}}{{end}}{{end}}
+  {{if not $up}}<p class="empty">Nothing scheduled<small>Add the interview when the company gets back to you. Each one gets a short prep checklist.</small></p>{{end}}
+</section>
+{{$past := 0}}{{range .Interviews}}{{if lt .At $today}}{{$past = 1}}{{end}}{{end}}
+{{if $past}}<section class="panel">
+  <div class="panel-h"><h2>Past interviews</h2></div>
+  {{range .Interviews}}{{if lt .At $today}}{{template "ivcard" (prepArgs . $.Data.Self)}}{{end}}{{end}}
+</section>{{end}}
 {{else if eq $tab "files"}}
+{{range .FileGroups}}{{if .Files}}<section class="panel">
+  <div class="panel-h"><h2>{{.Title}}</h2><span class="n">{{len .Files}}</span></div>
+  <ul class="filelist">{{range .Files}}<li>{{template "ico-doc"}}<span><b>{{.Label}}</b><small class="muted">{{with .Note}}{{.}} · {{end}}updated {{.Mod}}</small></span>
+    <span class="facts-acts">{{if .Preview}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}">Preview</a>{{end}}{{if .Editable}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}?edit=1">Edit</a>{{end}}{{if .Download}}<a class="btn mini" href="/jobs/{{$j.ID}}/download/{{.Name}}">Download</a>{{end}}</span></li>{{end}}</ul>
+</section>{{end}}{{end}}
+{{if not .Files}}<section class="panel"><div class="panel-h"><h2>Files</h2></div><p class="empty">No files yet<small>The assistant saves the drafts here when it prepares this application. <a href="/jobs/{{$j.ID}}">Start on Overview</a>.</small></p></section>{{end}}
+{{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export" data-busy="Making the PDF…"><button class="mini" type="submit">Make resume PDF again</button></form>{{end}}
+{{else}}{{$today := today}}
 <section class="panel">
-  <div class="panel-h"><h2>Files</h2><span class="n">{{len .Files}}</span></div>
-  {{if .Files}}{{$id := $j.ID}}{{range .Files}}{{if hasSuffix . ".docx"}}<a class="chip dim" href="/jobs/{{$id}}/download/{{.}}" title="download">{{template "ico-doc"}}{{.}}</a>{{else}}<a class="chip dim" href="/jobs/{{$id}}/files/{{.}}" title="preview">{{template "ico-doc"}}{{.}}</a>{{end}} {{end}}{{else}}<p class="muted">None yet. Drafts land here when you run <code>/scoutjobs:apply</code>.</p>{{end}}
-  <p class="mono small">{{tilde .Dir}}</p>
-  {{if .HasResumeMD}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/export"><button class="mini" type="submit">Export resume.md as PDF</button></form>{{end}}
-</section>
-{{else}}
-<section class="panel">
-  <div class="panel-h"><h2>Activity</h2><span class="n">{{len .Events}}</span></div>
-  <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Self}}"><input name="note" placeholder="Add a note" aria-label="note"><button class="primary">Add</button></form>
-  <ul class="timeline">{{range .Events}}<li><span class="mono">{{when .At}}</span><span><span class="tag">{{.Kind}}</span> {{.Note}}</span></li>{{end}}</ul>
+  <div class="panel-h"><h2>Activity</h2><span class="n">{{len .Events}}</span><button class="act mini" type="button" data-expand=".evdata">Show all details</button></div>
+  {{if gt (len .EvGroups) 1}}<div class="chips evfilter">{{$k := .Kind}}<a href="/jobs/{{$j.ID}}?tab=activity" {{if eq $k ""}}class="on" aria-current="true"{{end}}>All</a>{{range .EvGroups}}<a href="/jobs/{{$j.ID}}?tab=activity&amp;kind={{.}}" {{if eq . $k}}class="on" aria-current="true"{{end}}>{{title .}}</a>{{end}}</div>{{end}}
+  <form method="post" action="/jobs/{{$j.ID}}/note" class="note"><input type="hidden" name="back" value="{{.Self}}"><input name="note" placeholder="Add a note, e.g. called the recruiter, they liked my background" aria-label="note"><button class="primary">Add note</button></form>
+  {{$d := ""}}{{$k := .Kind}}{{range .Events}}{{$e := evrow .}}{{if or (eq $k "") (eq $k $e.Group)}}{{if ne (day $e.At) $d}}{{if $d}}</ul>{{end}}{{$d = day $e.At}}<h3 class="evday-h">{{if eq $d $today}}Today{{else}}{{$d}}{{end}}</h3><ul class="evrows tl">{{end}}<li>
+    <span class="mono muted">{{hm $e.At}}</span>
+    <span class="evico {{$e.Group}}" aria-hidden="true">{{template "evico" $e.Group}}</span>
+    <div class="what"><b>{{$e.Name}}</b>{{if $e.Long}}<details class="evnote"><summary>{{$e.Note}}</summary><p>{{$e.Note}}</p></details>{{else if $e.Note}}<p class="evnote">{{$e.Note}}</p>{{end}}{{template "evdata" $e}}</div>
+    <span class="badge {{$e.Tone}}">{{title $e.Group}}</span>
+  </li>{{end}}{{end}}{{if $d}}</ul>{{else}}<p class="empty">Nothing yet<small>Status changes, drafts, e-mails and interviews for this job show up here.</small></p>{{end}}
 </section>
 {{end}}
 </div>
 <div class="stack">
 <section class="panel">
-  <div class="panel-h"><h2>Application</h2></div>
+  <div class="panel-h"><h2>Job details</h2>{{if $j.URL}}<a class="act" href="{{$j.URL}}" rel="noopener noreferrer" target="_blank" title="{{$j.URL}}">{{host $j.URL}} ↗</a>{{end}}</div>
   <dl class="facts">
-    <dt>Status</dt><dd><span class="badge {{$j.Status}}">{{title $j.Status}}</span></dd>
-    <dt>Move to</dt><dd>{{template "move" (dict_status $j.ID $j.Status $.Data.Self)}}</dd>
-    <dt>Where</dt><dd>{{$j.Location}} {{if $j.Remote}}<span class="chip">{{$j.Remote}}</span>{{end}}</dd>
-    {{if $j.URL}}<dt>Posting</dt><dd><a href="{{$j.URL}}" rel="noopener noreferrer" target="_blank">{{$j.URL}}</a></dd>{{end}}
-    <dt>Source</dt><dd>{{$j.Source}}</dd>
-    {{if $j.Contact}}<dt>Contact</dt><dd><a href="mailto:{{$j.Contact}}">{{$j.Contact}}</a></dd>{{end}}
+    <dt>Company</dt><dd>{{$j.Company}}</dd>
+    <dt>Role</dt><dd>{{$j.Title}}</dd>
+    {{if $j.Location}}<dt>Location</dt><dd>{{$j.Location}}</dd>{{end}}
+    {{if $j.Remote}}<dt>Work</dt><dd>{{title $j.Remote}}</dd>{{end}}
     {{if $j.SalaryMax}}<dt>Salary</dt><dd>{{$j.SalaryMin}}–{{$j.SalaryMax}} {{$j.Currency}}</dd>{{end}}
     {{if $j.Deadline}}<dt>Deadline</dt><dd>{{$j.Deadline}}</dd>{{end}}
-    {{if $j.Tags}}<dt>Tags</dt><dd>{{range split $j.Tags}}<span class="chip">{{.}}</span> {{end}}</dd>{{end}}
-    <dt>Added</dt><dd>{{day $j.CreatedAt}}</dd>
+    {{if $j.Contact}}<dt>Contact</dt><dd><a href="mailto:{{$j.Contact}}">{{$j.Contact}}</a></dd>{{end}}
+    <dt>Found on</dt><dd>{{$j.Source}}</dd>
+    {{if $j.Tags}}<dt>Skills</dt><dd>{{range split $j.Tags}}<span class="chip">{{.}}</span> {{end}}</dd>{{end}}
   </dl>
 </section>
 <section class="panel">
-  <div class="panel-h"><h2>People you know here</h2><span class="n">{{len .Contacts}}</span></div>
-  {{if .Contacts}}<ul class="plain">{{range .Contacts}}<li><div><b>{{if .URL}}<a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Name}}</a>{{else}}{{.Name}}{{end}}</b><br><small class="muted">{{.Position}}</small></div></li>{{end}}</ul>
-  <p class="small muted">Ask for a referral before you send. <code>scoutjobs contacts {{$j.ID}}</code></p>
-  {{else if .ContactCount}}<p class="muted small">Nobody in your {{.ContactCount}} imported connections works at {{$j.Company}}.</p>
-  {{else}}<p class="muted small">Import your LinkedIn data export to see who you know here: <code>scoutjobs linkedin import &lt;export.zip&gt;</code></p>{{end}}
+  <div class="panel-h"><h2>Application</h2></div>
+  <dl class="facts">
+    <dt>Move to</dt><dd>{{template "move" (dict_status $j.ID $j.Status $.Data.Self)}}</dd>
+    <dt>Added</dt><dd>{{date $j.CreatedAt}}</dd>
+  </dl>
 </section>
+{{if .Contacts}}<section class="panel">
+  <div class="panel-h"><h2>People you know here</h2><span class="n">{{len .Contacts}}</span></div>
+  <ul class="plain">{{range .Contacts}}<li><div><b>{{if .URL}}<a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Name}}</a>{{else}}{{.Name}}{{end}}</b><br><small class="muted">{{.Position}}</small></div></li>{{end}}</ul>
+  <p class="small muted">Ask one of them for a referral before you send.</p>
+</section>
+{{end}}
 </div>
 </div>
 {{end}}
 {{template "foot" .}}
+
+{{define "aipanel"}}{{$j := .Job}}{{$c := .Checklist}}
+<section class="panel aipanel" id="run"{{with .RunP}}{{if .Active}} data-run="/jobs/{{$j.ID}}/run"{{else if .Queued}} data-run="/jobs/{{$j.ID}}/run" data-queued="1"{{end}}{{end}}>
+<div class="ailead">
+{{with .RunErr}}<p class="callout bad">{{.}}</p>{{end}}
+{{with .RunP}}
+  {{if .Active}}{{with .Run}}<span class="eyebrow">{{template "ico-spark"}}Assistant at work</span><h2>Preparing your application</h2>
+    {{template "runprog" .}}
+    <ol class="runsteps">{{range .Steps}}<li data-step="{{.Name}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{steplabel .Name}}</b></div></li>{{end}}</ol>
+    {{if .Log}}<details class="runlog"><summary>Show what it is doing</summary><pre>{{range .Log}}{{.}}
+{{end}}</pre></details>{{end}}{{end}}
+    <form class="inline" method="post" action="/jobs/{{$j.ID}}/run/cancel"><button class="mini" type="submit">Stop</button></form>
+  {{else if .Queued}}<span class="eyebrow">{{template "ico-spark"}}Assistant</span><h2>Waiting in line</h2>
+    <p class="callout"><span class="spin" aria-hidden="true"></span> Position {{.Queued}} in the Prepare all queue. It starts when the job before it finishes.</p>
+  {{else if .Agents}}
+    {{if .Todo}}<span class="eyebrow">{{template "ico-spark"}}Assistant</span><h2>{{if .Done}}Let AI finish this application{{else}}Let AI prepare this application{{end}}</h2>
+    <p class="muted">It tailors your resume and cover letter to this job, checks them and prepares an e-mail. Nothing is sent without you.</p>
+    {{else}}<span class="eyebrow">{{template "ico-spark"}}Assistant</span><h2>Your application is ready</h2>
+    <p class="muted">Review the drafts below, then send. Nothing is sent without you.</p>{{end}}
+    {{with .Run}}{{if .Error}}{{if not $.RunP.Recovered}}<p class="callout bad"><b>The last run stopped:</b> {{.Error}}</p>{{end}}{{end}}{{end}}
+    {{if .Recovered}}<p class="callout">The last run stopped at <b>{{.Recovered}}</b>; that step is done now.</p>{{end}}
+    <form class="runform" method="post" action="/jobs/{{$j.ID}}/run">
+      {{if .Todo}}<button class="primary big" type="submit" data-busy="Starting the assistant…">{{template "ico-spark"}}{{if .Done}}Continue with AI{{else}}Start preparing with AI{{end}}</button>{{end}}
+      <details class="aiopts"{{if not .Todo}} open{{end}}><summary>{{if .Todo}}Options{{else}}Redo a step with AI{{end}}</summary>
+        {{if .Todo}}<div class="runpick">{{range .Todo}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{steplabel .Name}}{{with index $.RunP.Stale .Name}} <small class="muted">stale: {{.}}</small>{{end}}</label>{{end}}</div>{{end}}
+        {{if .Done}}<p class="muted small">Already done: {{range $i, $d := .Done}}{{if $i}}, {{end}}{{$d.Label}}{{end}}.</p>
+        <div class="runpick">{{range .Done}}<label class="check"><input type="checkbox" name="redo" value="{{.Name}}"> Redo: {{steplabel .Name}}{{with index $.RunP.Stale .Name}} <small class="muted">stale: {{.}}</small>{{end}}</label>{{end}}</div>{{end}}
+        <div class="runbar">{{if .Agents}}<span class="agentnote small muted">Uses <b class="agentname">{{index .Agents 0}}</b> · <a href="/connections#ai">Change</a></span>{{end}}
+        <label class="check" title="A review that asks for fixes is noted, and the PDF and e-mail are still prepared. Sending stays blocked."><input type="checkbox" name="keep" value="1"> Keep going if the review asks for fixes</label>
+        {{if not .Todo}}<button type="submit" data-busy="Starting the assistant…">Redo picked steps</button>{{end}}</div>
+        {{with .Run}}<details class="runlog"><summary>Last run</summary><ol class="runsteps">{{range .Steps}}{{$n := .Name}}<li data-step="{{$n}}"><span class="badge {{.State}}">{{.State}}</span><div><b>{{steplabel $n}}</b>{{if .Detail}}<small>{{.Detail}}</small>{{end}}{{with index $.RunP.Now $n}}<small><span class="badge {{.}}">now {{.}}</span>{{with index $.RunP.Stale $n}} {{.}}{{end}}</small>{{end}}</div></li>{{end}}</ol>{{if .Log}}<pre>{{range .Log}}{{.}}
+{{end}}</pre>{{end}}</details>{{end}}
+      </details>
+    </form>
+  {{else}}<span class="eyebrow">{{template "ico-spark"}}Assistant</span><h2>Connect an AI assistant</h2>
+    <p class="muted">ScoutJobs uses an AI assistant on this computer to write your drafts. Install <a href="https://docs.anthropic.com/en/docs/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or <a href="https://github.com/openai/codex" rel="noopener noreferrer" target="_blank">Codex</a>, then reload this page.</p>
+  {{end}}
+{{else}}<span class="eyebrow">{{template "ico-spark"}}Next step</span><h2>Prepare this application</h2>
+  <p class="muted">Write the resume and cover letter, check them, then send.</p>
+{{end}}
+</div>
+{{with $c}}<div class="aisteps" id="checklist">
+  <div class="prog"><span>{{.Done}} of {{len .Items}} done</span><meter min="0" max="{{len .Items}}" value="{{.Done}}"></meter></div>
+  <ol class="checklist">{{range .Items}}{{template "checkrow" .}}{{end}}</ol>
+</div>{{end}}
+</section>{{end}}
+
+{{define "checkrow"}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{.Label}}</b>{{if .Detail}}<small title="{{.Detail}}">{{.Detail}}</small>{{end}}{{with .Files}}<small class="prov" title="Fingerprints of the files this result covered">{{.}}</small>{{end}}</div>{{if .Href}}<a class="btn mini" href="{{.Href}}">{{.Act}}</a>{{end}}</li>{{end}}
+
+{{define "ivcard"}}{{$i := .I}}<article class="ivcard">
+  {{template "cal" $i.At}}
+  <div class="ivmain">
+    <div class="ivhead"><b>{{title $i.Stage}} interview</b>{{$up := ge $i.At today}}{{if $up}}<span class="badge {{$i.PrepStatus}}">prep {{$i.PrepCount}}/6</span>{{end}}{{if $i.Outcome}}<span class="badge {{$i.Outcome}}">{{title $i.Outcome}}</span>{{end}}</div>
+    <p class="small muted">{{hm $i.At}}{{if $i.Duration}} · {{$i.Duration}} min{{end}}{{with $i.Format}} · {{.}}{{end}}{{with $i.Interviewer}} · with {{.}}{{end}}{{with $i.Location}} · {{if isURL .}}<a href="{{.}}" rel="noopener noreferrer" target="_blank">join link ↗</a>{{else}}{{.}}{{end}}{{end}}</p>
+    {{if $up}}{{template "prep-check" .}}{{else if not $i.Outcome}}<p class="small muted">How did it go? Set the result from the <a href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">calendar</a>.</p>{{end}}
+    {{with $i.Feedback}}<p class="small"><b>Notes:</b> {{.}}</p>{{end}}
+  </div>
+  <div class="ivacts"><a class="btn mini" href="/calendar?view=week&amp;d={{day $i.At}}&amp;ev=i{{$i.ID}}">Open in calendar</a></div>
+</article>{{end}}
+
+{{define "evico"}}{{if eq . "emails"}}{{template "ico-mail"}}{{else if eq . "interviews"}}{{template "ico-calendar"}}{{else if eq . "assistant"}}{{template "ico-spark"}}{{else if eq . "applications"}}{{template "ico-send"}}{{else if eq . "status"}}{{template "ico-columns"}}{{else if eq . "jobs"}}{{template "ico-search"}}{{else if eq . "notes"}}{{template "ico-doc"}}{{else}}{{template "ico-pulse"}}{{end}}{{end}}

@@ -15,3 +15,6 @@
 
 # plugin eval runs
 /evals/results/
+
+# design work: mockups, screenshots, logo sources (kept local)
+/design/

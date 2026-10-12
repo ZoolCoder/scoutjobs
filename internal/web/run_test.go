@@ -34,7 +34,7 @@ func TestPrepareApplicationPanel(t *testing.T) {
 		return rec
 	}
 	page := do("GET", "/jobs/1", "").Body.String()
-	for _, want := range []string{"Prepare application", `name="step" value="tailor"`, `<option value="custom">custom</option>`, "Nothing is sent"} {
+	for _, want := range []string{"Start preparing with AI", `name="step" value="tailor"`, `href="/connections#ai"`, "Nothing is sent"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("job page lacks %q", want)
 		}
@@ -84,7 +84,7 @@ func TestPrepareApplicationWithoutAgent(t *testing.T) {
 	h, _ := Handler(s, Config{Runner: runner.NewManager(&runner.Runner{Store: s})})
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
-	if !strings.Contains(rec.Body.String(), "No agent CLI found") {
+	if !strings.Contains(rec.Body.String(), "Connect an AI assistant") {
 		t.Error("no hint when no agent is installed")
 	}
 }

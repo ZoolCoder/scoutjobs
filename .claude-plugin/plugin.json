@@ -1,6 +1,6 @@
 {
   "name": "scoutjobs",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Job search operating system for the job seeker: search Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, RSS and remote boards, score fit, check your CV, tailor applications, prep and mock interviews, learn from your decisions, track it all on a local dashboard with a JSON API and an MCP server for n8n and other agents; scoutjobs doctor checks the install.",
   "author": {
     "name": "Abdallah Emad (ZoolCoder)",

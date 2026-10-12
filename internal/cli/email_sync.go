@@ -98,7 +98,7 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) (err
 	since := fs.String("since", "14d", "how far back to look: 14d, 3w, 2026-09-01; never before your first tracked job")
 	limit := fs.Int("limit", 500, "newest messages to inspect at most")
 	dry := fs.Bool("dry-run", false, "show matches, change nothing")
-	via := fs.String("via", "auto", "gmail (API, after gmail connect), imap (imap_host), or auto")
+	via := fs.String("via", "auto", "agent (your AI agent's mail connector), gmail (API, after gmail connect), imap (imap_host), or auto")
 	asJSON := fs.Bool("json", false, "")
 	if _, err := parse(fs, rest); err != nil {
 		return err
@@ -110,6 +110,9 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) (err
 	source, err := mailSource(s, cfg, *via)
 	if err != nil {
 		return err
+	}
+	if source == "agent" {
+		return agentSync(s, cfg, from, out)
 	}
 	// a sync stopped by Gmail's rate limit still logs the replies among the messages it read
 	mails, fetchErr := fetchMail(s, cfg, source, from, *limit)
@@ -150,6 +153,9 @@ func SyncMail(s *store.Store, cfg Config) (int, error) {
 	source, err := mailSource(s, cfg, "auto")
 	if err != nil {
 		return 0, err
+	}
+	if source == "agent" {
+		return 0, errors.New("mail is read by your AI agent: start it from the Inbox page")
 	}
 	mails, fetchErr := fetchMail(s, cfg, source, time.Now().AddDate(0, 0, -14), 500)
 	replies, err := syncReplies(s, mails, source, false)
@@ -287,6 +293,11 @@ func matchReply(s *store.Store, m mail.Mail) (store.Job, string, bool) {
 			}
 		}
 	}
+	if id, ok := s.ThreadJob(m.Thread); ok { // a reply in the Gmail thread of a draft or an earlier reply
+		if j, err := s.JobByID(id); err == nil {
+			return j, "thread", true
+		}
+	}
 	if m.From == "" {
 		return store.Job{}, "", false
 	}
@@ -313,8 +324,54 @@ func matchReply(s *store.Store, m mail.Mail) (store.Job, string, bool) {
 	if len(hit) == 1 {
 		return hit[0], "domain", true
 	}
+	if j, ok := companyNamed(jobs, m); ok {
+		return j, "company", true
+	}
 	return store.Job{}, "", false
 }
+
+// companyNamed matches the mail an applicant tracking system sends ("Your application to Acme", from
+// no-reply@greenhouse.io): the message must come from an ATS or speak of an application, and name the
+// company of exactly one job applied to.
+func companyNamed(jobs []store.Job, m mail.Mail) (store.Job, bool) {
+	text := strings.ToLower(m.Subject + "\n" + m.Text)
+	if !atsSender(m.From) && !containsAny(text, applicationWords) {
+		return store.Job{}, false
+	}
+	var hit []store.Job
+	for _, j := range jobs {
+		name := strings.ToLower(strings.TrimSpace(j.Company))
+		if len(name) >= 3 && appliedStatus[j.Status] && hasWord(text, name) {
+			hit = append(hit, j)
+		}
+	}
+	if len(hit) == 1 {
+		return hit[0], true
+	}
+	return store.Job{}, false
+}
+
+// appliedStatus are the open statuses a company writes back to: before applying, mail naming it is not a reply.
+var appliedStatus = map[string]bool{"applied": true, "interview": true, "offer": true}
+
+// hasWord finds w in s with no letter or digit right around it, so "Meta" does not match "metadata".
+func hasWord(s, w string) bool {
+	for i := 0; ; {
+		k := strings.Index(s[i:], w)
+		if k < 0 {
+			return false
+		}
+		k += i
+		end := k + len(w)
+		before, after := k == 0 || !wordByte(s[k-1]), end == len(s) || !wordByte(s[end])
+		if before && after {
+			return true
+		}
+		i = k + 1
+	}
+}
+
+func wordByte(b byte) bool { return b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || b >= 0x80 }
 
 var freeMail = map[string]bool{"gmail.com": true, "googlemail.com": true, "outlook.com": true, "hotmail.com": true, "yahoo.com": true, "icloud.com": true, "gmx.de": true, "web.de": true, "proton.me": true, "protonmail.com": true}
 

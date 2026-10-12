@@ -10,7 +10,7 @@ import (
 
 // todo is one row of the overview's Today list: what to do, and buttons that do it.
 type todo struct {
-	Kind    string // interview | reply | followup | send | deadline | score
+	Kind    string // outcome | interview | reply | followup | send | deadline | score
 	Title   string
 	Detail  string
 	Href    string // the row itself
@@ -26,16 +26,22 @@ type todoLink struct {
 }
 
 // today collects what needs a hand now, most urgent first. Each source is capped so one kind cannot flood the list.
-func (v *server) today(st store.Stats, upcoming []store.Interview) []todo {
+func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []todo {
 	now := time.Now()
 	soon := now.Add(72 * time.Hour).Format("2006-01-02T15:04")
 	var out []todo
+	for _, i := range waiting {
+		out = append(out, todo{Kind: "outcome", Title: fmt.Sprintf("How did the %s %s interview go?", i.Company, strings.ReplaceAll(i.Stage, "_", " ")),
+			Detail: friendlyWhen(i.At, now) + " · log the outcome so the pipeline moves on",
+			Href:   "/interviews",
+			Links:  []todoLink{{"Log outcome", "/interviews", false}}})
+	}
 	for _, i := range upcoming {
 		if i.At > soon || i.Outcome != "" {
 			continue
 		}
-		out = append(out, todo{Kind: "interview", Title: fmt.Sprintf("Prepare for %s · %s", i.Company, i.Stage),
-			Detail: fmt.Sprintf("%s · prep %d/%d", i.At, i.PrepCount(), len(store.PrepItems)),
+		out = append(out, todo{Kind: "interview", Title: fmt.Sprintf("Prepare for %s · %s", i.Company, strings.ReplaceAll(i.Stage, "_", " ")),
+			Detail: fmt.Sprintf("%s · prep %d/%d", friendlyWhen(i.At, time.Now()), i.PrepCount(), len(store.PrepItems)),
 			Href:   fmt.Sprintf("/calendar?view=week&d=%s&ev=i%d", day(i.At), i.ID),
 			Links:  []todoLink{{"Open prep checklist", fmt.Sprintf("/calendar?view=week&d=%s&ev=i%d", day(i.At), i.ID), false}}})
 	}
@@ -43,7 +49,7 @@ func (v *server) today(st store.Stats, upcoming []store.Interview) []todo {
 	n := 0
 	if ms, err := v.s.Mails(0, 30); err == nil {
 		for _, m := range ms {
-			row := toRow(m)
+			row := toRow(m, v.mailAccount())
 			if m.Dir != "in" || n >= 4 || row.When.Before(cutoff) || m.Kind == "ack" || m.Kind == "rejected" {
 				continue
 			}

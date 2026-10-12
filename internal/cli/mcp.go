@@ -68,9 +68,11 @@ var mcpTools = []mcpTool{
 		req("verdict", "string", "send | fix", "verdict"), p("notes", "string", "what was checked, or what must change", "notes")}, false},
 	{"job_skip", "Skip a job with the reason the preference learner reads.", []string{"job", "skip"}, []mcpProp{jobRef,
 		req("reason", "string", "why, in the user's words", "reason"), p("signals", "string", `json object, e.g. {"remote":"onsite","stack":["java"]}`, "signals")}, false},
-	{"search", "Search company boards (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr, rss) and remote boards. add=true tracks the matches as status new.", []string{"search", "--compact"}, []mcpProp{
+	{"search", "Search company boards (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr, rss) and remote boards. Each posting carries derived skills, level, employment type, regions and visa, and a match score against the profile (best first). add=true tracks the matches as status new.", []string{"search", "--compact"}, []mcpProp{
 		p("query", "array", "keyword queries; every word of a query must appear", "query"), p("board", "array", "source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, or the careers page URL", "board"),
-		p("remote", "boolean", "also query the remote boards", "remote"), p("limit", "integer", "max postings", "limit"), p("add", "boolean", "add matches to the tracker", "add")}, true},
+		p("remote", "boolean", "also query the remote boards", "remote"), p("limit", "integer", "max postings", "limit"), p("add", "boolean", "add matches to the tracker", "add"),
+		p("location", "string", "comma separated cities, countries or regions; remote jobs match when open to them", "location"),
+		p("hide_mismatches", "boolean", "drop postings that break a must in the profile (place, engagement, salary floor)", "hide-mismatches")}, true},
 	{"cv_files", "Resume files in the cv folder.", []string{"cv", "files"}, nil, true},
 	{"cv_log", "Log a CV check result.", []string{"cv", "log"}, []mcpProp{req("file", "string", "file name inside cv/", "file"),
 		p("score", "integer", "overall 0-100", "score"), p("ats", "integer", "ATS score 0-100", "ats"), p("summary", "string", "one line verdict", "summary"),
@@ -84,7 +86,7 @@ var mcpTools = []mcpTool{
 		p("to", "string", "recipient; default the job's contact", "to"), p("subject", "string", "", "subject"),
 		p("body", "string", "file in the application folder used as body", "body"), p("attach", "array", "extra files to attach", "attach")}, true},
 	{"email_show", "Show the e-mail draft of a job.", []string{"email", "show"}, []mcpProp{jobRef}, true},
-	{"email_sync", "Read the inbox on this machine (Gmail API after gmail setup, or IMAP), log replies matched to applications (rejections and interview invitations move the status), and return under review the few unmatched messages that look like they concern the search. Use this before reading mail through a connector: it costs no message bodies.", []string{"email", "sync"}, []mcpProp{
+	{"email_sync", "Read the inbox on this machine (Gmail API after gmail setup, or IMAP; when the user chose the AI agent on the Inbox page this fails, so read the mail through your connector and log replies with email_log), log replies matched to applications (rejections and interview invitations move the status), and return under review the few unmatched messages that look like they concern the search. Use this before reading mail through a connector: it costs no message bodies.", []string{"email", "sync"}, []mcpProp{
 		p("since", "string", "14d, 3w, or YYYY-MM-DD", "since"), p("limit", "integer", "", "limit"), p("dry_run", "boolean", "show matches, change nothing", "dry-run"),
 		p("via", "string", "gmail | imap | auto", "via")}, true},
 	{"email_log", "Record a message matched to a job through a Gmail connector, so the dashboard shows it on the job and in the inbox. Repeat runs with the same message_id are ignored.", []string{"email", "log"}, []mcpProp{jobRef,
@@ -114,6 +116,8 @@ var mcpTools = []mcpTool{
 		p("format", "string", "phone|video|onsite", "format"), p("interviewer", "string", "", "interviewer"),
 		p("duration", "integer", "minutes, default 60", "duration"), p("location", "string", "meeting link or address", "location")}, false},
 	{"calendar_sync", "Sync interviews with the user's Google Calendar both ways: scheduled interviews are added there (no guests, nobody is invited), moves and deletions there come back, and events naming a tracked company become interviews.", []string{"calendar", "sync"}, nil, true},
+	{"calendar_save", "Save the events you listed from the user's calendar so ScoutJobs shows them; replaces the last list. Pass titles, times and locations only, never descriptions or guests.", []string{"calendar", "save"}, []mcpProp{
+		req("events", "string", `JSON array of {"id","title","start","end","all_day","location"}; times as YYYY-MM-DDTHH:MM in the user's time`, "events")}, false},
 	{"interview_set", "Update an interview: outcome, feedback, prep status, time.", []string{"interview", "set"}, []mcpProp{req("id", "integer", "interview id", ""),
 		p("at", "string", "", "at"), p("format", "string", "", "format"), p("interviewer", "string", "", "interviewer"), p("prep_status", "string", "todo|in_progress|ready", "prep-status"),
 		p("outcome", "string", "passed|failed|pending|cancelled", "outcome"), p("feedback", "string", "", "feedback"), p("stage", "string", "", "stage"),
@@ -147,7 +151,7 @@ func mcpDenied(args []string) bool {
 		// an unattended job run gets no Google access at all
 		return os.Getenv("SCOUTJOBS_RUNNER") != "" || len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
 	case "calendar":
-		return os.Getenv("SCOUTJOBS_RUNNER") != ""
+		return os.Getenv("SCOUTJOBS_RUNNER") != "" && (len(args) < 2 || args[1] != "save")
 	case "job":
 		return len(args) > 1 && args[1] == "run"
 	case "email":
@@ -351,9 +355,12 @@ func mcpCall(name string, in map[string]any) (string, error) {
 		if mcpDenied(args) {
 			return "", fmt.Errorf("%s is not available over MCP; ask the user to run it in a terminal", strings.Join(args, " "))
 		}
-		var buf bytes.Buffer
+		var buf mcpOutput
 		err = Run(args, &buf)
 		return strings.TrimSpace(buf.String()), err
 	}
 	return "", fmt.Errorf("%w: %s", errNoTool, name)
 }
+
+// mcpOutput collects a tool's output and tells commands that an AI client called them.
+type mcpOutput struct{ bytes.Buffer }

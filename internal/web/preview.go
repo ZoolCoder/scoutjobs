@@ -129,26 +129,41 @@ func (v *server) saveCVFile(w http.ResponseWriter, r *http.Request) {
 }
 
 var (
-	mdBold   = regexp.MustCompile(`\*\*([^*]+)\*\*`)
-	mdItalic = regexp.MustCompile(`(^|[^*\w])[*_]([^*_]+)[*_]`)
-	mdCode   = regexp.MustCompile("`([^`]+)`")
-	mdLink   = regexp.MustCompile(`\[([^\]]+)\]\((https?://[^)\s]+)\)`)
+	mdBold     = regexp.MustCompile(`\*\*([^*]+)\*\*`)
+	mdItalic   = regexp.MustCompile(`(^|[^*\w])[*_]([^*_]+)[*_]`)
+	mdCode     = regexp.MustCompile("`([^`]+)`")
+	mdLink     = regexp.MustCompile(`\[([^\]]+)\]\((https?://[^)\s]+)\)`)
+	mdNumbered = regexp.MustCompile(`^\d{1,3}[.)] `)
 )
 
 // mdHTML renders the Markdown subset the drafts use: headings, bullets, paragraphs, emphasis,
 // code and http links. Every line is escaped first, so the result carries no markup from the file.
 func mdHTML(src string) template.HTML {
 	var b strings.Builder
-	inList, para := false, []string{}
+	list, para := "", []string{}
+	closeList := func() {
+		if list != "" {
+			b.WriteString("</" + list + ">\n")
+			list = ""
+		}
+	}
+	openList := func(tag string) {
+		if len(para) > 0 {
+			b.WriteString("<p>" + strings.Join(para, "<br>") + "</p>\n")
+			para = para[:0]
+		}
+		if list != tag {
+			closeList()
+			b.WriteString("<" + tag + ">\n")
+			list = tag
+		}
+	}
 	flush := func() {
 		if len(para) > 0 {
 			b.WriteString("<p>" + strings.Join(para, "<br>") + "</p>\n")
 			para = para[:0]
 		}
-		if inList {
-			b.WriteString("</ul>\n")
-			inList = false
-		}
+		closeList()
 	}
 	for _, raw := range strings.Split(src, "\n") {
 		line := strings.TrimRight(raw, " \t")
@@ -168,20 +183,13 @@ func mdHTML(src string) template.HTML {
 			flush()
 			b.WriteString("<hr>\n")
 		case strings.HasPrefix(t, "- ") || strings.HasPrefix(t, "* ") || strings.HasPrefix(t, "+ "):
-			if len(para) > 0 {
-				b.WriteString("<p>" + strings.Join(para, "<br>") + "</p>\n")
-				para = para[:0]
-			}
-			if !inList {
-				b.WriteString("<ul>\n")
-				inList = true
-			}
+			openList("ul")
 			b.WriteString("<li>" + inlineMD(t[2:]) + "</li>\n")
+		case mdNumbered.MatchString(t):
+			openList("ol")
+			b.WriteString("<li>" + inlineMD(mdNumbered.ReplaceAllString(t, "")) + "</li>\n")
 		default:
-			if inList {
-				b.WriteString("</ul>\n")
-				inList = false
-			}
+			closeList()
 			para = append(para, inlineMD(t))
 		}
 	}

@@ -49,6 +49,9 @@ func TestEndToEnd(t *testing.T) {
 	run(t, "job", "add", "--company", "Globex", "--title", "Java Lead")
 	run(t, "job", "skip", "2", "--reason", "java shop", "--signals", `{"stack":["java"]}`)
 	run(t, "interview", "add", "1", "--stage", "screen", "--at", "2999-01-01")
+	if out := run(t, "interview", "add", "1", "--stage", "other", "--at", "2999-01-01"); !strings.Contains(out, "already") {
+		t.Errorf("same interview added twice: %s", out)
+	}
 	run(t, "interview", "set", "1", "--prep-status", "ready")
 	run(t, "session", "log", "--kind", "mock_behavioral", "--score", "70")
 	run(t, "learn", "add", "--skill", "Kubernetes")

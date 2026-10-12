@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -431,7 +432,7 @@ func (v *server) apiSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
-	res := search.Run(ctx, search.Options{Queries: in.Queries, Boards: in.Boards, Remote: in.Remote, Limit: in.Limit, BaseURL: v.cfg.SearchBaseURL})
+	res := search.Run(ctx, search.Options{Queries: in.Queries, Boards: in.Boards, Remote: in.Remote, Off: v.remoteOff(), Limit: in.Limit, BaseURL: v.cfg.SearchBaseURL})
 	type row struct {
 		search.Posting
 		ID      int64 `json:"id,omitempty"`
@@ -443,6 +444,9 @@ func (v *server) apiSearch(w http.ResponseWriter, r *http.Request) {
 		rw := row{Posting: p}
 		if in.Add {
 			j, created, err := v.s.UpsertJob(p.Job())
+			if err == nil {
+				err = apply.SavePosting(v.s, j, p.Description)
+			}
 			if err != nil {
 				apiErr(w, 500, err)
 				return

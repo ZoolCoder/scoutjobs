@@ -4,15 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
+<meta name="description" content="ScoutJobs: your local job search dashboard.">
 <title>ScoutJobs · {{.Title}}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 <script src="/app.js" defer></script>
 </head>
 <body>
-<div class="shell">
+<div class="shell{{if .Mini}} mini{{end}}">
 <aside class="side">
-  <a class="brand" href="/">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
+  <div class="sidetop">
+  <a class="brand" href="/" title="ScoutJobs home" aria-label="ScoutJobs home">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
+  <button class="sidefold" type="button" data-fold aria-label="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}" aria-expanded="{{if .Mini}}false{{else}}true{{end}}" title="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 10l-2 2 2 2"/></svg></button>
+  </div>
   <nav aria-label="main">
     <a href="/" {{if eq .Active "overview"}}class="on" aria-current="page"{{end}}>{{template "ico-grid"}}Overview</a>
     <p class="navh">Apply</p>
@@ -25,6 +29,7 @@
     <a href="/learning" {{if eq .Active "learning"}}class="on" aria-current="page"{{end}}>{{template "ico-book"}}Learning</a>
     <p class="navh">You</p>
     <a href="/profile" {{if eq .Active "profile"}}class="on" aria-current="page"{{end}}>{{template "ico-user"}}Profile &amp; CV</a>
+    <a href="/connections" {{if eq .Active "connections"}}class="on" aria-current="page"{{end}}>{{template "ico-plug"}}Connections</a>
     <a href="/preferences" {{if eq .Active "preferences"}}class="on" aria-current="page"{{end}}>{{template "ico-sliders"}}Preferences</a>
     <a href="/reviews" {{if eq .Active "reviews"}}class="on" aria-current="page"{{end}}>{{template "ico-bars"}}Reviews</a>
     <a href="/activity" {{if eq .Active "activity"}}class="on" aria-current="page"{{end}}>{{template "ico-pulse"}}Activity</a>
@@ -40,7 +45,7 @@
 </aside>
 <div class="body">
 {{if not .Bare}}<header class="top">
-  <div><h1 class="pg">{{title .Title}}</h1><p class="sub">{{.Sub}}</p></div>
+  <div><h1 class="pg{{if eq .Active "overview"}} greet{{end}}">{{if eq .Active "overview"}}{{greet}}{{else}}{{title .Title}}{{end}}</h1><p class="sub">{{.Sub}}</p></div>
   <span class="now">{{.Now}}</span>
 </header>{{end}}
 <main>
@@ -71,9 +76,9 @@
 </form>
 {{end}}
 
-{{define "gauge"}}<span class="gauge g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="fit {{fit .}}"><b>{{fit .}}</b></span>{{end}}
+{{define "gauge"}}<span class="gauge g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="Fit score {{fit .}} out of 100"><b>{{fit .}}</b></span>{{end}}
 {{define "cal"}}<span class="cal"><small>{{mon .}}</small><b>{{dom .}}</b></span>{{end}}
-{{define "gauge-lg"}}<span class="gauge lg g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="score {{fit .}}"><b>{{fit .}}</b></span>{{end}}
+{{define "gauge-lg"}}<span class="gauge lg g{{bucket .}}{{if lt . 0}}{{else if lt . 50}} lo{{else if lt . 75}} mid{{end}}" title="Match score {{fit .}} out of 100"><b>{{fit .}}</b></span>{{end}}
 
 {{define "mark"}}<svg class="mark" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="42" cy="42" r="30"/><path d="M64 64 L88 88"/><path d="M42 24 C44 36 48 40 60 42 C48 44 44 48 42 60 C40 48 36 44 24 42 C36 40 40 36 42 24 Z" fill="currentColor" stroke="none"/></svg>{{end}}
 {{define "ico-search"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>{{end}}
@@ -82,12 +87,14 @@
 {{define "ico-calendar"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>{{end}}
 {{define "ico-book"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4zM20 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z"/></svg>{{end}}
 {{define "ico-sliders"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></svg>{{end}}
+{{define "ico-plug"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4"/></svg>{{end}}
 {{define "ico-user"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>{{end}}
 {{define "ico-doc"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/></svg>{{end}}
 {{define "ico-send"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>{{end}}
 {{define "ico-bars"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V12M10 20V5M15 20v-6M20 20V9"/></svg>{{end}}
 {{define "ico-pin"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>{{end}}
 {{define "ico-clock"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>{{end}}
+{{define "ico-spark"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>{{end}}
 {{define "ico-pulse"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>{{end}}
 {{define "ico-play"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>{{end}}
 {{define "ico-users"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M15.5 4.5a3.5 3.5 0 0 1 0 7M17 13.5a6.5 6.5 0 0 1 4.5 6.5"/></svg>{{end}}

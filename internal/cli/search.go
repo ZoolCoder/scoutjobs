@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/match"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -35,9 +36,40 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	add := fs.Bool("add", false, "add matches to the tracker as status new")
 	asJSON := fs.Bool("json", false, "print JSON lines (description included)")
 	compact := fs.Bool("compact", false, "with --json: drop descriptions")
+	location := fs.String("location", "", "keep jobs in, or remote and open to, these comma separated cities, countries or regions")
+	rank := fs.Bool("rank", true, "score each posting against profile.md and the preferences, best fit first")
+	hide := fs.Bool("hide-mismatches", false, "drop postings that break a must in the profile: place, engagement, salary floor")
+	suggest := fs.Bool("suggest", false, "print searches built from the profile and exit")
 	if err := fs.Parse(rest); err != nil {
 		return err
 	}
+	pr := match.Load(s)
+	if *suggest {
+		sg := pr.Suggest()
+		return emit(out, *asJSON, sg, func() {
+			for _, x := range sg {
+				fmt.Fprintf(out, "%s: scoutjobs search", x.Name)
+				for _, q := range strings.Split(x.Queries, ", ") {
+					fmt.Fprintf(out, " --query %q", q)
+				}
+				if x.Location != "" {
+					fmt.Fprintf(out, " --location %q", x.Location)
+				}
+				if x.RemoteOnly {
+					fmt.Fprint(out, " --remote")
+				}
+				fmt.Fprintln(out)
+			}
+			if len(sg) == 0 {
+				fmt.Fprintln(out, "fill in Roles and Skills in profile.md to get suggestions")
+			}
+		})
+	}
+	wants := splitList(*location)
+	if len(wants) > 0 {
+		pr.Places = wants // the place searched for is the place to score against
+	}
+	ranked := *rank && !pr.Empty()
 	if len(queries) == 0 {
 		queries = cfg.SearchQueries
 	}
@@ -52,22 +84,45 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	r := search.Run(ctx, search.Options{Queries: queries, Boards: boards, Remote: *remote, Limit: *limit})
+	opts := search.Options{Queries: queries, Boards: boards, Remote: *remote, Off: splitList(s.Setting(search.OffSetting)), Limit: *limit}
+	var dropped int
+	opts.Keep = func(p search.Posting) bool {
+		ok, _ := search.LocationMatch(p, wants)
+		if ok && *hide && ranked {
+			ok = len(pr.Score(p).Hard) == 0
+		}
+		if !ok {
+			dropped++
+		}
+		return ok
+	}
+	if ranked {
+		opts.Rank = func(p search.Posting) int { return pr.Score(p).Score }
+	}
+	r := search.Run(ctx, opts)
 	for _, e := range r.Errors {
 		fmt.Fprintln(os.Stderr, "warn:", e)
 	}
 	var added int
 	type row struct {
 		search.Posting
-		ID      int64 `json:"id,omitempty"`
-		Created bool  `json:"created,omitempty"`
+		Match   *match.Result `json:"match,omitempty"`
+		ID      int64         `json:"id,omitempty"`
+		Created bool          `json:"created,omitempty"`
 	}
 	rows := make([]row, 0, len(r.Postings))
 	for _, p := range r.Postings {
 		rw := row{Posting: p}
+		if ranked {
+			m := pr.Score(p)
+			rw.Match = &m
+		}
 		if *add {
 			j, created, err := s.UpsertJob(p.Job())
 			if err != nil {
+				return err
+			}
+			if err := apply.SavePosting(s, j, p.Description); err != nil {
 				return err
 			}
 			rw.ID, rw.Created = j.ID, created
@@ -98,10 +153,23 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 				id += "="
 			}
 		}
-		tbl = append(tbl, []string{id, rw.Source, trunc(rw.Company, 22), trunc(rw.Title, 44), rw.Remote, trunc(rw.Location, 20), rw.PostedAt})
+		fitCol := "-"
+		if rw.Match != nil {
+			fitCol = fmt.Sprint(rw.Match.Score)
+			if len(rw.Match.Hard) > 0 {
+				fitCol += "!"
+			}
+		}
+		tbl = append(tbl, []string{id, fitCol, rw.Source, trunc(rw.Company, 22), trunc(rw.Title, 44), rw.Remote, trunc(rw.Location, 20), rw.PostedAt})
 	}
-	table(out, "ID\tSOURCE\tCOMPANY\tTITLE\tREMOTE\tLOCATION\tPOSTED", tbl)
+	table(out, "ID\tFIT\tSOURCE\tCOMPANY\tTITLE\tREMOTE\tLOCATION\tPOSTED", tbl)
 	fmt.Fprintf(out, "%d postings", len(rows))
+	if dropped > 0 {
+		fmt.Fprintf(out, ", %d dropped by --location or --hide-mismatches", dropped)
+	}
+	if ranked {
+		fmt.Fprint(out, ", best fit first (! breaks a must)")
+	}
 	if *add {
 		fmt.Fprintf(out, ", %d added (= already tracked)", added)
 	}
@@ -158,6 +226,9 @@ func runImport(s *store.Store, rest []string, out io.Writer) error {
 		}
 		j, c, err := s.UpsertJob(p.Job())
 		if err != nil {
+			return err
+		}
+		if err := apply.SavePosting(s, j, p.Description); err != nil {
 			return err
 		}
 		ids = append(ids, j.ID)

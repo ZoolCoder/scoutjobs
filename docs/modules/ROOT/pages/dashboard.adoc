@@ -7,9 +7,11 @@ $ scoutjobs serve                     # http://127.0.0.1:7070
 $ scoutjobs serve --addr 127.0.0.1:8080
 ----
 
-One Go binary, SQLite, HTML templates, one small script for the drag and drop, no external assets, strict Content-Security-Policy. Light theme by default, `theme: dark` or `theme: auto` in `config.yaml`, and a switch in the sidebar that overrides per browser. The pages have no login, so keep it on localhost (see xref:security.adoc[]).
+One Go binary, SQLite, HTML templates, one small embedded script, no external assets, strict Content-Security-Policy. Light theme by default, `theme: dark` or `theme: auto` in `config.yaml`, and a switch in the sidebar that overrides per browser. The pages have no login, so keep it on localhost (see xref:security.adoc[]).
 
-image::overview.png[The overview: next best move, the four numbers, pipeline health, interviews and drafts,1200]
+For a step-by-step tour from an empty install to an interview in your calendar, see xref:getting-started.adoc[].
+
+image::overview.png[The overview: next best move, the four numbers, pipeline health, today's tasks, interviews, CV health, learning and recent activity,1200]
 
 == How it works
 
@@ -17,15 +19,15 @@ The dashboard is a second window onto the same `~/.scoutjobs` the CLI and the ag
 
 The agents never open the dashboard. They write through the CLI (or the JSON API from a cloud runner), and you watch the result here: a new card after `job add`, a score gauge after the `job-fit` skill runs, the tailored resume in the drafts viewer after `resume-tailor`, the gates turning green after `draft-review` logs its verdict. The one place the loop closes the other way is the drafts viewer: an edit you save there is the text the agent reads on its next turn.
 
-Because every page is a plain `GET` and every action a `POST` with a redirect, the whole thing works with the keyboard, in a reader mode, and with JavaScript off. The board script only adds drag and drop on top of the stage buttons; it never talks to anything but the same `/jobs/\{id}/status` form.
+Because every page is a plain `GET` and every action a `POST` with a redirect, the whole thing works with the keyboard and in a reader mode. The one script (`app.js`, served from the binary under the same Content-Security-Policy) only adds to that: drag and drop on the board on top of the stage buttons, the progress bar and elapsed time while the AI assistant runs, the search tag filter, the connection tests, and a reload offer when the binary was upgraded. It talks to nothing but the dashboard's own forms and JSON.
 
 == Overview
 
-The page opens with *Next best move*: one card the server picks from the state of the pipeline, in this order: the strongest draft waiting to be sent, a follow-up past its date, an interview to prepare, a CV that has never been checked, otherwise new jobs to find and score. The four numbers below are open jobs, applications this week against `weekly_apply_target`, upcoming interviews and the response rate over everything applied. *Pipeline health* is the funnel with the last eight weeks of applications as bars; *Coming up* lists interviews and the drafts waiting with their fit gauge.
+The page opens with *Next best move*: one card the server picks from the state of the pipeline, in this order: the strongest draft waiting to be sent, a follow-up past its date, an interview to prepare, a CV that has never been checked, otherwise new jobs to find and score. The four numbers next to it are open jobs, applications this week against `weekly_apply_target`, upcoming interviews and the response rate over everything applied. *Pipeline health* is the funnel, *Applications per week* the last eight weeks as bars, and *Today* the tasks due now with a button each. The bottom row shows upcoming interviews and drafts waiting, CV health, the top learning gaps and the latest activity.
 
 == Pipeline
 
-image::pipeline.png[The pipeline board: one column per open stage, a gauge per card, a veto badge, stage buttons,1200]
+image::pipeline.png[The pipeline board: one column per open stage, a fit ring per card,1200]
 
 One column per stage, left to right in the order a job moves. Each card carries the fit gauge (green from 75, amber from 50, red below), where and how remote the job is, the deadline or last update, the source board, and the buttons for the stages that usually come next. A job with a veto shows the `veto` badge instead of a gauge, so a hard failure never hides behind a good number.
 
@@ -35,33 +37,59 @@ image::pipeline-dark.png[The same board in the dark theme,1200]
 
 == Job
 
-image::job.png[One job: the Get selected kit, the application facts, the files in its folder,1200]
+image::job.png[One job: let AI finish this application, the step checklist, the drafts and the job details,1200]
 
-The job page is where an application gets made. *Get selected* is the kit, four steps with the slash command that runs each: tailor the CV, write the cover letter, run the ATS check against this posting, and send. A step shows *Done* when its file exists, and the ATS step shows the score and the gaps it found. The right column holds the facts the agents also read (status, posting URL, contact, salary, deadline, tags) and the *Files* panel with everything in the application folder; each text file opens in the drafts viewer, and *Export resume.md as PDF* renders the PDF the ATS gate inspects. The checklist shows under the draft review, the resume PDF and the ATS check the files each one covered with the start of their SHA-256, and marks a result *stale* when one of those files changed since; Prepare application then offers that step again. With a Word cover letter template, the Documents panel lists `cover-letter.docx` and `cover-letter.pdf` and shows the template used, when the letter was built, its page count against the template's and the template check with its problems; the checklist's Cover letter step is done only when that check passes. Opening the page records the agent results a stopped run left behind, so the last run's steps show as *now recovered* or *now stale*.
+The job page is where an application gets made. The stage line under the title shows how far the job has come. *Let AI finish this application* has one button, *Continue with AI*: the AI assistant chosen on Connections checks the fit, tailors the resume, writes the cover letter, reviews both against `profile.md`, renders the resume PDF, runs the hiring software check and prepares the application e-mail. *Options* picks which steps to run. While it runs, a progress bar shows the step it is on and how long it has been going; the page reloads when it ends.
 
-image::job-gates.png[Ready to send: seven gates all passing, and the evidence table from fit-review.json,1200]
+The checklist on the right shows each step: green when done, amber when it needs a look, red when it blocks, with *Preview*, *Edit drafts* or *Details* next to it. A result is marked *stale* when a file it covered changed since, and the next run offers that step again. Opening the page records the agent results a stopped run left behind, so the last run's steps show as *now recovered* or *now stale*. With a Word cover letter template, the Documents panel lists `cover-letter.docx` and `cover-letter.pdf` with the template check; the Cover letter step is done only when that check passes.
+
+*Drafts* holds the resume, the cover letter and the e-mail, each with *Preview* and *Edit*; *Mail app* opens your own mail program with the e-mail filled in. The right column holds the facts the agents also read (company, role, place, salary, source, skills) and *Application*, with buttons for the stages that usually come next. *Emails*, *Interviews*, *Files* and *Activity* tabs show everything else about the job.
+
+image::job-gates.png[Ready to send: one check still to fix, and why the job fits with evidence from profile.md,760]
 
 *Ready to send?* runs the same seven quality gates as `scoutjobs job check` on every page load: the documents exist and are not stubs, the fit review has no veto, every must-have is covered and its agreed wording is in the drafts, the draft-reviewer logged a `send` verdict after the last edit, nothing is duplicated, `resume.pdf` has a text layer, and the filenames look professional. A warning never blocks; a failure does, and the panel says what to do about each one:
 
-image::job-blocked.png[Three failing gates: a missing cover letter, a must-have without evidence, no reviewer verdict,1200]
+image::job-blocked.png[A drafted job: the review asked for fixes and the resume PDF is not made yet,1200]
 
 *Apply with gaps* appears when must-haves have no evidence. Tick each gap, say why you apply anyway, and press *Proceed with gaps*: the decision is logged as `check:acknowledged`, the fit review is not touched, and e-mail sending stays blocked. Once every other gate passes, *Proceed to official application* opens the posting, and *Yes, mark applied* records the submission with an optional note. Nothing is submitted for you.
 
-*Why this job fits* is `fit-review.json` as a table: the posting's wording for each requirement, whether it is a must or a nice-to-have, where in your profile the evidence is, how strong the match is (direct, adjacent, partial, gap), the wording the CV may use, and the risk a reviewer could raise. Below it the free-text notes, then interviews and the full history of the job. *People you know here* lists your LinkedIn connections at the company after `scoutjobs linkedin import`, for asking a referral.
+*Why this job fits* is `fit-review.json`, one row per requirement: the posting's wording for each requirement, whether it is a must or a nice-to-have, where in your profile the evidence is, how strong the match is (direct, adjacent, partial, gap), the wording the CV may use, and the risk a reviewer could raise. Below it the free-text notes, then interviews and the full history of the job. *People you know here* lists your LinkedIn connections at the company after `scoutjobs linkedin import`, for asking a referral.
 
 == Drafts viewer
 
-image::drafts.png[The drafts viewer: cover-letter.md in a textarea with save and discard,1200]
+image::drafts.png[The drafts viewer: cover-letter.md rendered, with Edit and Download,1200]
 
-`/jobs/\{id}/files/\{name}` renders a text file from the job's application folder: the posting, the tailored resume, the cover letter, the e-mail draft, research, the prep sheet. Drafts (`.md`, `.txt`, `.json`) open in a textarea: edit, save, and the agent sees the new text on its next read; the save logs `draft:edited` and the grounding gate asks for a fresh review. `.eml` files are read-only. Binary files (PDF, DOCX) are listed but not rendered.
+`/jobs/\{id}/files/\{name}` renders a text file from the job's application folder: the posting, the tailored resume, the cover letter, the e-mail draft, research, the prep sheet. *Edit* opens drafts (`.md`, `.txt`, `.json`) in a textarea: edit, save, and the agent sees the new text on its next read; the save logs `draft:edited` and the grounding gate asks for a fresh review. `.eml` files are read-only. Binary files (PDF, DOCX) are listed but not rendered.
 
 == Search
 
-image::search.png[Search: queries, boards and the remote aggregators, prefilled from config,1200]
+image::search.png[Find jobs: what kind of job, where, remote only, posted, salary and the suggestions from your profile,1200]
 
-The same sources as `scoutjobs search`, prefilled from `search_queries`, `search_boards` and `search_remote` in `config.yaml`. Paste a careers page URL or a `source:slug` into *Boards*; results list company, title, place, source and date with an *Add* button each, or *Search and add all* tracks every hit as `new`. A posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
+The same sources as `scoutjobs search`, prefilled from `search_queries`, `search_boards` and `search_remote` in `config.yaml`. Paste a careers page URL or a `source:slug` into *Boards*; results list company, title, place, source and date with *+ Add to pipeline* each, or *Add all to pipeline* tracks every hit as `new`. A posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
 
-== Pages
+image::search-results.png[Search results: a score and label per job, what fits and what does not,1200]
+
+With a filled `profile.md` the results come best fit first, each with its match score, a label (*Great match*, *Good match*, *Weak match*, *Breaks a must-have*), what fits (target role, skills, level, place) and what does not. *Suggested from your profile* above the form runs ready searches built from your target roles, seniority and strongest languages. *Location* (prefilled from the profile) keeps jobs in, or remote and open to, a city, country or region, and *Hide jobs that break my must-haves* drops the ones in the wrong place, of an engagement type you ruled out, or paying below your floor; saved searches keep both. Each row shows its tags, derived skills, level, engagement type, region and visa stance included, and the tag bar above the table narrows the rows to those carrying every tag you pick.
+
+== Inbox
+
+image::inbox.png[Inbox: replies grouped by day, each tagged with its kind and the job it belongs to,1200]
+
+Replies from companies, matched to your applications and grouped by day. Each one carries its kind (interview, offer, request, rejected, acknowledgement), the job it belongs to and where it came from; the chips on top filter by kind. *Open in Gmail*, *Reply in Gmail* and *All mail for this job* link to the thread.
+
+*Sync now* reads new mail the way Connections says: through your own Google client, an IMAP mailbox, or the AI assistant's mail connector. With the assistant, the page is covered by a *Syncing your mail* window with a progress bar, the step it is on (searching, reading, matching, logging the replies) and the time it has taken; *Cancel* stops it and keeps what was already logged. A reply that names an interview time becomes an interview on that job, with its length; an offer or a rejection proposes the stage change. Mail you sent yourself is skipped.
+
+== Connections
+
+image::connections.png[Connections: AI assistant, mail, calendar and job sources,1200]
+
+One card per tool ScoutJobs uses, each with *Test connection*:
+
+AI assistant:: Claude (recommended), Codex, or a custom command from `config.yaml` (`agent_command`). It writes the tailored documents and runs the mail and calendar syncs.
+Mail:: A Google account through your own OAuth client (no AI reads your mail), any IMAP mailbox (read only), or the AI assistant's mail connector. *Disconnect* forgets the choice.
+Calendar:: Google Calendar, the AI assistant's calendar connector, or an Apple Calendar subscription link (read only). With the connector, *Sync now* opens a *Syncing your calendar* window like the Inbox's and syncs interviews both ways; *Sync the next* sets how many days ahead it looks (shorter is quicker).
+Job sources:: The job boards *Find jobs* searches, each with an on/off switch, and the career page systems it can read.
+
 
 [cols="1,3"]
 |===
@@ -71,19 +99,25 @@ The same sources as `scoutjobs search`, prefilled from `search_queries`, `search
 | Your next best move, the funnel, applied this week against `weekly_apply_target`, follow-ups due, stale jobs, upcoming interviews, activity streak.
 
 | Pipeline
-| One column per open status. *Due this week* keeps only open jobs with a deadline within 7 days or a follow-up due; the search box filters company, title and tags. Every card opens the job and can be dragged onto another column, or onto the closing stages shown below the board while dragging. *Add job* opens a form with the same fields as `scoutjobs job add`; paste a posting URL from Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee or BambooHR into *Fill from a posting URL* and the form is filled, description included, for you to check. An existing company and title is updated, not duplicated. Each card has one-click buttons for the stages that follow (`new` offers ranked, drafted, skipped; `applied` offers interview, rejected, no response, withdrawn) and a *more* disclosure for any other status with a reason. See xref:pipeline.adoc[].
+| One column per open status. *Due this week* keeps only open jobs with a deadline within 7 days or a follow-up due; the search box filters company, title and tags; *Location* keeps jobs in, or remote and open to, a city, country or region, and the tag picker keeps one tag. Cards and list rows show where the job is. Every card opens the job and can be dragged onto another column, or onto the closing stages shown below the board while dragging. *Add job* opens a form with the same fields as `scoutjobs job add`; paste a posting URL from Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee or BambooHR into *Fill from a posting URL* and the form is filled, description included, for you to check. An existing company and title is updated, not duplicated. Each card has one-click buttons for the stages that follow (`new` offers ranked, drafted, skipped; `applied` offers interview, rejected, no response, withdrawn) and a *more* disclosure for any other status with a reason. See xref:pipeline.adoc[].
 
 | Job
-| Everything about one posting: score and fit notes, contact, tags, notes, events, interviews, the *Get selected* kit (tailored resume, cover letter, ATS check at 70 or more, e-mail draft), the *Ready to send?* panel with the seven quality gates and what blocks, and the evidence table from `fit-review.json` with a veto callout when one is set. A vetoed job shows a `veto` badge instead of its gauge on the pipeline board. Each file in the application folder opens in the drafts viewer (`.md`, `.txt`, `.json`, `.eml`). A `mailto:` link opens your own mail app with the subject and body prefilled.
+| Everything about one posting: score and fit notes, contact, tags, notes, events, interviews, *Continue with AI* and its step checklist (fit, tailored resume, cover letter, draft review, resume PDF, hiring software check at 70 or more, final checks, e-mail draft), the *Ready to send?* panel with the seven quality gates and what blocks, and the evidence table from `fit-review.json` with a veto callout when one is set. A vetoed job shows a `veto` badge instead of its gauge on the pipeline board. Each file in the application folder opens in the drafts viewer (`.md`, `.txt`, `.json`, `.eml`). A `mailto:` link opens your own mail app with the subject and body prefilled.
+
+| Inbox
+| Replies from companies matched to your jobs, filtered by kind, with *Sync now* and its progress window.
+
+| Connections
+| AI assistant, mail, calendar and job sources, each with a connection test.
 
 | Search
-| The same sources as `scoutjobs search`: queries, boards (`greenhouse:stripe`, a careers URL such as `https://jobs.lever.co/netlify`, `rss:https://...`) and the remote aggregators including the Hacker News "Who is hiring" thread, prefilled from `search_queries`, `search_boards` and `search_remote`. Results list company, title, place, source and date with an *Add* button each, or *Search and add all* tracks every hit as `new`; a posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
+| The same sources as `scoutjobs search`: queries, boards (`greenhouse:stripe`, a careers URL such as `https://jobs.lever.co/netlify`, `rss:https://...`) and the remote aggregators including the Hacker News "Who is hiring" thread, prefilled from `search_queries`, `search_boards` and `search_remote`. Results list company, title, place, source and date with *+ Add to pipeline* each, or *Add all to pipeline* tracks every hit as `new`; a posting already in the pipeline shows its stage instead of the button. Postings are stored as text and never followed.
 
 | Interviews
-| Scheduled and past interviews with prep status, plus the mock sessions and their scores.
+| The next interview with its prep checklist, past interviews waiting for an outcome, and later ones.
 
 | Calendar
-| Interviews, application deadlines and follow-ups due, laid out like Google Calendar: day, week, month and schedule views, colour by stage, an all-day row for deadlines and date-only interviews, and a red line at the current time. Click an empty slot or *Create* to schedule an interview for a tracked job; click an event to see it, move it, change its length or place, set prep status and outcome. Each event has *Add to Google Calendar* (Google's own event form, filled in) and *Download .ics*. The side panel shows the feed address for subscribing; see xref:interviews.adoc#_calendar[Calendar].
+| Interviews, application deadlines and follow-ups due, laid out like Google Calendar: day, week, month and schedule views, colour by stage, an all-day row for deadlines and date-only interviews, and a red line at the current time. Click an empty slot or *Create* to schedule an interview for a tracked job; click an event to see it, move it, change its length or place, set prep status and outcome. Each event has *Add to Google Calendar* (Google's own event form, filled in) and *Download .ics*. The side panel lists the calendars with *Sync now* when the assistant's connector is set; see xref:interviews.adoc#_calendar[Calendar].
 
 | Learning
 | Skill gaps found by `upskill`, ranked, with hours tracked.

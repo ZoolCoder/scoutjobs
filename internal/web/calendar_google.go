@@ -9,6 +9,7 @@ import (
 
 	"github.com/zoolcoder/scoutjobs/internal/calsync"
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -57,6 +58,28 @@ func (v *server) googleEvents(ctx context.Context, d time.Time) ([]calEvent, str
 		}
 	}
 	return v.gcal.events, ""
+}
+
+// agentEvents are the calendar events the AI agent saved at its last sync. Google Calendar, when
+// it is the calendar, shows the same events itself.
+func (v *server) agentEvents() []calEvent {
+	if via := v.s.Setting(runner.CalendarVia); via != "agent" {
+		if g := v.gmailClient(); via == "apple" || g != nil && g.HasCalendar() {
+			return nil
+		}
+	}
+	open, _ := v.s.ListJobs(store.JobFilter{Open: true})
+	ivs, _ := v.s.Interviews(0, false)
+	var out []calEvent
+	for _, g := range calsync.LoadAgentEvents(v.s) {
+		if strings.HasPrefix(g.Title, "Interview: ") { // ScoutJobs' own interview, already shown
+			continue
+		}
+		if e, ok := googleEvent(g, open, ivs); ok {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 // syncCalendar runs the two-way sync with Google Calendar, at most every googleTTL unless forced.
@@ -142,6 +165,11 @@ func googleEvent(g gmail.Event, open []store.Job, ivs []store.Interview) (calEve
 }
 
 func (v *server) googleByKey(id string) (calEvent, bool) {
+	for _, e := range v.agentEvents() {
+		if e.Key == "g"+id {
+			return e, true
+		}
+	}
 	v.gcal.mu.Lock()
 	defer v.gcal.mu.Unlock()
 	for _, e := range v.gcal.events {

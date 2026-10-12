@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -181,6 +182,16 @@ func FetchPosting(ctx context.Context, rawURL string, client *http.Client, base 
 	if err != nil || u.Host == "" {
 		return Posting{}, fmt.Errorf("%q: not a URL", rawURL)
 	}
+	f := fetcher{client: client, base: base}
+	if f.client == nil {
+		f.client = &http.Client{Timeout: 20 * time.Second}
+	}
+	if f.base == nil {
+		f.base = map[string]string{}
+	}
+	if strings.TrimPrefix(u.Hostname(), "www.") == "remotive.com" {
+		return f.remotiveJob(ctx, u, rawURL)
+	}
 	src, slug, id, ok := locate(u)
 	if !ok {
 		if name := closedBoard(u.Host); name != "" {
@@ -190,13 +201,6 @@ func FetchPosting(ctx context.Context, rawURL string, client *http.Client, base 
 	}
 	if id == "" {
 		return Posting{}, fmt.Errorf("%s is a board, not a posting: search it with --board %s:%s", u.Host, src, slug)
-	}
-	f := fetcher{client: client, base: base}
-	if f.client == nil {
-		f.client = &http.Client{Timeout: 20 * time.Second}
-	}
-	if f.base == nil {
-		f.base = map[string]string{}
 	}
 	var p Posting
 	switch src {
@@ -230,7 +234,27 @@ func FetchPosting(ctx context.Context, rawURL string, client *http.Client, base 
 	if p.URL == "" {
 		p.URL = rawURL
 	}
+	Enrich(&p)
 	return p, nil
+}
+
+// remotiveJob finds a Remotive posting through its search API: the URL's last segment is the
+// title's words and the posting id (/remote-jobs/<category>/<title-words>-<id>).
+func (f fetcher) remotiveJob(ctx context.Context, u *url.URL, rawURL string) (Posting, error) {
+	last := path.Base(strings.TrimSuffix(u.Path, "/"))
+	i := strings.LastIndex(last, "-")
+	if i < 0 || strings.Trim(last[i+1:], "0123456789") != "" {
+		return Posting{}, fmt.Errorf("%s is not a Remotive posting URL", rawURL)
+	}
+	list, err := f.remotive(ctx, strings.ReplaceAll(last[:i], "-", " "))
+	if err != nil {
+		return Posting{}, err
+	}
+	p, err := pick(list, last[i:])
+	if err == nil {
+		Enrich(&p)
+	}
+	return p, err
 }
 
 func pick(list []Posting, id string) (Posting, error) {

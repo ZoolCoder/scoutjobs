@@ -133,7 +133,7 @@ func Run(args []string, out io.Writer) error {
 		if n, err := apply.ReconcileAll(s); n > 0 || err != nil {
 			fmt.Fprintf(out, "merged %d file(s) from older application folders %v\n", n, errOrNil(err))
 		}
-		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, FitApplyFloor: cfg.FitApplyFloor, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
+		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, FitApplyFloor: cfg.FitApplyFloor, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, IMAP: cfg.IMAPHost != "", Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }
@@ -270,7 +270,7 @@ smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
 
-# Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Gmail on the dashboard's Inbox page); it stores
+# Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Google on the dashboard's Inbox page); it stores
 # the client in gmail-client.json, so these two stay empty unless you prefer them here
 gmail_client_id:        # xxxx.apps.googleusercontent.com
 gmail_client_secret:    # the Desktop client's secret; or set $SCOUTJOBS_GMAIL_CLIENT_SECRET
@@ -783,6 +783,10 @@ func runInterview(s *store.Store, rest []string, out io.Writer) error {
 			return err
 		}
 		i.JobID = j.ID
+		if dup := sameInterview(s, i); dup != nil { // a sync may find the same invitation again
+			fmt.Fprintf(out, "interview #%d already on %s for #%d %s\n", dup.ID, dup.At, j.ID, j.Company)
+			return nil
+		}
 		id, err := s.AddInterview(i)
 		if err != nil {
 			return err
@@ -1090,4 +1094,15 @@ func errOrNil(err error) string {
 		return ""
 	}
 	return "(" + err.Error() + ")"
+}
+
+// sameInterview is the job's interview already at that time, if any.
+func sameInterview(s *store.Store, i store.Interview) *store.Interview {
+	all, _ := s.Interviews(i.JobID, false)
+	for _, have := range all {
+		if have.At == i.At {
+			return &have
+		}
+	}
+	return nil
 }

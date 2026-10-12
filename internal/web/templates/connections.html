@@ -1,0 +1,77 @@
+{{define "ico-mail"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>{{end}}
+{{define "ico-case"}}<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18"/></svg>{{end}}
+{{define "ico-globe"}}<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>{{end}}
+{{define "connopt"}}<li{{if .On}} class="on"{{end}}><label{{if .Off}} class="dis"{{end}}><input type="radio" name="via" value="{{.Value}}"{{if .On}} checked{{end}}{{if .Off}} disabled{{end}}>
+  <span><b>{{.Title}}</b><small>{{.Note}}</small></span></label>{{if .On}}<span class="badge done">Connected</span>{{end}}</li>{{end}}
+{{define "connbadge"}}{{if .}}<span class="badge done">Connected</span>{{else}}<span class="badge todo">Not set up</span>{{end}}{{end}}
+{{template "head" .}}
+{{with .Data}}
+{{if .Msg}}<p class="callout ok">{{.Msg}}</p>{{end}}{{if .Err}}<p class="callout bad">{{.Err}}</p>{{end}}
+<div class="conngrid">
+
+<section class="panel conncard" id="ai">
+  <div class="connhead"><span class="connico">{{template "ico-spark"}}</span>
+    <div><h2>AI assistant</h2><p>Choose which AI app on this computer writes your tailored resumes, cover letters and e-mails.</p></div>
+    {{template "connbadge" .AIOn}}</div>
+  <form id="f-ai" method="post" action="/connections/agent" data-change><ul class="connopts">{{range .AI}}{{template "connopt" .}}{{end}}</ul></form>
+  <div class="cfoot"><button class="primary" type="button" data-test="ai">Test connection</button><button form="f-ai" type="submit">Change</button></div>
+  <p class="testout" data-test-out role="status" hidden></p>
+</section>
+
+<section class="panel conncard" id="mail">
+  <div class="connhead"><span class="connico">{{template "ico-mail"}}</span>
+    <div><h2>Mail</h2><p>Let ScoutJobs read replies from recruiters and file drafts in your mailbox. It never sends anything without you.</p></div>
+    {{template "connbadge" .MailOn}}</div>
+  <form id="f-mail" method="post" action="/connections/mail" data-change><ul class="connopts">{{range .Mail}}{{template "connopt" .}}{{end}}</ul></form>
+  {{with .MailOff}}<form id="f-mail-off" method="post" action="{{.}}"><input type="hidden" name="back" value="/connections#mail"></form>{{end}}
+  <div class="cfoot"><button class="primary" type="button" data-test="mail">Test connection</button><button form="f-mail" type="submit">Change</button>
+    {{if .MailOff}}<button class="danger push" form="f-mail-off" type="submit">Disconnect</button>{{end}}</div>
+  <p class="testout" data-test-out role="status" hidden></p>
+</section>
+
+<section class="panel conncard" id="calendar">
+  <div class="connhead"><span class="connico">{{template "ico-calendar"}}</span>
+    <div><h2>Calendar</h2><p>Sync your interviews with your calendar, both ways.</p></div>
+    {{template "connbadge" .CalOn}}</div>
+  <form id="f-cal" method="post" action="/connections/calendar" data-change><ul class="connopts">{{range .Cal}}{{template "connopt" .}}{{end}}</ul></form>
+  {{if eq .CalOn "apple"}}<div class="feed"><label for="feedurl">In Apple Calendar: File › New Calendar Subscription, then paste</label><input id="feedurl" class="feedurl" readonly value="{{.FeedURL}}">{{with .FeedNote}}<small>{{.}}</small>{{end}}</div>{{end}}
+  {{if .CalDays}}<form class="calwin" method="post" action="/connections/calendar/days"><label for="caldays">Sync the next</label>
+    <select id="caldays" name="days" data-autosubmit>{{$d := .CalDays}}{{range .CalPeriods}}<option value="{{.}}" {{if eq . $d}}selected{{end}}>{{.}} days</option>{{end}}</select>
+    <small class="muted">Shorter is quicker.</small><noscript><button class="mini">Save</button></noscript></form>{{end}}
+  {{with .CalSync}}<form id="f-sync" method="post" action="{{.}}" data-busy="Starting…"><input type="hidden" name="back" value="/connections#calendar"></form>{{end}}
+  <div class="cfoot">{{if .CalSync}}<button class="primary" form="f-sync" type="submit">Sync now</button>{{else}}<button class="primary" type="button" data-test="calendar">Test connection</button>{{end}}<button form="f-cal" type="submit">Change</button>
+    {{if eq .CalOn "agent"}}<span class="push small muted">{{with .CalSynced}}Last synced {{ago .}}{{else}}Not synced yet{{end}}</span>{{end}}</div>
+  <p class="testout" data-test-out role="status" hidden></p>
+</section>
+
+<section class="panel conncard" id="sources">
+  <div class="connhead"><span class="connico">{{template "ico-case"}}</span>
+    <div><h2>Job sources</h2><p>Choose the job boards and company career pages Find jobs searches.</p></div>
+    <span class="badge done">Ready</span></div>
+  <div class="ctabs"><nav class="tabs" aria-label="job sources">
+    <a {{if eq .Tab "remote"}}class="on" aria-current="page" {{end}}href="/connections?tab=remote#sources">Job boards</a>
+    <a {{if eq .Tab "careers"}}class="on" aria-current="page" {{end}}href="/connections?tab=careers#sources">Company career pages</a></nav>
+    <a class="btn" href="/search">Add source</a></div>
+  {{if eq .Tab "remote"}}<ul class="srclist">{{range .Remote}}<li><span class="sico">{{template "ico-globe"}}</span><b>{{.Title}}</b><small>Remote jobs</small>
+    <form method="post" action="/connections/sources"><input type="hidden" name="source" value="{{.Name}}"><label class="switch"><input type="checkbox" name="on" value="1"{{if .On}} checked{{end}} data-autosubmit aria-label="Search {{.Title}}"><i aria-hidden="true"></i></label><noscript><button class="mini">Save</button></noscript></form></li>{{end}}</ul>
+  <p class="small muted">{{if .SearchRemote}}Every search includes the boards that are on.{{else}}Searches include these boards when “Also search remote job sites” is ticked on Find jobs.{{end}}</p>
+  {{else}}<ul class="srclist">{{range .Career}}<li><span class="sico">{{template "ico-doc"}}</span><b>{{.Title}}</b><small>Careers pages</small></li>{{end}}</ul>
+  <p class="small muted">Paste a company's careers page link in Find jobs, under More options. ScoutJobs reads pages built on these systems.</p>{{end}}
+</section>
+
+</div>
+
+{{with .Sync}}<dialog class="syncdlg" open data-modal data-run="/mail/agent/run" data-phases="calendar" data-done="/connections?synced=1#calendar" aria-labelledby="sync-title">
+  <div class="synchead"><span class="connico">{{template "ico-calendar"}}</span>
+    <div><h2 id="sync-title">Syncing your calendar</h2><p class="muted">{{agentTitle .Agent}} is reading your calendar and adding your interviews, both ways. It looks {{$.Data.CalDays}} days ahead and usually takes under a minute.</p></div></div>
+  <div class="runprog live" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="">
+    <progress max="100" value="5" aria-label="sync progress"></progress>
+    <p class="runnow"><span class="spin" aria-hidden="true"></span><b data-now role="status">Starting your AI assistant…</b><span class="muted" data-elapsed></span></p></div>
+  <form class="dlgfoot" method="post" action="/mail/agent/cancel"><input type="hidden" name="back" value="/connections?synced=1#calendar"><button type="submit" autofocus>Cancel</button></form>
+</dialog>{{end}}
+{{with .Ended}}<div class="synctoast" role="status"><span class="connico">{{template "ico-calendar"}}</span>
+  <div><b>{{if eq .State "done"}}Calendar synced{{else if eq .State "cancelled"}}Sync stopped{{else}}Sync did not finish{{end}}</b>
+  <p>{{if eq .State "done"}}{{with $.Data.Summary}}{{.}}{{else}}Your interviews are in sync with your calendar.{{end}}{{else if eq .State "cancelled"}}You stopped it. Anything already added stays.{{else}}{{.Error}}{{end}}</p></div>
+  <a class="btn primary" href="/connections#calendar">OK</a></div>{{end}}
+{{end}}
+{{template "foot" .}}

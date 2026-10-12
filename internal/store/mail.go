@@ -13,6 +13,30 @@ func (s *Store) RecordMail(messageID string, jobID int64, dir string, uid uint32
 	return err
 }
 
+// RecordDraft remembers a draft made in Gmail: its Message-ID and Gmail thread, so a reply in that
+// thread finds the job even when Gmail gives the sent message a new Message-ID.
+func (s *Store) RecordDraft(messageID string, jobID int64, thread string) error {
+	_, err := s.DB.Exec(`INSERT OR IGNORE INTO mail (message_id,job_id,dir,uid,at,thread,source) VALUES (?,?,'out',0,?,?,'gmail')`,
+		messageID, jobID, now(), thread)
+	return err
+}
+
+// ThreadJob returns the job a Gmail thread was matched to before, by a draft or an earlier reply.
+func (s *Store) ThreadJob(thread string) (int64, bool) {
+	if thread == "" {
+		return 0, false
+	}
+	var id int64
+	err := s.DB.QueryRow(`SELECT job_id FROM mail WHERE thread=? AND job_id IS NOT NULL ORDER BY at DESC LIMIT 1`, thread).Scan(&id)
+	return id, err == nil
+}
+
+// JobThread is the job's latest Gmail thread and a Message-ID in it, for a follow-up to answer.
+func (s *Store) JobThread(jobID int64) (thread, messageID string) {
+	_ = s.DB.QueryRow(`SELECT thread,message_id FROM mail WHERE job_id=? AND thread<>'' ORDER BY at DESC LIMIT 1`, jobID).Scan(&thread, &messageID)
+	return thread, messageID
+}
+
 // MailJob returns the job an outbound Message-ID belongs to.
 func (s *Store) MailJob(messageID string) (int64, bool) {
 	var id int64

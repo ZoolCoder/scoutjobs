@@ -257,8 +257,15 @@ func (rn *Runner) Plan(j store.Job, req Request) (*Run, Agent, error) {
 	return run, ag, nil
 }
 
-// pick resolves the agent asked for, else the one config.yaml prefers, else the first installed.
+// DefaultAgent is the setting that names the agent the user picked on the Connections page.
+const DefaultAgent = "agent"
+
+// pick resolves the agent asked for, else the one picked on the Connections page, else the one
+// config.yaml prefers, else the first installed.
 func (rn *Runner) pick(name string) (Agent, error) {
+	if name == "" && rn.Store != nil {
+		name = rn.Store.Setting(DefaultAgent)
+	}
 	if name == "" {
 		name = rn.Agent
 	}
@@ -367,6 +374,7 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+	rn.ensurePosting(ctx, run, j)
 	var steps []Step
 	for _, i := range group {
 		steps = append(steps, run.Steps[i].Step)
@@ -422,7 +430,11 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 
 // agent runs the agent CLI once in dir, which is the only folder it may write, and logs what it does.
 func (rn *Runner) agent(ctx context.Context, run *Run, ag Agent, dir, prompt string) error {
-	argv := ag.command(rn.Exe, rn.Store.Home, dir)
+	return rn.agentArgv(ctx, run, ag, ag.command(rn.Exe, rn.Store.Home, dir), dir, prompt)
+}
+
+// agentArgv runs argv in dir with the prompt on stdin and logs what the agent does.
+func (rn *Runner) agentArgv(ctx context.Context, run *Run, ag Agent, argv []string, dir, prompt string) error {
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "SCOUTJOBS_HOME="+rn.Store.Home, "SCOUTJOBS_RUNNER=1")

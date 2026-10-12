@@ -28,7 +28,7 @@ func TestDocumentsPreviewAndDownload(t *testing.T) {
 		return rec
 	}
 	page := get("/jobs/1").Body.String()
-	if !strings.Contains(page, `id="docs"`) || !strings.Contains(page, "not written yet") {
+	if !strings.Contains(page, `id="docs"`) || !strings.Contains(page, "Not written yet") {
 		t.Fatalf("documents panel missing: %s", page)
 	}
 	if strings.Contains(page, `href="/jobs/1/files/resume.md"`) {
@@ -107,7 +107,7 @@ func TestProposedEmails(t *testing.T) {
 	st := "offer"
 	_ = s.UpdateJob(1, store.JobPatch{Status: &st})
 	page := httptest.NewRecorder()
-	h.ServeHTTP(page, httptest.NewRequest("GET", "/jobs/1", nil))
+	h.ServeHTTP(page, httptest.NewRequest("GET", "/jobs/1?tab=mail", nil))
 	if b := page.Body.String(); !strings.Contains(b, `id="emails"`) || !strings.Contains(b, "/jobs/1/emails/offer-accept") {
 		t.Fatalf("offer replies missing: %s", b)
 	}
@@ -202,19 +202,19 @@ func TestJobChecklistAndGroupedNav(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
 	page := rec.Body.String()
-	list := page[strings.Index(page, `<ol class="checklist">`):]
-	list = list[:strings.Index(list, "</ol>")]
+	list := page[strings.Index(page, `id="checklist"`):]
+	list = list[:strings.Index(list, "</section>")]
 	for _, want := range []string{
 		`<li class="done"><span class="tick" aria-hidden="true"></span><div><b>Tailored resume</b>`,
 		`<li class="next"><span class="tick" aria-hidden="true"></span><div><b>Cover letter</b>`,
 		`<li class="warn"><span class="tick" aria-hidden="true"></span><div><b>Draft review</b><small title="drop the Kafka claim">drop the Kafka claim`,
-		`<li class="blocked"><span class="tick" aria-hidden="true"></span><div><b>Quality gates</b><small title="sending blocked`,
+		`<li class="blocked"><span class="tick" aria-hidden="true"></span><div><b>Final checks</b><small title="to fix`,
 	} {
 		if !strings.Contains(list, want) {
 			t.Errorf("checklist lacks %q:\n%s", want, list)
 		}
 	}
-	if strings.Count(list, `class="next"`) != 1 {
+	if strings.Count(list, `class="next"`)+strings.Count(list, `class="ns next"`) != 1 {
 		t.Error("exactly one item is next")
 	}
 	if !strings.Contains(page, `<p class="navh">Apply</p>`) || !strings.Contains(page, "Find jobs") {
@@ -357,5 +357,29 @@ func TestJobPageShowsTheCoverLetterTemplateCheck(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/jobs/1", nil))
 	if b := rec.Body.String(); !strings.Contains(b, "stale, changed after the build: cover-letter.md") {
 		t.Errorf("an edited letter no longer matches its DOCX: %s", b)
+	}
+}
+
+func TestCVGapsKeepsCommasInsideFindings(t *testing.T) {
+	in := "Structural: add email, phone and URLs, Tailor: lead with systems (Parcelo, Ledgerly) end to end, Profile gap (needs the user, do not invent): no contract work"
+	got := cvGaps(in)
+	want := []string{
+		"Structural: add email, phone and URLs",
+		"Tailor: lead with systems (Parcelo, Ledgerly) end to end",
+		"Profile gap (needs the user, do not invent): no contract work",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("cvGaps = %q, want %q", got, want)
+	}
+	if cvGaps("  ") != nil {
+		t.Fatal("blank gaps should be nil")
+	}
+}
+
+func TestMarkdownNumberedList(t *testing.T) {
+	got := string(mdHTML("Next week\n1. Apply to 4 jobs\n2) Two mock sessions\n- a bullet"))
+	want := "<p>Next week</p>\n<ol>\n<li>Apply to 4 jobs</li>\n<li>Two mock sessions</li>\n</ol>\n<ul>\n<li>a bullet</li>\n</ul>\n"
+	if got != want {
+		t.Errorf("mdHTML = %q", got)
 	}
 }

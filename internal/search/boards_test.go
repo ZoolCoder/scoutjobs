@@ -153,3 +153,25 @@ func TestFetchPosting(t *testing.T) {
 		t.Errorf("Excerpt = %q", got)
 	}
 }
+
+func TestFetchRemotivePosting(t *testing.T) {
+	var query string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query = r.URL.Query().Get("search")
+		_, _ = w.Write([]byte(`{"jobs":[
+			{"company_name":"Other","title":"Senior Independent AI Engineer","url":"https://remotive.com/remote-jobs/software-development/senior-independent-ai-engineer-1919266","description":"<p>AI</p>"},
+			{"company_name":"A.Team","title":"Senior Independent Software Developer","url":"https://remotive.com/remote-jobs/software-development/senior-independent-software-developer-1919265","description":"<p>Build Go services.</p>"}]}`))
+	}))
+	defer srv.Close()
+	base := map[string]string{"remotive": srv.URL}
+	p, err := FetchPosting(context.Background(), "https://remotive.com/remote-jobs/software-development/senior-independent-software-developer-1919265", srv.Client(), base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if query != "senior independent software developer" || p.Company != "A.Team" || !strings.Contains(p.Description, "Build Go services.") {
+		t.Errorf("query %q, posting %+v", query, p)
+	}
+	if _, err := FetchPosting(context.Background(), "https://remotive.com/remote-jobs/software-development", srv.Client(), base); err == nil {
+		t.Error("a category page is not a posting")
+	}
+}

@@ -151,8 +151,18 @@ func (c *Client) Finish(ctx context.Context, p Pending, code string) (Token, err
 	var prof struct {
 		EmailAddress string `json:"emailAddress"`
 	}
-	if err := c.call(ctx, t.AccessToken, "GET", "/profile", nil, &prof); err == nil {
-		t.Email = prof.EmailAddress
+	if HasScope(t.Scope, MailScope) || HasScope(t.Scope, ComposeScope) {
+		if err := c.call(ctx, t.AccessToken, "GET", "/profile", nil, &prof); err == nil {
+			t.Email = prof.EmailAddress
+		}
+	}
+	if t.Email == "" && (HasScope(t.Scope, CalendarScope) || HasScope(t.Scope, CalendarEventsScope)) {
+		var cal struct { // the primary calendar's id is the account's address
+			ID string `json:"id"`
+		}
+		if err := c.callURL(ctx, t.AccessToken, "GET", c.CalBase+"/calendars/primary", nil, &cal); err == nil && strings.Contains(cal.ID, "@") {
+			t.Email = cal.ID
+		}
 	}
 	return t, c.save(t)
 }

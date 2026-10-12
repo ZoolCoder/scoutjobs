@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -312,5 +313,29 @@ func TestWordCoverTemplateIsFilledNotRewritten(t *testing.T) {
 	}
 	if again := run(t, rn, j, Request{Steps: []string{"cover"}}); states(again) != "cover=skipped" {
 		t.Errorf("a built letter is done: %s", states(again))
+	}
+}
+
+func TestRunSavesThePostingBeforeTheAgentReadsIt(t *testing.T) {
+	rn, j := setup(t, fakeAgent)
+	j.URL = "https://remotive.com/remote-jobs/software-development/go-engineer-1"
+	fetched := 0
+	orig := fetchPosting
+	t.Cleanup(func() { fetchPosting = orig })
+	fetchPosting = func(_ context.Context, u string) (search.Posting, error) {
+		fetched++
+		return search.Posting{Description: "Must have: Go, Postgres."}, nil
+	}
+	run(t, rn, j, Request{Steps: []string{"tailor"}})
+	b, err := os.ReadFile(filepath.Join(apply.Dir(rn.Store, j), "posting.md"))
+	if err != nil || !strings.Contains(string(b), "Must have: Go, Postgres.") || !strings.Contains(string(b), j.URL) {
+		t.Fatalf("posting.md: %q %v", b, err)
+	}
+	if err := os.WriteFile(filepath.Join(apply.Dir(rn.Store, j), "posting.md"), []byte("edited"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(t, rn, j, Request{Steps: []string{"cover"}, Force: true})
+	if b, _ := os.ReadFile(filepath.Join(apply.Dir(rn.Store, j), "posting.md")); string(b) != "edited" || fetched != 1 {
+		t.Errorf("a saved posting is kept: %q, fetched %d times", b, fetched)
 	}
 }

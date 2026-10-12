@@ -7,6 +7,87 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-12
+
+### Added
+- New dashboard look: a violet brand, an overview that leads with the next
+  best move and a *Today* list of what to do, a pipeline that fits every stage
+  on screen, and a sidebar that folds to icons.
+- Connections page: pick the AI assistant, connect mail and calendar and the
+  job sources in one place, each with a *Test connection* button.
+- Calendar sync through the AI assistant: interviews go to your calendar and
+  your other events come in. Choose how far ahead it looks.
+- Mail sync shows a progress bar in a dialog that can be cancelled; what was
+  already found stays.
+- Every page asks before it acts and shows a loading bar; the activity
+  timeline and job events are written in plain language.
+- Accessible tooltips on every hint: they show on hover and keyboard focus,
+  close with Esc, and screen readers announce them. The folded sidebar names
+  each icon.
+- The overview asks how a past interview went, with a link to log the outcome.
+- Read mail through your AI agent: on the Inbox page pick Claude Code or
+  Codex, and it reads replies with the connectors you signed in to (Gmail and
+  Google Calendar, Microsoft 365, any mail MCP server), logs them, adds
+  interviews and calendar events, and files drafts. No Google Cloud project or
+  password needed; nothing is sent. `scoutjobs email sync --via agent` does
+  the same in a terminal. The Inbox's *Connect your email & calendar* panel offers
+  it first, with the own Google client, IMAP (iCloud and others) and other MCP
+  apps as the alternatives.
+- Search finds the jobs that fit: with a filled `profile.md`, results are
+  ranked by a match score with the reasons (target role, skills, level, work
+  mode, place, avoided stacks), and *Hide jobs that break a must* drops the
+  wrong place, a ruled-out engagement type or pay below the floor. The search
+  page suggests searches built from the profile; `scoutjobs search` gains
+  `--location`, `--hide-mismatches`, `--suggest` and `--rank`.
+- Location filter: search by city, country or region (`Berlin`, `Germany`,
+  `Europe`, `EMEA`); remote jobs match when open to it. The pipeline shows
+  where each job is and filters by location and tag.
+- More tags: every posting gets its skills, level, employment type, regions
+  and visa stance from the title, tags and description, stored with the job on
+  add. The search results have a tag bar to narrow the rows.
+- Connect Google: one button for mail and calendar. The Inbox page walks
+  through the Google Cloud setup with a link per step, watches Downloads for
+  the client JSON and offers to import it, and after the sign-in says which
+  boxes were left unticked on Google's screen.
+
+### Changed
+- The job page leads with the next step and folds the details; search and the
+  interviews, learning, preferences and profile pages are simpler.
+- Dates read "today", "yesterday" or "13 Oct" instead of `2026-10-13`. The
+  weekly chart is labelled by week.
+- Better contrast for muted text, underlined links in text, larger click
+  targets, and filter chips that say what they do.
+- Calendar and mail sync start at once and are capped in time.
+- The boards of a search are queried in parallel.
+- Gmail sync reads every folder except Sent, Drafts and the promotions and
+  social tabs, so archived or filtered replies are found.
+
+### Fixed
+- The overview no longer cuts panels off on laptop screens; it scrolls.
+- Interviews already past no longer show as upcoming.
+- On Mondays the weekly applications chart counts the day's applications in
+  the new week.
+- Adding an interview at a time that already has one skips the duplicate.
+- A page reloads when a sync ends on it, and mail sync passes the interview
+  length on.
+- Jobs added from a search keep the posting: its text is saved to
+  `posting.md`, and Prepare application fetches a missing one from the job's
+  URL (Remotive links included) before the agent starts, so the fit and draft
+  reviews check the drafts against the posting, not the board's tags.
+- Gmail replies to a draft sent from Gmail match the job again: Gmail gives
+  the sent message a new Message-ID, so the draft's thread is recorded and a
+  reply in it is matched. Mail from an applicant tracking system that names
+  the company of exactly one job you applied to is matched too.
+- Follow-up and thank-you drafts in Gmail answer the job's thread
+  (`In-Reply-To`), and draft and message links open the connected account,
+  not the first account signed in to the browser.
+- A connection Google ended (Testing-mode apps expire after 7 days, revoked
+  access) shows as such, with how to fix it, instead of a connected inbox
+  that fails every sync. A Testing-mode app is warned about before it ends.
+- Connecting with mail unticked on Google's consent screen no longer leaves
+  the account unnamed, and reading or drafting says which permission is
+  missing. The token is written atomically.
+
 ## [0.6.0] - 2026-10-11
 
 ### Added
@@ -241,7 +322,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.5.0
 [0.4.0]: https://github.com/ZoolCoder/scoutjobs/releases/tag/v0.4.0

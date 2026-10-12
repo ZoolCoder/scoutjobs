@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/mail"
+	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -205,5 +206,75 @@ func TestFetchMailReadsNothingBeforeAnyJob(t *testing.T) {
 	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev")
 	if st, ok := s.Started(); !ok || time.Since(st) > time.Minute {
 		t.Fatalf("started %v %v", st, ok)
+	}
+}
+
+func TestMatchReplyByThreadAndCompany(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	run(t, "job", "add", "--company", "Acme", "--title", "Go Dev")
+	run(t, "job", "add", "--company", "Globex", "--title", "SRE")
+	run(t, "job", "set", "2", "--status", "applied")
+	s, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.RecordDraft("<d1@me>", 1, "t-acme"); err != nil {
+		t.Fatal(err)
+	}
+	// Gmail gives the sent draft a new Message-ID, so only the thread ties the reply to the job
+	if j, how, ok := matchReply(s, mail.Mail{From: "x@other.test", Thread: "t-acme", InReplyTo: "<new@mail.gmail.com>"}); !ok || j.ID != 1 || how != "thread" {
+		t.Errorf("thread match: %d %q %v", j.ID, how, ok)
+	}
+	ats := mail.Mail{From: "no-reply@us.greenhouse.io", Subject: "Thank you for applying to Globex"}
+	if j, how, ok := matchReply(s, ats); !ok || j.ID != 2 || how != "company" {
+		t.Errorf("company match: %d %q %v", j.ID, how, ok)
+	}
+	// Acme is not applied to yet, and "Globex" inside a word is not the company
+	for _, m := range []mail.Mail{{From: "no-reply@us.greenhouse.io", Subject: "Thank you for applying to Acme"},
+		{From: "news@x.test", Subject: "Globextra weekly"}} {
+		if j, _, ok := matchReply(s, m); ok {
+			t.Errorf("%q matched job %d", m.Subject, j.ID)
+		}
+	}
+	if th, ref := s.JobThread(1); th != "t-acme" || ref != "<d1@me>" {
+		t.Errorf("job thread %q %q", th, ref)
+	}
+}
+
+func TestMailSourceAgent(t *testing.T) {
+	t.Setenv("SCOUTJOBS_HOME", t.TempDir())
+	run(t, "init")
+	s, err := store.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	cfg := Config{IMAPHost: "imap.mail.me.com:993"}
+	if src, _ := mailSource(s, cfg, "auto"); src != "imap" {
+		t.Errorf("before choosing the agent: %q", src)
+	}
+	if err := s.SetSetting(runner.MailVia, "agent"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSetting(runner.MailAgent, "codex"); err != nil {
+		t.Fatal(err)
+	}
+	if src, _ := mailSource(s, cfg, ""); src != "agent" {
+		t.Errorf("agent chosen: %q", src)
+	}
+	if got := mailAgentName(s, Config{Agent: "claude"}); got != "codex" {
+		t.Errorf("mail agent: %q", got)
+	}
+	if err := agentSync(s, cfg, time.Now(), &mcpOutput{}); err == nil || !strings.Contains(err.Error(), "email_log") {
+		t.Errorf("an MCP client must not start another agent: %v", err)
+	}
+	t.Setenv("SCOUTJOBS_RUNNER", "1")
+	if err := agentSync(s, cfg, time.Now(), io.Discard); err == nil || !strings.Contains(err.Error(), "email_log") {
+		t.Errorf("the agent's own email_sync call must not start another agent: %v", err)
+	}
+	if _, err := draftTask(s, cfg, store.Job{ID: 1, Company: "Acme"}, "nonsense"); err == nil {
+		t.Error("unknown kind accepted")
 	}
 }

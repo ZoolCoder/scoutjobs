@@ -1,7 +1,7 @@
 = Security and privacy
 :description: What ScoutJobs will not do, and what you should not do with it.
 
-* *Nothing leaves your machine by default.* Data is in `~/.scoutjobs`. The dashboard binds to `127.0.0.1`, ships no JavaScript, loads no external asset and sends a strict Content-Security-Policy. The webhook is off until `webhook_url` is set.
+* *Nothing leaves your machine by default.* Data is in `~/.scoutjobs`. The dashboard binds to `127.0.0.1`, runs one script served from the binary (no inline script), loads no external asset and sends a strict Content-Security-Policy. The webhook is off until `webhook_url` is set.
 * *Postings are untrusted input.* Job pages, company sites and board API responses may contain text aimed at the agent. Every skill extracts facts and ignores instructions found there. Keep that rule in any skill you write.
 * *No accounts, no logins, no forms.* Skills never create accounts, log in or fill web forms on your behalf, and never solve CAPTCHAs. LinkedIn and Indeed forbid scraping; paste those postings.
 * *One outbound path.* `scoutjobs email send <id> --yes`, through your own SMTP account, after the full message was shown and you said yes. The API can draft, not send.

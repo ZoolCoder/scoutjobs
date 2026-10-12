@@ -109,7 +109,7 @@
   <ul class="legend">
     <li><i class="dot c-screen"></i>Screens</li><li><i class="dot c-tech"></i>Technical</li><li><i class="dot c-behav"></i>Behavioral</li><li><i class="dot c-final"></i>Onsite and final</li>
     <li><i class="dot c-deadline"></i>Deadlines<span class="n">{{index .Counts "deadline"}}</span></li><li><i class="dot c-follow"></i>Follow-ups<span class="n">{{index .Counts "followup"}}</span></li>
-    {{if eq .GoogleCal "on"}}<li><i class="dot c-google"></i>Google Calendar<span class="n">{{index .Counts "google"}}</span></li>{{end}}
+    {{if eq .GoogleCal "on"}}<li><i class="dot c-google"></i>Google Calendar<span class="n">{{index .Counts "google"}}</span></li>{{else if .AgentCal}}<li><i class="dot c-google"></i>Your calendar<span class="n">{{index .Counts "google"}}</span></li>{{end}}
   </ul>
   {{if .GoogleErr}}<p class="callout bad small">Google Calendar: {{.GoogleErr}}</p>{{end}}
   {{if eq .GoogleCal "on"}}<form class="row" method="post" action="/calendar/sync"><input type="hidden" name="back" value="/calendar?view={{.View}}&amp;d={{.D}}"><button class="mini">Sync now</button>
@@ -118,14 +118,16 @@
   <form method="post" action="/gmail/connect"><input type="hidden" name="for" value="calendar"><button class="mini primary">Reconnect Google</button></form></div>
   {{else if eq .GoogleCal "reconnect"}}<div class="small"><p>Sync your interviews with your Google Calendar. Enable the <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener noreferrer">Calendar API</a> in your Google Cloud project, then reconnect and allow Calendar.</p>
   <form method="post" action="/gmail/connect"><input type="hidden" name="for" value="calendar"><button class="mini primary">Reconnect Google</button></form></div>
-  {{else if eq .GoogleCal "setup"}}<p class="small muted">Connect Google on the <a href="/inbox">Inbox</a> page to sync your interviews with your Google Calendar.</p>{{end}}
+  {{else if .AgentCal}}<form class="row" method="post" action="/connections/calendar/sync"><input type="hidden" name="back" value="/connections"><button class="mini">Sync now</button>
+  <span class="small muted">Your AI assistant syncs your interviews with your calendar, both ways, and brings your other events here to see. <a href="/connections#calendar">Settings</a></span></form>
+  {{else}}<p class="small muted"><a href="/connections#calendar">Connect your calendar</a>: through your AI assistant or your Google account, so your interviews sync both ways.</p>{{end}}
   <p class="small muted">{{index .Counts "interview"}} interviews ahead.</p>
 </section>
 
-<section class="panel">
-  <div class="panel-h"><h2>{{if eq .GoogleCal "on"}}Calendar feed{{else}}Google Calendar{{end}}</h2></div>
+<details class="panel calfold">
+  <summary class="panel-h"><h2>{{if eq .GoogleCal "on"}}Calendar feed{{else}}Add to Google Calendar{{end}}</h2></summary>
   {{if eq .GoogleCal "on"}}<p class="small muted">Apple Calendar and Outlook can subscribe to this feed of interviews, deadlines and follow-ups.</p>{{else}}
-  <ol class="steps">
+  <ol class="calsteps">
     <li><b>One event</b><small>Open it here and press <em>Add to Google Calendar</em>. Google shows the event filled in; nothing is saved until you click Save there.</small></li>
     <li><b>Everything at once</b><small><a href="{{.FeedDownload}}">Download scoutjobs.ics</a>, then in Google Calendar: Settings › Import &amp; export › Import.</small></li>
     <li><b>Stay in sync</b><small>Subscribe to the feed below with Settings › Add calendar › From URL. Google fetches it from its own servers, so the address must be public: run <code>serve</code> behind a tunnel. Apple Calendar and Outlook on this machine can subscribe to it as it is.</small></li>
@@ -133,7 +135,7 @@
   </ol>{{end}}
   <label class="feed">Feed<input readonly value="{{.FeedURL}}" aria-label="calendar feed URL"></label>
   <p class="small muted">{{.FeedNote}}</p>
-</section>
+</details>
 </aside>
 </div>
 {{end}}

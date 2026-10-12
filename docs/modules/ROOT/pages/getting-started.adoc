@@ -1,0 +1,118 @@
+= Your first job search
+:description: A walk through the dashboard from an empty install to an interview in your calendar, no command line needed after the first start.
+
+This page follows one job search from start to finish in the dashboard. You need no command line after the first start: every step below is a page and a button. The screenshots come from a demo workspace, so the names and numbers are made up.
+
+The whole flow in one line: *Profile & CV* → *Connections* → *Find jobs* → *Pipeline* → the job page (let AI prepare, check, send) → *Inbox* → *Interviews* and *Calendar*.
+
+== 1. Start ScoutJobs
+
+Install it once (see xref:install.adoc[]), then start the dashboard:
+
+[source,console]
+----
+$ scoutjobs init     # first time only: creates ~/.scoutjobs
+$ scoutjobs serve    # opens on http://127.0.0.1:7070
+----
+
+Open http://127.0.0.1:7070 in your browser. Everything you see is stored in `~/.scoutjobs` on this computer; the sidebar says *Local workspace, data stays on this device*. Leave the terminal open while you use the dashboard.
+
+image::overview.png[The overview: next best move, open jobs, applied this week, upcoming interviews, response rate, pipeline health and today's tasks,1200]
+
+The *Overview* is your home page. *Next best move* always names the one thing to do now, with a button that takes you there. On a new install that is "find jobs" or "check your CV".
+
+== 2. Tell it who you are: Profile & CV
+
+Open *Profile & CV*. ScoutJobs uses `profile.md` as the single source of truth: every line in a tailored resume or cover letter must be backed by something written here.
+
+image::profile.png[Profile & CV: profile.md on the left, the main CV and cover letter, your CV files and the latest CV check on the right,1200]
+
+. Put your current resume (PDF, Word or Markdown) in the *CV & assets* folder shown on the page.
+. Fill `profile.md`: your target roles, where you want to work, your experience with real numbers, your skills. The easiest way is to ask your AI assistant "set up scoutjobs" and paste your CV; it writes the file for you.
+. Press *Prepare with AI* under *Main CV & cover letter*. Your assistant writes a clean main resume and cover letter that every job starts from.
+
+The *Latest CV check* card scores how well hiring software can read your resume and lists what to fix.
+
+== 3. Connect your tools: Connections
+
+Open *Connections*. Four cards, each with a *Test connection* button so you know it works before you rely on it.
+
+image::connections.png[Connections: AI assistant, mail, calendar and job sources,1200]
+
+AI assistant:: The app on this computer that writes for you. Pick *Claude* (recommended) or *Codex*; it uses the subscription you already have. No API key.
+Mail:: Lets ScoutJobs read replies from companies and file drafts in your mailbox. *Use my AI assistant's mail connector* is the quickest; a Google account or any IMAP mailbox also works. Nothing is ever sent without you.
+Calendar:: Puts your interviews in your calendar and brings your other events in, so you never book over something. Choose how far ahead to sync; shorter is quicker.
+Job sources:: The job boards and company career pages *Find jobs* searches. Switch boards on or off here.
+
+== 4. Find jobs
+
+Open *Find jobs*. Type the kind of job and where, or press one of the *Suggested from your profile* chips, which are built from your target roles.
+
+image::search.png[Find jobs: what kind of job, where, remote only, posted, salary and the suggestions from your profile,1200]
+
+Results come best match first. Each one shows a score, a label (*Great match*, *Good match*, *Weak match*, *Breaks a must-have*), and in plain words what fits (✓) and what does not (✕ and –).
+
+image::search-results.png[Search results: a score and label per job, what fits and what does not, and an Add to pipeline button,1200]
+
+Press *+ Add to pipeline* on the ones you like. Tick *Hide jobs that break my must-haves* to drop jobs in the wrong place, of the wrong type or below your salary floor. *More options* lets you add a company's careers page and save the search to run it again with one click.
+
+== 5. Keep track: Pipeline
+
+Open *Pipeline*. Every job you added is a card in a column, from *New* to *Offer*. The ring on each card is the fit score.
+
+image::pipeline.png[The pipeline board: New, Ranked, Drafted, Applied, Interview and Offer columns with one card per job,1200]
+
+Click a card to open the job. Drag a card to another column when something changes, for example from *Applied* to *Interview*. *Due this week* shows only jobs with a deadline or a follow-up coming up; *List* switches to a table. The sidebar switch at the bottom left changes between light, dark and your system's setting:
+
+image::pipeline-dark.png[The same board in the dark theme,1200]
+
+== 6. Apply: the job page
+
+The job page is where an application gets made. The line under the title shows how far the job has come, from *New* to *Hired*.
+
+image::job.png[One job: let AI finish this application, the step checklist, the drafts and the job details,1200]
+
+. Press *Continue with AI*. Your assistant checks the fit, tailors your resume and writes a cover letter for this job, reviews both against your profile, makes the resume PDF and prepares the application e-mail. The checklist on the right fills in as each step finishes; a step with a problem turns red or amber and tells you why.
+. Read the drafts. Under *Drafts*, *Preview* shows each document and *Edit* opens it in the browser. What you save is what the assistant reads next time.
++
+image::drafts.png[A cover letter opened in the drafts viewer,1200]
+. Check *Ready to send?*. It lists every check the application must pass: documents written, every claim backed by your profile, every must-have covered, the resume readable by hiring software, not applied there before. Sending stays blocked until they pass; fix the draft or press *Continue with AI* again.
++
+image::job-gates.png[Ready to send: one check still to fix, and why the job fits with evidence from your profile,760]
+. Send it yourself. *Mail app* on the e-mail draft opens your own mail program with everything filled in, or apply on the company's site with *View posting*. Then move the job to *applied* under *Application*.
+
+ScoutJobs never sends an application on its own.
+
+== 7. Answers: Inbox
+
+When companies reply, open *Inbox* and press *Sync now*. Your assistant reads your mail, matches each reply to the job it belongs to and sorts it: interview, offer, request, rejection or a simple acknowledgement. A progress window shows what it is doing; you can cancel it, and anything already found stays.
+
+image::inbox.png[Inbox: replies grouped by day, each tagged with its kind and the job it belongs to,1200]
+
+An interview invitation becomes an interview on that job, with its date and length. A rejection or an offer moves the job on the pipeline. *Reply in Gmail* and *All mail for this job* take you straight to the thread.
+
+== 8. Interviews and Calendar
+
+*Interviews* puts the next interview on top with a prep checklist: research the company, map the posting to your stories, rehearse, write questions, run a mock interview, test the link or route. *How did it go?* asks for the outcome of past interviews, one click each; *Later* lists the rest.
+
+image::interviews.png[Interviews: the next interview with its prep checklist, past interviews waiting for an outcome, and later ones,1200]
+
+*Calendar* shows interviews, deadlines and follow-ups by day, week or month. Click an empty slot to add an interview, click an event to move it. *Sync now* sends your interviews to your own calendar and brings your other events in.
+
+image::calendar.png[The calendar week view with interviews, a deadline and the calendars list,1200]
+
+== 9. Get better every week
+
+Learning:: The skills the jobs you track ask for and you do not have yet, ranked by how many jobs ask, with the hours you put in and your mock interview scores.
++
+image::learning.png[Learning: skill gaps ranked by how many jobs ask for them,1200]
+Preferences:: What you told ScoutJobs and what it learned from the jobs you skip and apply to, for example "avoid on-call", with how sure it is and why. The scores and the drafts use them; anything you set yourself is never overwritten.
++
+image::preferences.png[Preferences: what you want, how sure ScoutJobs is and why,1200]
+Activity:: Every change, by you or the assistant, in one log.
++
+image::activity.png[Activity: a log of every change,1200]
+
+That is the loop. Come back to the *Overview* each day: *Next best move* and *Today* tell you what to do next.
+
+Prefer to work from your AI assistant's chat? Everything here is also a skill and a command; see xref:quickstart.adoc[] and xref:agents.adoc[].

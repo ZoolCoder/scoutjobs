@@ -12,8 +12,10 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +48,7 @@ type Config struct {
 	EmailFrom                                  string            // sender for drafts built through the API; sending stays in the CLI
 	SearchQueries, SearchBoards                []string          // defaults for POST /api/search and the search page
 	SearchRemote                               bool              // search page default for the remote boards
+	IMAP                                       bool              // imap_host is set in config.yaml
 	Currency                                   string            // default on the add-job form
 	SearchBaseURL                              map[string]string // test override per search source
 	Version                                    string            // shown in the footer next to the release link
@@ -56,10 +59,13 @@ type Config struct {
 
 // MailHooks reach the mail code in cli without an import cycle.
 type MailHooks struct {
-	Status func() (source, account string) // source: gmail | imap | ""
+	Status func() (source, account string) // source: agent | gmail | imap | ""; account is the agent's name for agent
 	Sync   func() (int, error)
+	Test   func() error                                               // reads one message from Gmail or IMAP, to prove the mailbox answers
 	Draft  func(jobID int64, kind string) (openURL string, err error) // kind "" is the application e-mail
-	Gmail  func() *gmail.Client                                       // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
+	// Compose builds the e-mail the AI agent files as a draft when it reads the mail
+	Compose func(jobID int64, kind string) (runner.MailTask, error)
+	Gmail   func() *gmail.Client // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
 }
 
 func day(s string) string {
@@ -67,6 +73,42 @@ func day(s string) string {
 		return s[:10]
 	}
 	return s
+}
+
+// friendlyDay is day for people: "today", "yesterday", "11 Oct", or "3 Mar 2025" outside this year.
+func friendlyDay(s string, now time.Time) string {
+	d, err := time.ParseInLocation("2006-01-02", day(s), now.Location())
+	if err != nil {
+		return s
+	}
+	y, m, dd := now.Date()
+	today := time.Date(y, m, dd, 0, 0, 0, 0, now.Location())
+	switch {
+	case d.Equal(today):
+		return "today"
+	case d.Equal(today.AddDate(0, 0, -1)):
+		return "yesterday"
+	case d.Year() == y:
+		return d.Format("2 Jan")
+	}
+	return d.Format("2 Jan 2006")
+}
+
+// mondayOf is the Monday that starts t's week, the way store.WeeklyCounts groups them.
+func mondayOf(t time.Time) time.Time {
+	wd := int(t.Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	return t.AddDate(0, 0, 1-wd)
+}
+
+// friendlyWhen is friendlyDay with the time of day when s has one: "today 16:00".
+func friendlyWhen(s string, now time.Time) string {
+	if len(s) >= 16 && (s[10] == 'T' || s[10] == ' ') {
+		return friendlyDay(s, now) + " " + s[11:16]
+	}
+	return friendlyDay(s, now)
 }
 
 var funcs = template.FuncMap{
@@ -85,7 +127,9 @@ var funcs = template.FuncMap{
 		}
 		return p
 	},
-	"kindcls": func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
+	"kindcls":   func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
+	"evrow":     activityRowOf,
+	"gatelabel": gateLabel, "steplabel": stepLabel, "plain": plainDetail, "filelabel": fileLabel,
 	"mailto": func(m any) string {
 		switch m := m.(type) {
 		case *mail.Message:
@@ -95,8 +139,16 @@ var funcs = template.FuncMap{
 		}
 		return ""
 	},
-	"day":       day,
+	"day":  day,
+	"date": func(s string) string { return friendlyDay(s, time.Now()) },
+	"host": func(u string) string {
+		if p, err := url.Parse(u); err == nil && p.Host != "" {
+			return strings.TrimPrefix(p.Host, "www.")
+		}
+		return u
+	},
 	"hasSuffix": strings.HasSuffix,
+	"isURL":     func(s string) bool { return strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://") },
 	"base":      filepath.Base,
 	"join":      strings.Join,
 	// mon and dom feed the calendar tile: "2026-10-14" -> "Oct", "14".
@@ -112,27 +164,34 @@ var funcs = template.FuncMap{
 		}
 		return s
 	},
+	"greet": func() string {
+		switch h := time.Now().Hour(); {
+		case h < 12:
+			return "Good morning"
+		case h < 18:
+			return "Good afternoon"
+		}
+		return "Good evening"
+	},
 	"hm": func(s string) string {
 		if len(s) >= 16 && s[10] == 'T' {
 			return s[11:16]
 		}
 		return ""
 	},
-	"when": func(s string) string {
-		if len(s) >= 16 && s[10] == 'T' {
-			return s[:10] + " " + s[11:16]
-		}
-		return s
-	},
+	"ago":  ago,
+	"when": func(s string) string { return friendlyWhen(s, time.Now()) },
 	"fit": func(n int64) string {
 		if n < 0 {
 			return "–"
 		}
 		return strconv.FormatInt(n, 10)
 	},
-	"pct":   func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
-	"f1":    func(f float64) string { return fmt.Sprintf("%.1f", f) },
-	"title": func(s string) string { return strings.ReplaceAll(s, "_", " ") },
+	"pct":        func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
+	"f1":         func(f float64) string { return fmt.Sprintf("%.1f", f) },
+	"title":      func(s string) string { return strings.ReplaceAll(s, "_", " ") },
+	"agentTitle": agentTitle,
+	"lower":      strings.ToLower,
 	"split": func(s string) []string {
 		if strings.TrimSpace(s) == "" {
 			return nil
@@ -143,6 +202,7 @@ var funcs = template.FuncMap{
 		}
 		return parts
 	},
+	"gaps":      cvGaps,
 	"statuses":  func() []string { return store.Statuses },
 	"next":      func(st string) []string { return store.NextStatuses[st] },
 	"initial":   initial,
@@ -267,11 +327,17 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/emails/{kind}", srv.saveEmail)
 	mux.HandleFunc("POST /jobs/prepare-all", srv.prepareAll)
 	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
+	mux.HandleFunc("GET /gmail/detect", srv.gmailDetect)
 	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
 	mux.HandleFunc("GET /gmail/callback", srv.gmailCallback)
 	mux.HandleFunc("POST /gmail/disconnect", srv.gmailDisconnect)
 	mux.HandleFunc("GET /inbox", srv.inbox)
 	mux.HandleFunc("POST /inbox/sync", srv.syncInbox)
+	mux.HandleFunc("POST /mail/agent", srv.useAgent)
+	mux.HandleFunc("POST /mail/agent/off", srv.stopAgent)
+	mux.HandleFunc("GET /mail/agent/check", srv.agentCheck)
+	mux.HandleFunc("GET /mail/agent/run", srv.agentRun)
+	mux.HandleFunc("POST /mail/agent/cancel", srv.cancelAgent)
 	mux.HandleFunc("GET /interviews", srv.interviews)
 	mux.HandleFunc("POST /interviews", srv.createInterview)
 	mux.HandleFunc("POST /interviews/{id}", srv.setInterview)
@@ -283,6 +349,8 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
 	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
+	mux.HandleFunc("POST /preferences", srv.setPreferenceForm)
+	mux.HandleFunc("POST /preferences/delete", srv.deletePreferenceForm)
 	mux.HandleFunc("GET /profile", srv.profile)
 	mux.HandleFunc("GET /cv/{name}", srv.cvDownload)
 	mux.HandleFunc("GET /cv/view/{name}", srv.cvView)
@@ -292,6 +360,14 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /profile/prepare/cancel", srv.cancelMaster)
 	mux.HandleFunc("GET /profile/prepare", srv.masterState)
 	mux.HandleFunc("POST /settings/auto-prepare", srv.setAutoPrepare)
+	mux.HandleFunc("GET /connections", srv.connections)
+	mux.HandleFunc("POST /connections/agent", srv.setDefaultAgent)
+	mux.HandleFunc("POST /connections/calendar", srv.setCalendarVia)
+	mux.HandleFunc("POST /connections/calendar/sync", srv.syncCalendarAgent)
+	mux.HandleFunc("POST /connections/calendar/days", srv.setCalendarDays)
+	mux.HandleFunc("POST /connections/mail", srv.setMailVia)
+	mux.HandleFunc("POST /connections/sources", srv.setSource)
+	mux.HandleFunc("GET /connections/test", srv.testConnection)
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
@@ -393,6 +469,7 @@ type page struct {
 	Cfg    Config
 	Now    string
 	Theme  string // dark | light | auto, resolved from cookie then config
+	Mini   bool   // the sidebar is folded to icons, from the side cookie app.js sets
 	Path   string
 	Sub    string
 }
@@ -415,7 +492,8 @@ func hue(s string) int {
 
 var subtitles = map[string]string{
 	"inbox":       "Replies from companies, matched to your applications.",
-	"overview":    "Your job search, at a glance.",
+	"connections": "Connect the tools ScoutJobs uses: your AI assistant, mail, calendar and job sources.",
+	"overview":    "Your job search, at a glance. Here's what to do next.",
 	"pipeline":    "Every opportunity, from discovery to outcome.",
 	"interviews":  "Prepare for what is coming, record how it went.",
 	"calendar":    "Interviews, deadlines and follow-ups. Subscribe from Google Calendar or add one event at a time.",
@@ -424,8 +502,13 @@ var subtitles = map[string]string{
 	"profile":     "The source of truth behind every CV claim.",
 	"activity":    "Everything ScoutJobs recorded, newest first.",
 	"reviews":     "The weekly look back: numbers, funnel, commitments.",
-	"search":      "Public boards and feeds, deduplicated, nothing followed.",
+	"search":      "Find open jobs that fit you and add the good ones to your pipeline.",
 	"add_job":     "Track a posting you found elsewhere.",
+}
+
+func sideMini(r *http.Request) bool {
+	c, err := r.Cookie("side")
+	return err == nil && c.Value == "mini"
 }
 
 func (v *server) render(w http.ResponseWriter, r *http.Request, name, active string, data any) {
@@ -442,7 +525,7 @@ func (v *server) render(w http.ResponseWriter, r *http.Request, name, active str
 			}
 		}
 	}
-	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Path: r.URL.RequestURI(), Sub: subtitles[active], Nav: v.navCounts()}
+	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Mini: sideMini(r), Path: r.URL.RequestURI(), Sub: subtitles[active], Nav: v.navCounts()}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := v.tpl.ExecuteTemplate(w, name, p); err != nil {
 		http.Error(w, err.Error(), 500)
@@ -470,19 +553,16 @@ func pathID(r *http.Request) (int64, error) {
 // ---- overview ----
 
 type overviewData struct {
-	Stats     store.Stats
-	Funnel    []funnelRow
-	Weekly    []weekBar
-	Upcoming  []store.Interview
-	Recent    []store.Event
-	Prefs     []store.Preference
-	Learning  []store.Learning
-	Sessions  []store.Session
-	TodoJobs  []store.Job
-	Decisions []store.Decision
-	Checks    []store.CVCheck
-	Target    int
-	Today     []todo
+	Stats    store.Stats
+	Funnel   []funnelRow
+	Weekly   []weekBar
+	Upcoming []store.Interview
+	Recent   []store.Event
+	Learning []store.Learning
+	TodoJobs []store.Job
+	Checks   []store.CVCheck
+	Target   int
+	Today    []todo
 }
 
 type funnelRow struct {
@@ -507,7 +587,8 @@ func funnelOf(st store.Stats) []funnelRow {
 
 type weekBar struct {
 	Count int64
-	Pct   int // 0-100 in steps of 5, rendered as a CSS height class
+	Pct   int    // 0-100 in steps of 5, rendered as a CSS height class
+	Label string // the Monday the week starts, "now" for the last bar
 }
 
 func (v *server) overview(w http.ResponseWriter, r *http.Request) {
@@ -528,23 +609,37 @@ func (v *server) overview(w http.ResponseWriter, r *http.Request) {
 		wmax = 1
 	}
 	var weekly []weekBar
-	for _, c := range counts {
-		weekly = append(weekly, weekBar{c, int(c*100/wmax) / 5 * 5})
+	monday := mondayOf(time.Now().UTC())
+	for i, c := range counts {
+		label := "now"
+		if back := len(counts) - 1 - i; back > 0 {
+			label = monday.AddDate(0, 0, -7*back).Format("2 Jan")
+		}
+		weekly = append(weekly, weekBar{c, int(c*100/wmax) / 5 * 5, label})
 	}
 	d := overviewData{Stats: st, Funnel: funnel, Weekly: weekly, Target: v.cfg.WeeklyApplyTarget}
-	d.Upcoming, _ = v.s.Interviews(0, true)
-	d.Recent, _ = v.s.Events(0, 12)
-	d.Prefs, _ = v.s.Preferences()
-	if len(d.Prefs) > 6 {
-		d.Prefs = d.Prefs[:6]
-	}
+	open, _ := v.s.Interviews(0, true)
+	var waiting []store.Interview
+	d.Upcoming, waiting = splitPast(open, time.Now().UTC())
+	d.Recent, _ = v.s.Events(0, 8)
 	d.Learning, _ = v.s.LearningItems()
-	d.Sessions, _ = v.s.Sessions(5)
 	d.TodoJobs, _ = v.s.ListJobs(store.JobFilter{Status: "drafted", Limit: 5})
-	d.Decisions, _ = v.s.Decisions(5)
 	d.Checks, _ = v.s.CVChecks(1)
-	d.Today = v.today(st, d.Upcoming)
+	d.Today = v.today(st, d.Upcoming, waiting)
 	v.render(w, r, "overview.html", "overview", d)
+}
+
+// splitPast parts interviews still to come, today's included, from those already behind us.
+func splitPast(is []store.Interview, now time.Time) (ahead, past []store.Interview) {
+	today := now.Format("2006-01-02")
+	for _, i := range is {
+		if i.At == "" || i.At >= today {
+			ahead = append(ahead, i)
+		} else {
+			past = append(past, i)
+		}
+	}
+	return ahead, past
 }
 
 // dueJobs keeps what needs a hand this week: a deadline within 7 days (or passed) on an open job, or a follow-up due.
@@ -603,13 +698,13 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		self += "?tab=" + tab
 	}
 	p := v.panel(j, self, "/pipeline")
-	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Interviews": ivs, "Dir": dir, "Files": files, "HasResumeMD": hasMD,
+	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Kind": r.URL.Query().Get("kind"), "EvGroups": eventGroupsOf(events), "Interviews": ivs, "Dir": dir, "Files": files, "FileGroups": fileGroups(dir, files), "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
-		"Docs": docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf"), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
-		"CanGmail": v.cfg.Mail.Draft != nil && v.mailSource() == "gmail",
-		"Msg":      r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
+		"Cards": docCards(docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf")), "Points": fitPoints(review, 6), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
+		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(),
+		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
 }
 
 // gmailLink keeps the "open your draft" link pointing at Gmail, whatever the query string says.
@@ -675,11 +770,27 @@ func (v *server) saveFile(w http.ResponseWriter, r *http.Request) {
 // ---- reviews ----
 
 type review struct {
-	Name string
-	Mod  string
+	Name  string
+	Mod   string
+	Label string
 }
 
-// reviews lists reviews/*.md (written by the weekly-review skill), shows one, and draws the funnel next to it.
+// weekLabel turns a review file name like 2026-41.md into "Week 41 · 5–11 Oct 2026".
+func weekLabel(name string) string {
+	var y, wk int
+	if _, err := fmt.Sscanf(name, "%d-%d.md", &y, &wk); err != nil || wk < 1 || wk > 53 {
+		return strings.TrimSuffix(name, ".md")
+	}
+	jan4 := time.Date(y, 1, 4, 0, 0, 0, 0, time.UTC)
+	mon := jan4.AddDate(0, 0, -((int(jan4.Weekday())+6)%7)+(wk-1)*7)
+	sun := mon.AddDate(0, 0, 6)
+	span := fmt.Sprintf("%d–%d %s %d", mon.Day(), sun.Day(), sun.Format("Jan"), sun.Year())
+	if mon.Month() != sun.Month() {
+		span = mon.Format("2 Jan") + " – " + sun.Format("2 Jan 2006")
+	}
+	return fmt.Sprintf("Week %d · %s", wk, span)
+}
+
 func (v *server) reviews(w http.ResponseWriter, r *http.Request) {
 	dir := filepath.Join(v.s.Home, "reviews")
 	var list []review
@@ -692,21 +803,36 @@ func (v *server) reviews(w http.ResponseWriter, r *http.Request) {
 			if info, err := e.Info(); err == nil {
 				mod = info.ModTime().Format("2006-01-02")
 			}
-			list = append(list, review{e.Name(), mod})
+			list = append(list, review{e.Name(), mod, weekLabel(e.Name())})
 		}
 	}
 	sort.Slice(list, func(a, b int) bool { return list[a].Name > list[b].Name })
 	pick := filepath.Base(r.URL.Query().Get("f"))
-	var body, current string
-	for _, rv := range list {
+	var body, current, label, older, newer string
+	for n, rv := range list {
 		if pick == rv.Name || (pick == "." && current == "") {
 			if b, err := os.ReadFile(filepath.Join(dir, rv.Name)); err == nil {
-				body, current = string(b), rv.Name
+				body, current, label = string(b), rv.Name, rv.Label
+				if n+1 < len(list) {
+					older = list[n+1].Name
+				}
+				if n > 0 {
+					newer = list[n-1].Name
+				}
 			}
 		}
 	}
+	// the page shows the week as its title, so drop the file's own heading
+	if first, rest, ok := strings.Cut(body, "\n"); ok && strings.HasPrefix(first, "# ") {
+		body = rest
+	}
 	st, _ := v.s.Stats(v.cfg.FollowUpDays, v.cfg.StaleDays)
-	v.render(w, r, "reviews.html", "reviews", map[string]any{"Reviews": list, "Current": current, "Body": body, "Dir": dir,
+	up, _ := v.s.Interviews(0, true)
+	if len(up) > 3 {
+		up = up[:3]
+	}
+	v.render(w, r, "reviews.html", "reviews", map[string]any{"Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
+		"Older": older, "Newer": newer, "Upcoming": up,
 		"Funnel": funnelOf(st), "Stats": st, "Target": v.cfg.WeeklyApplyTarget, "ThisWeek": v.s.WeeklyCounts("status", "%applied%", 1)})
 }
 
@@ -911,6 +1037,34 @@ func (v *server) reviewForm(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
 }
 
+// setPreferenceForm stores a preference in the user's own words, so learning never overwrites it.
+func (v *server) setPreferenceForm(w http.ResponseWriter, r *http.Request) {
+	key := prefKey(r.FormValue("key"))
+	value := strings.TrimSpace(r.FormValue("value"))
+	if key == "" || value == "" {
+		fail(w, errors.New("name the preference and give it a value"))
+		return
+	}
+	if err := v.s.SetPreference(store.Preference{Key: key, Value: value, Confidence: 1, Source: "stated"}); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+}
+
+func (v *server) deletePreferenceForm(w http.ResponseWriter, r *http.Request) {
+	if err := v.s.DeletePreference(r.FormValue("key")); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+}
+
+// prefKey turns "Company size" into the stored key "company_size".
+func prefKey(s string) string {
+	return strings.Join(strings.Fields(strings.ToLower(s)), "_")
+}
+
 // profile shows profile.md, the cv/ folder and the CV check history. Files are read, never written, from here.
 func (v *server) profile(w http.ResponseWriter, r *http.Request) {
 	prof, _ := os.ReadFile(filepath.Join(v.s.Home, "profile.md"))
@@ -941,32 +1095,59 @@ func (v *server) profile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	checks, _ := v.s.CVChecks(20)
-	prefs, _ := v.s.Preferences()
 	v.render(w, r, "profile.html", "profile", map[string]any{
 		"Profile": string(prof), "Filled": filled, "ProfilePath": filepath.Join(v.s.Home, "profile.md"),
-		"CVDir": cvDir, "Files": files, "Checks": checks, "Prefs": prefs, "Main": v.masterPanel(),
+		"CVDir": cvDir, "Files": files, "Checks": checks, "Main": v.masterPanel(),
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"),
 	})
 }
 
 func (v *server) activity(w http.ResponseWriter, r *http.Request) {
-	all, _ := v.s.Events(0, 200)
-	kind := r.URL.Query().Get("kind")
-	kinds := map[string]bool{}
+	q := r.URL.Query()
+	group := q.Get("kind")
+	limit := 60
+	if n, err := strconv.Atoi(q.Get("n")); err == nil && n > 0 {
+		limit = min(n, 500)
+	}
+	all, _ := v.s.Events(0, 500)
+	weekAgo := time.Now().UTC().AddDate(0, 0, -7).Format("2006-01-02")
+	present, week := map[string]bool{}, map[string]int{}
 	var events []store.Event
 	for _, e := range all {
-		k, _, _ := strings.Cut(e.Kind, ":")
-		kinds[k] = true
-		if kind == "" || k == kind {
+		g := eventGroup(e.Kind)
+		present[g] = true
+		if day(e.At) >= weekAgo {
+			week[g]++
+		}
+		if group == "" || g == group {
 			events = append(events, e)
 		}
 	}
-	var names []string
-	for k := range kinds {
-		names = append(names, k)
+	total := len(events)
+	if len(events) > limit {
+		events = events[:limit]
 	}
-	sort.Strings(names)
-	v.render(w, r, "activity.html", "activity", map[string]any{"Days": groupByDay(events, time.Now()), "Kinds": names, "Kind": kind, "Count": len(events)})
+	type tally struct {
+		Group      string
+		Count, Max int
+	}
+	var groups []string
+	var tallies []tally
+	most := 0
+	for _, g := range activityGroups {
+		if present[g] {
+			groups = append(groups, g)
+		}
+		if week[g] > 0 {
+			tallies = append(tallies, tally{Group: g, Count: week[g]})
+			most = max(most, week[g])
+		}
+	}
+	for i := range tallies {
+		tallies[i].Max = most
+	}
+	v.render(w, r, "activity.html", "activity", map[string]any{"Days": groupByDay(events, time.Now()), "Groups": groups, "Kind": group,
+		"Older": total - len(events), "More": limit + 60, "Week": tallies})
 }
 
 // ---- json api (n8n, Make, scripts) ----
@@ -1223,4 +1404,23 @@ func (v *server) navCounts() navCounts {
 		n.Interviews = len(ivs)
 	}
 	return n
+}
+
+// gapStart matches the start of a CV-check finding, such as "Tailor:" or "Profile gap (".
+var gapStart = regexp.MustCompile(`^[A-Z][A-Za-z ]{0,30}[:(]`)
+
+// cvGaps splits a CV check's comma-joined findings, keeping commas inside a finding.
+func cvGaps(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		switch {
+		case p == "":
+		case len(out) == 0 || gapStart.MatchString(p):
+			out = append(out, p)
+		default:
+			out[len(out)-1] += ", " + p
+		}
+	}
+	return out
 }
