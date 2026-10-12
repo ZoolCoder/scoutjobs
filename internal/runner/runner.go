@@ -50,7 +50,7 @@ var Steps = []Step{
 
 // ExtraSteps run only when asked for by name; "all" leaves them out.
 var ExtraSteps = []Step{
-	{"prep", "Interview prep pack", "interview-prep", "Prepare for the next interview of job #{id} that has no outcome yet (see `scoutjobs interview list`), following the interview-prep skill unattended: write research.md, stories.md and interview-prep.md in the application folder. Do not run the story-extraction interview or a mock interview: where no story in stories/ fits a likely question, list the question under `## Gaps to cover before the day`."},
+	{"prep", "Interview prep pack", "interview-prep", "Prepare for the next interview of job #{id} that has no outcome yet (see `scoutjobs interview list`), following the interview-prep skill unattended: write research.md, stories.md and interview-prep.md in the application folder. In stories.md, pick for each must-have of fit-review.json the story in stories/ whose themes, title and core facts fit it best. Do not run the story-extraction interview or a mock interview: where no story in stories/ fits a likely question, list the question under `## Gaps to cover before the day`."},
 }
 
 func allSteps() []Step { return append(append([]Step{}, Steps...), ExtraSteps...) }

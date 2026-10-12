@@ -353,6 +353,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /calendar.ics", srv.calendarFeed)
 	mux.HandleFunc("GET /calendar/event/{key}", srv.calendarEvent)
 	mux.HandleFunc("GET /learning", srv.learning)
+	mux.HandleFunc("GET /stories", srv.stories)
 	mux.HandleFunc("POST /learning/{id}", srv.setLearning)
 	mux.HandleFunc("GET /preferences", srv.preferences)
 	mux.HandleFunc("POST /preferences/review", srv.reviewForm)
@@ -507,6 +508,7 @@ var subtitles = map[string]string{
 	"interviews":  "Prepare for what is coming, record how it went.",
 	"calendar":    "Interviews, deadlines and follow-ups. Subscribe from Google Calendar or add one event at a time.",
 	"learning":    "Close the gaps your target roles keep asking for.",
+	"stories":     "Your interview stories and the requirements they answer.",
 	"preferences": "What ScoutJobs learned from your decisions, and why.",
 	"profile":     "The source of truth behind every CV claim.",
 	"activity":    "Everything ScoutJobs recorded, newest first.",
@@ -710,7 +712,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Kind": r.URL.Query().Get("kind"), "EvGroups": eventGroupsOf(events), "Interviews": ivs, "Dir": dir, "Files": files, "FileGroups": fileGroups(dir, files), "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
-		"Checklist": jobChecklist(j, kit, gates, events, dir), "Keywords": apply.KeywordGaps(dir, v.cvGaps(j.ID)), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
+		"Checklist": jobChecklist(j, kit, gates, events, dir), "Keywords": apply.KeywordGaps(dir, v.cvGaps(j.ID)), "StoryMap": v.storyMap(dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
 		"Cards": docCards(docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf")), "Points": fitPoints(review, 6), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
 		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(),
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})

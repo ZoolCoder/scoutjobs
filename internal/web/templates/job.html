@@ -139,6 +139,10 @@
   {{$up := 0}}{{range .Interviews}}{{if ge .At $today}}{{$up = 1}}{{template "ivcard" (prepArgs . $.Data.Self)}}{{end}}{{end}}
   {{if not $up}}<p class="empty">Nothing scheduled<small>Add the interview when the company gets back to you. Each one gets a short prep checklist.</small></p>{{end}}
 </section>
+{{with .StoryMap}}<section class="panel" id="stories">
+  <div class="panel-h"><h2>Stories for this job</h2><a class="act btn mini" href="/stories">Story bank</a></div>
+  <ul class="kwlist">{{range .}}<li class="{{if .Story}}add{{else}}hold{{end}}"><div><b>{{.Requirement}}</b><small>{{with .Story}}Tell “{{.Title}}”{{with .Metrics}} · {{index . 0}}{{end}}{{else}}No story yet · capture one with <code>/scoutjobs:interview</code>{{end}}</small></div></li>{{end}}</ul>
+</section>{{end}}
 {{$past := 0}}{{range .Interviews}}{{if lt .At $today}}{{$past = 1}}{{end}}{{end}}
 {{if $past}}<section class="panel">
   <div class="panel-h"><h2>Past interviews</h2></div>

@@ -212,3 +212,31 @@ func TestKeywordsPanelAndFix(t *testing.T) {
 		t.Errorf("prompt:\n%.800s", prompt)
 	}
 }
+
+func TestStoryBankPageAndJobMapping(t *testing.T) {
+	s := testStore(t)
+	h := mustHandler(t, s, Config{})
+	if b := get(h, "/stories").Body.String(); !strings.Contains(b, "No stories yet") || !strings.Contains(b, `href="/stories"`) {
+		t.Error("empty story bank")
+	}
+	_ = os.MkdirAll(filepath.Join(s.Home, "stories"), 0o755)
+	_ = os.WriteFile(filepath.Join(s.Home, "stories", "kafka.md"), []byte("---\nid: kafka\ntitle: Moved billing to Kafka\nthemes: [kafka, migration]\nmetrics:\n  - lag 6h to 4m\n---\n\n## Core Facts\nEvent streaming in Go.\n"), 0o644)
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, apply.ReviewName), []byte(`{"score":70,"requirements":[
+		{"requirement":"Kafka event streaming","kind":"must","strength":"direct","evidence":"x"},
+		{"requirement":"Rust","kind":"must","strength":"gap"}]}`), 0o644)
+	b := get(h, "/stories").Body.String()
+	for _, want := range []string{"Moved billing to Kafka", "lag 6h to 4m", `href="/jobs/1?tab=interviews#stories">Acme`, "1 must-have requirement has no story"} {
+		if !strings.Contains(b, want) {
+			t.Errorf("stories page lacks %q", want)
+		}
+	}
+	b = get(h, "/jobs/1?tab=interviews").Body.String()
+	for _, want := range []string{"Stories for this job", "Tell “Moved billing to Kafka”", "Rust", "No story yet"} {
+		if !strings.Contains(b, want) {
+			t.Errorf("job page lacks %q", want)
+		}
+	}
+}
