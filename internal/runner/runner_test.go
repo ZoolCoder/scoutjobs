@@ -368,3 +368,15 @@ func TestPrepStepIsAskedForByName(t *testing.T) {
 		t.Errorf("second run: %s", states(got))
 	}
 }
+
+func TestExtraReachesTheStepTask(t *testing.T) {
+	rn, j := setup(t, fakeAgent)
+	got := run(t, rn, j, Request{Steps: []string{"tailor"}, Extra: map[string]string{"tailor": "Work in: event streaming with Kafka.", "cover": "never shown"}})
+	if got.State != Done {
+		t.Fatalf("%s %s", got.State, got.Error)
+	}
+	prompt, _ := os.ReadFile(filepath.Join(apply.Dir(rn.Store, j), "prompt.txt"))
+	if !strings.Contains(string(prompt), "Work in: event streaming with Kafka.") || strings.Contains(string(prompt), "never shown") {
+		t.Errorf("prompt:\n%.600s", prompt)
+	}
+}

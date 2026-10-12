@@ -183,3 +183,32 @@ func waitIdle(t *testing.T, m *runner.Manager) {
 	}
 	t.Fatal("queue never drained")
 }
+
+func TestKeywordsPanelAndFix(t *testing.T) {
+	s := testStore(t)
+	j, _ := s.JobByID(1)
+	dir := apply.Dir(s, j)
+	_ = os.MkdirAll(dir, 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Jane\n\nGo services.\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, apply.ReviewName), []byte(`{"score":70,"requirements":[
+		{"requirement":"Kafka","kind":"must","strength":"adjacent","evidence":"profile: queues","wording":"event streaming with Kafka"},
+		{"requirement":"Rust","kind":"must","strength":"gap"}]}`), 0o644)
+	agent := filepath.Join(s.Home, "agent.sh")
+	_ = os.WriteFile(agent, []byte("#!/bin/sh\ncat > prompt.txt\n"), 0o700)
+	m := runner.NewManager(&runner.Runner{Store: s, Exe: "scoutjobs", Custom: agent})
+	h := mustHandler(t, s, Config{Runner: m})
+	b := get(h, "/jobs/1").Body.String()
+	for _, want := range []string{"Keywords to add", "event streaming with Kafka", "Rust", "never added for you", `action="/jobs/1/keywords"`} {
+		if !strings.Contains(b, want) {
+			t.Errorf("job page lacks %q", want)
+		}
+	}
+	if rec := post(h, "/jobs/1/keywords", url.Values{"agent": {"custom"}}); rec.Code != http.StatusSeeOther || strings.Contains(rec.Header().Get("Location"), "runerr") {
+		t.Fatalf("fix: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	m.Latest(1).Wait()
+	prompt, _ := os.ReadFile(filepath.Join(dir, "prompt.txt"))
+	if !strings.Contains(string(prompt), `"event streaming with Kafka"`) || strings.Contains(string(prompt), `"Rust"`) {
+		t.Errorf("prompt:\n%.800s", prompt)
+	}
+}

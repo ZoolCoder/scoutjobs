@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/zoolcoder/scoutjobs/internal/apply"
 	"github.com/zoolcoder/scoutjobs/internal/runner"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -240,4 +241,39 @@ func (v *server) apiAgents(w http.ResponseWriter, r *http.Request) {
 		out = v.cfg.Runner.Agents()
 	}
 	writeJSON(w, 200, map[string]any{"agents": out, "steps": runner.Steps})
+}
+
+// fixKeywords redoes the tailored CV with the agreed wording it misses, then reviews it again.
+func (v *server) fixKeywords(w http.ResponseWriter, r *http.Request) {
+	j, ok := v.formJob(w, r)
+	if !ok {
+		return
+	}
+	if v.cfg.Runner == nil || sameOrigin(r) != nil {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	u := fmt.Sprintf("/jobs/%d", j.ID)
+	task := apply.KeywordTask(apply.KeywordGaps(apply.Dir(v.s, j), v.cvGaps(j.ID)))
+	msg := ""
+	if task == "" {
+		msg = "nothing to add: the missing keywords have no evidence in your profile"
+	} else if _, err := v.cfg.Runner.Start(j, runner.Request{Steps: []string{"tailor", "review"}, Force: true, Agent: r.FormValue("agent"), Extra: map[string]string{"tailor": task}}); err != nil {
+		msg = err.Error()
+	}
+	if msg != "" {
+		u += "?runerr=" + url.QueryEscape(msg)
+	}
+	http.Redirect(w, r, u+"#run", http.StatusSeeOther)
+}
+
+// cvGaps is the gap list of the job's newest CV check.
+func (v *server) cvGaps(jobID int64) string {
+	checks, _ := v.s.CVChecks(50)
+	for _, c := range checks {
+		if c.JobID == jobID {
+			return c.Gaps
+		}
+	}
+	return ""
 }

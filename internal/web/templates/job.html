@@ -56,6 +56,13 @@
   {{with .CoverBuild}}{{with .Cover}}<p class="small cover-build"><span class="badge {{if $.Data.CoverBuild.CoverChanged}}stale{{else}}{{.State}}{{end}}">{{if $.Data.CoverBuild.CoverChanged}}stale{{else}}template {{.State}}{{end}}</span> Cover letter built from <code>{{base .Template}}</code> {{date .At}}{{if .Rendered}}, {{.Pages}} of {{.TemplatePages}} {{if eq .TemplatePages 1}}page{{else}}pages{{end}}{{end}}. {{.Summary}}{{if $.Data.CoverBuild.CoverChanged}} Changed since: {{join $.Data.CoverBuild.CoverChanged ", "}}; ask the assistant to write it again.{{end}}</p>
   {{if .Problems}}<ul class="gates-left">{{range .Problems}}<li>{{.}}</li>{{end}}</ul>{{end}}{{end}}{{end}}
 </section>
+{{with .Keywords}}<section class="panel" id="keywords">
+  <div class="panel-h"><h2>Keywords to add</h2><span class="n">{{len .}}</span><span class="act muted">what your tailored CV does not say yet</span></div>
+  <ul class="kwlist">{{range .}}<li class="{{if .Addable}}add{{else}}hold{{end}}"><div><b>{{if .Wording}}{{.Wording}}{{else}}{{.Requirement}}{{end}}</b>
+    <small>{{if .Addable}}For “{{.Requirement}}” · backed by {{.Evidence}}{{else if eq .Source "CV check"}}From the last CV check · add it yourself only if it is true{{else}}No evidence in your profile · never added for you{{end}}</small></div></li>{{end}}</ul>
+  {{if $.Data.RunP}}{{if and $.Data.RunP.Agents (not $.Data.RunP.Active) (kwaddable .)}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/keywords" data-busy="Starting your agent…"><button class="mini go" type="submit">Fix with AI</button></form>
+  <small class="muted">Rewrites the tailored CV with the backed wording only, then reviews it again. Nothing is sent.</small>{{end}}{{end}}
+</section>{{end}}
 <div class="grid-2 jobpair">
 <section class="panel" id="gates">
   <div class="panel-h"><h2>Ready to send?</h2>{{if .Gates.OK}}<span class="badge done">All good</span>{{else}}<span class="n">{{.Gates.Failed}} to fix</span>{{end}}</div>

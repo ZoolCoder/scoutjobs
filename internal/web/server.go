@@ -212,6 +212,7 @@ var funcs = template.FuncMap{
 	"colcap":     func() int { return colCap },
 	"prepItems":  func() []store.PrepItem { return store.PrepItems },
 	"preparable": preparable,
+	"kwaddable":  func(gaps []apply.KeywordGap) bool { return apply.KeywordTask(gaps) != "" },
 	"prepArgs": func(i store.Interview, back string) map[string]any {
 		return map[string]any{"I": i, "Back": back}
 	},
@@ -324,6 +325,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /jobs/{id}/run", srv.startRun)
 	mux.HandleFunc("POST /jobs/{id}/run/cancel", srv.cancelRun)
 	mux.HandleFunc("GET /jobs/{id}/run", srv.runState)
+	mux.HandleFunc("POST /jobs/{id}/keywords", srv.fixKeywords)
 	mux.HandleFunc("POST /jobs/{id}/gmail-draft", srv.gmailDraft)
 	mux.HandleFunc("GET /jobs/{id}/download/{name}", srv.jobDownload)
 	mux.HandleFunc("GET /jobs/{id}/view/{name}", srv.jobView)
@@ -708,7 +710,7 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 	v.render(w, r, "job.html", "pipeline", map[string]any{"Job": j, "Tab": tab, "Self": self, "P": p, "Mails": v.mailRows(id, 200), "Events": events, "Kind": r.URL.Query().Get("kind"), "EvGroups": eventGroupsOf(events), "Interviews": ivs, "Dir": dir, "Files": files, "FileGroups": fileGroups(dir, files), "HasResumeMD": hasMD,
 		"Resume": kit.Resume, "Cover": kit.Cover, "Check": kit.ATS, "Sent": kit.Sent, "Draft": kit.Draft, "KitDone": kit.Done,
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
-		"Checklist": jobChecklist(j, kit, gates, events, dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
+		"Checklist": jobChecklist(j, kit, gates, events, dir), "Keywords": apply.KeywordGaps(dir, v.cvGaps(j.ID)), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
 		"Cards": docCards(docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf")), "Points": fitPoints(review, 6), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
 		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(),
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})

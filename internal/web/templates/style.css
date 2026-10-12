@@ -589,6 +589,11 @@ form.gmail-client textarea{font:12px/1.5 var(--mono)}
 form.gmail-client button{justify-self:start}
 @media (max-width:820px){.issue-grid{grid-template-columns:1fr}.issue-side{border-left:0;border-top:1px solid var(--line)}}
 @media (max-width:720px){.tsearch{max-width:none}.modal-wrap{padding:0}.issue{max-height:100vh;height:100%;border-radius:0}.issue-main{padding:16px}}
+ul.kwlist{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:6px}
+ul.kwlist li{padding:6px 10px;border-left:3px solid var(--acc);background:var(--subtle);border-radius:4px}
+ul.kwlist li.hold{border-left-color:var(--line2)}
+ul.kwlist small{display:block;color:var(--muted);font-size:12.5px}
+
 .batchbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px}
 .batchbar small{font-size:12.5px}
 .listview td.pick{width:28px}
