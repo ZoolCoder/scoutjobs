@@ -23,7 +23,15 @@ Because every page is a plain `GET` and every action a `POST` with a redirect, t
 
 == Overview
 
-The page opens with *Next best move*: one card the server picks from the state of the pipeline, in this order: the strongest draft waiting to be sent, a follow-up past its date, an interview to prepare, a CV that has never been checked, otherwise new jobs to find and score. The four numbers next to it are open jobs, applications this week against `weekly_apply_target`, upcoming interviews and the response rate over everything applied. *Pipeline health* is the funnel, *Applications per week* the last eight weeks as bars, and *Today* the tasks due now with a button each. The bottom row shows upcoming interviews and drafts waiting, CV health, the top learning gaps and the latest activity.
+The page opens with *Next best move*: one card the server picks from the state of the pipeline, in this order: the strongest draft waiting to be sent, a follow-up past its date, an interview to prepare, a CV that has never been checked, otherwise new jobs to find and score. The four numbers next to it are open jobs, applications this week against `weekly_apply_target`, upcoming interviews and the response rate over everything applied. *Pipeline health* is the funnel, *Applications per week* the last eight weeks as bars labelled by the Monday that starts each week (the last one is *now*; hover a bar for its count), and *Today* the tasks due now with a button each. An interview whose time has passed without an outcome tops *Today* as "How did the Stripe system design interview go?" with *Log outcome*, so the pipeline moves on. The bottom row shows upcoming interviews and drafts waiting, CV health, the top learning gaps and the latest activity, written in plain words (*Status changed*, *Job added*) rather than event codes.
+
+Dates read the way you would say them: *today 10:00*, *yesterday 16:00*, *13 Oct* within this year and *2 Mar 2025* before it. The same wording is used on the overview, the inbox day headings, the job page and the file lists.
+
+== Navigation
+
+image::sidebar-folded.png[The sidebar folded to icons, with the Pipeline tooltip showing,1200]
+
+The sidebar groups the pages by what you are doing: *Apply* (Find jobs, Pipeline, Inbox), *Interview* (Interviews, Calendar, Learning) and *You* (Profile & CV, Connections, Preferences, Reviews, Activity). The button next to the logo folds it to a rail of icons and back; the choice is kept in a cookie. Folded, each icon shows its name in a tooltip on hover or keyboard focus, and the badges (upcoming interviews) stay visible. Tooltips across the dashboard are the same accessible kind: they appear on focus as well as hover, are read out by screen readers, and close with `Esc`.
 
 == Pipeline
 

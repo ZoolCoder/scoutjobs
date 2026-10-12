@@ -19,7 +19,7 @@ Open http://127.0.0.1:7070 in your browser. Everything you see is stored in `~/.
 
 image::overview.png[The overview: next best move, open jobs, applied this week, upcoming interviews, response rate, pipeline health and today's tasks,1200]
 
-The *Overview* is your home page. *Next best move* always names the one thing to do now, with a button that takes you there. On a new install that is "find jobs" or "check your CV".
+The *Overview* is your home page. *Next best move* always names the one thing to do now, with a button that takes you there. On a new install that is "find jobs" or "check your CV". *Today* lists the tasks due now, one button each; after an interview it asks "How did it go?" with *Log outcome*. The button next to the logo folds the sidebar to icons when you want more room; hover an icon to see its name.
 
 == 2. Tell it who you are: Profile & CV
 
