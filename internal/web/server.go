@@ -48,6 +48,7 @@ type Config struct {
 	EmailFrom                                  string            // sender for drafts built through the API; sending stays in the CLI
 	SearchQueries, SearchBoards                []string          // defaults for POST /api/search and the search page
 	SearchRemote                               bool              // search page default for the remote boards
+	IMAP                                       bool              // imap_host is set in config.yaml
 	Currency                                   string            // default on the add-job form
 	SearchBaseURL                              map[string]string // test override per search source
 	Version                                    string            // shown in the footer next to the release link
@@ -60,6 +61,7 @@ type Config struct {
 type MailHooks struct {
 	Status func() (source, account string) // source: agent | gmail | imap | ""; account is the agent's name for agent
 	Sync   func() (int, error)
+	Test   func() error                                               // reads one message from Gmail or IMAP, to prove the mailbox answers
 	Draft  func(jobID int64, kind string) (openURL string, err error) // kind "" is the application e-mail
 	// Compose builds the e-mail the AI agent files as a draft when it reads the mail
 	Compose func(jobID int64, kind string) (runner.MailTask, error)
@@ -140,6 +142,7 @@ var funcs = template.FuncMap{
 		}
 		return ""
 	},
+	"ago": ago,
 	"when": func(s string) string {
 		if len(s) >= 16 && s[10] == 'T' {
 			return s[:10] + " " + s[11:16]
@@ -328,6 +331,9 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("POST /connections/agent", srv.setDefaultAgent)
 	mux.HandleFunc("POST /connections/calendar", srv.setCalendarVia)
 	mux.HandleFunc("POST /connections/calendar/sync", srv.syncCalendarAgent)
+	mux.HandleFunc("POST /connections/mail", srv.setMailVia)
+	mux.HandleFunc("POST /connections/sources", srv.setSource)
+	mux.HandleFunc("GET /connections/test", srv.testConnection)
 	mux.HandleFunc("GET /activity", srv.activity)
 	mux.HandleFunc("GET /theme", srv.theme)
 	mux.HandleFunc("GET /style.css", static("templates/style.css", "text/css; charset=utf-8", false))
@@ -429,6 +435,7 @@ type page struct {
 	Cfg    Config
 	Now    string
 	Theme  string // dark | light | auto, resolved from cookie then config
+	Mini   bool   // the sidebar is folded to icons, from the side cookie app.js sets
 	Path   string
 	Sub    string
 }
@@ -451,7 +458,7 @@ func hue(s string) int {
 
 var subtitles = map[string]string{
 	"inbox":       "Replies from companies, matched to your applications.",
-	"connections": "The tools ScoutJobs works with: your AI assistant, mail, calendar and job sources.",
+	"connections": "Connect the tools ScoutJobs uses: your AI assistant, mail, calendar and job sources.",
 	"overview":    "Your job search, at a glance. Here's what to do next.",
 	"pipeline":    "Every opportunity, from discovery to outcome.",
 	"interviews":  "Prepare for what is coming, record how it went.",
@@ -463,6 +470,11 @@ var subtitles = map[string]string{
 	"reviews":     "The weekly look back: numbers, funnel, commitments.",
 	"search":      "Find open jobs that fit you and add the good ones to your pipeline.",
 	"add_job":     "Track a posting you found elsewhere.",
+}
+
+func sideMini(r *http.Request) bool {
+	c, err := r.Cookie("side")
+	return err == nil && c.Value == "mini"
 }
 
 func (v *server) render(w http.ResponseWriter, r *http.Request, name, active string, data any) {
@@ -479,7 +491,7 @@ func (v *server) render(w http.ResponseWriter, r *http.Request, name, active str
 			}
 		}
 	}
-	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Path: r.URL.RequestURI(), Sub: subtitles[active], Nav: v.navCounts()}
+	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Mini: sideMini(r), Path: r.URL.RequestURI(), Sub: subtitles[active], Nav: v.navCounts()}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := v.tpl.ExecuteTemplate(w, name, p); err != nil {
 		http.Error(w, err.Error(), 500)

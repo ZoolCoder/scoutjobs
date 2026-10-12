@@ -20,7 +20,7 @@
   {{else if .Active}}<form class="inline" method="post" action="/profile/prepare/cancel"><button class="mini" type="submit">Cancel</button></form>
   {{else if .Agents}}<form class="runform" method="post" action="/profile/prepare">
     <div class="runpick">{{range .Steps}}<label class="check"><input type="checkbox" name="step" value="{{.Name}}" checked> {{.Label}}</label>{{end}}</div>
-    <div class="runbar"><label>Agent <select name="agent">{{range .Agents}}<option value="{{.}}">{{.}}</option>{{end}}</select></label><label class="check"><input type="checkbox" name="force" value="1"> Rewrite existing</label><button class="primary" type="submit" data-busy="Starting your agent…">Prepare with AI</button></div>
+    <div class="runbar"><span class="agentnote small muted">Uses <b class="agentname">{{index .Agents 0}}</b> · <a href="/connections#ai">Change</a></span><label class="check"><input type="checkbox" name="force" value="1"> Rewrite existing</label><button class="primary" type="submit" data-busy="Starting your agent…">Prepare with AI</button></div>
     <small class="muted">Your agent writes them from profile.md, your stories and the CV files below. The previous version is kept as <code>*.prev.md</code>. Edit the files any time; tailored resumes and cover letters start from them.</small>
   </form>
   {{else}}<p class="callout">No agent CLI found. Install Claude Code or Codex, or set <code>agent_command</code> in config.yaml.</p>{{end}}

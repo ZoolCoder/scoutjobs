@@ -84,7 +84,7 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	opts := search.Options{Queries: queries, Boards: boards, Remote: *remote, Limit: *limit}
+	opts := search.Options{Queries: queries, Boards: boards, Remote: *remote, Off: splitList(s.Setting(search.OffSetting)), Limit: *limit}
 	var dropped int
 	opts.Keep = func(p search.Posting) bool {
 		ok, _ := search.LocationMatch(p, wants)

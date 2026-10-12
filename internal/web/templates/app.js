@@ -77,7 +77,10 @@
     }).then(function (run) {
       if (!run) return;
       if (panel.dataset.queued) { if (run.state !== 'queued') location.reload(); return; }
-      if (run.state !== 'running') { location.reload(); return; }
+      if (run.state !== 'running') {
+        if (panel.dataset.done) location.href = panel.dataset.done; else location.reload();
+        return;
+      }
       var done = 0, now = [];
       (run.steps || []).forEach(function (s) {
         if (s.state !== 'pending' && s.state !== 'running') done++;
@@ -94,6 +97,7 @@
         set('[data-count]', done + '/' + (run.steps || []).length);
         set('[data-now]', now.length ? now.join(' + ') : 'Starting');
       }
+      if (panel.dataset.phases) phase(run.log || []);
       if (run.last) last = Date.parse(run.last);
       clock();
       var pre = panel.querySelector('details.runlog pre');
@@ -102,6 +106,25 @@
         pre.scrollTop = pre.scrollHeight;
       }
     }).catch(function () { /* next tick */ });
+  }
+
+  // calendar sync: the agent's tool calls tell how far it got
+  var phases = [
+    [/interview_add|interview_set/, 'Saving new interviews…', 85],
+    [/create|update|insert/i, 'Adding interviews to your calendar…', 70],
+    [/calendar|event/i, 'Reading your calendar…', 45],
+    [/interview_list|job_list/, 'Reading your interviews…', 25]
+  ];
+  function phase(log) {
+    var text = 'Starting your AI assistant…', pct = 5;
+    log.forEach(function (line) {
+      for (var i = 0; i < phases.length; i++) {
+        if (phases[i][0].test(line) && phases[i][2] > pct) { text = phases[i][1]; pct = phases[i][2]; break; }
+      }
+    });
+    var bar = prog && prog.querySelector('progress');
+    if (bar) bar.value = pct;
+    set('[data-now]', text);
   }
 
   clock();
@@ -316,4 +339,57 @@ document.querySelectorAll('[data-open]').forEach(function (a) {
   }
   window.addEventListener('hashchange', mark);
   mark();
+})();
+
+// Blocking dialogs: the page waits behind them; Escape does not close them.
+document.querySelectorAll('dialog[data-modal]').forEach(function (d) {
+  if (!d.showModal) return;
+  if (d.open) d.close();
+  d.showModal();
+  d.addEventListener('cancel', function (e) { e.preventDefault(); });
+});
+
+// Switches that save as soon as they flip.
+document.querySelectorAll('[data-autosubmit]').forEach(function (el) {
+  el.addEventListener('change', function () { el.form.submit(); });
+});
+
+// Connections: Test connection asks the server and says the answer under the card.
+document.querySelectorAll('[data-test]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var out = btn.closest('section').querySelector('[data-test-out]');
+    var label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Testing…';
+    out.hidden = false;
+    out.className = 'testout';
+    out.textContent = 'Checking, this can take up to a minute…';
+    fetch('/connections/test?card=' + encodeURIComponent(btn.dataset.test), { cache: 'no-store', credentials: 'same-origin' })
+      .then(function (res) { return res.json(); })
+      .then(function (r) { out.className = 'testout ' + (r.ok ? 'ok' : 'bad'); out.textContent = r.text; })
+      .catch(function () { out.className = 'testout bad'; out.textContent = 'ScoutJobs did not answer. Is it still running?'; })
+      .then(function () { btn.disabled = false; btn.textContent = label; });
+  });
+});
+
+// Sidebar: fold it to icons and back; a cookie keeps the choice so the server draws it folded next time.
+(function () {
+  var btn = document.querySelector('[data-fold]');
+  var shell = document.querySelector('.shell');
+  if (!btn || !shell) return;
+  function titles(mini) {
+    document.querySelectorAll('.side nav a').forEach(function (a) {
+      if (mini) a.title = a.textContent.trim(); else a.removeAttribute('title');
+    });
+  }
+  titles(shell.classList.contains('mini'));
+  btn.addEventListener('click', function () {
+    var mini = shell.classList.toggle('mini');
+    var label = mini ? 'Expand menu' : 'Collapse menu';
+    btn.setAttribute('aria-expanded', String(!mini));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    titles(mini);
+    document.cookie = 'side=' + (mini ? 'mini' : 'full') + '; path=/; max-age=31536000; samesite=lax';
+  });
 })();

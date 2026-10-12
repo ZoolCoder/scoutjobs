@@ -133,7 +133,7 @@ func Run(args []string, out io.Writer) error {
 		if n, err := apply.ReconcileAll(s); n > 0 || err != nil {
 			fmt.Fprintf(out, "merged %d file(s) from older application folders %v\n", n, errOrNil(err))
 		}
-		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, FitApplyFloor: cfg.FitApplyFloor, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
+		return serveAndRestart(s, *addr, !*noRestart, out, web.Config{FollowUpDays: cfg.FollowUpDays, FitApplyFloor: cfg.FitApplyFloor, StaleDays: cfg.StaleDays, WeeklyApplyTarget: cfg.WeeklyApplyTarget, APIToken: cfg.APIToken, Theme: cfg.Theme, EmailFrom: cfg.EmailFrom, SearchQueries: cfg.SearchQueries, SearchBoards: cfg.SearchBoards, SearchRemote: cfg.SearchRemote, IMAP: cfg.IMAPHost != "", Currency: cfg.Currency, Version: Version, MCP: mcpHTTP(), Mail: mailHooks(s, cfg), Runner: runner.NewManager(newRunner(s, cfg))})
 	}
 	return fmt.Errorf("unknown command %q\n%s", cmd, usage)
 }

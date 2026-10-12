@@ -10,9 +10,12 @@
 <script src="/app.js" defer></script>
 </head>
 <body>
-<div class="shell">
+<div class="shell{{if .Mini}} mini{{end}}">
 <aside class="side">
-  <a class="brand" href="/">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
+  <div class="sidetop">
+  <a class="brand" href="/" title="ScoutJobs">{{template "mark"}}<span class="word">Scout<b>Jobs</b></span></a>
+  <button class="sidefold" type="button" data-fold aria-label="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}" aria-expanded="{{if .Mini}}false{{else}}true{{end}}" title="{{if .Mini}}Expand menu{{else}}Collapse menu{{end}}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 10l-2 2 2 2"/></svg></button>
+  </div>
   <nav aria-label="main">
     <a href="/" {{if eq .Active "overview"}}class="on" aria-current="page"{{end}}>{{template "ico-grid"}}Overview</a>
     <p class="navh">Apply</p>

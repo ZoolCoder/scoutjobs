@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -54,6 +55,7 @@ type Options struct {
 	Queries []string // every word of a query must appear; any query may match
 	Boards  []string // "greenhouse:stripe", "lever:netlify", "recruitee:acme", "rss:https://..." or a careers URL (see ParseBoard)
 	Remote  bool     // also query the remote boards (remotive, remoteok, arbeitnow, jobicy, himalayas)
+	Off     []string // remote boards the user turned off, by name (see RemoteBoards)
 	Limit   int
 	Client  *http.Client
 	BaseURL map[string]string // test override per source
@@ -75,6 +77,10 @@ var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruite
 
 // RemoteBoards lists the keyword-searchable remote boards.
 var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas", "hn"}
+
+// OffSetting is the store setting that holds the remote boards turned off on the Connections page,
+// comma separated.
+const OffSetting = "remote_boards_off"
 
 var defaultBase = map[string]string{
 	"greenhouse":      "https://boards-api.greenhouse.io/v1/boards",
@@ -178,6 +184,11 @@ func Run(ctx context.Context, o Options) Result {
 		}
 		feeds = append(feeds, feed{"remoteok", func(ctx context.Context) ([]Posting, error) { return f.remoteok(ctx) }})
 	}
+
+	feeds = slices.DeleteFunc(feeds, func(fd feed) bool {
+		name, _, _ := strings.Cut(fd.name, ":")
+		return slices.Contains(RemoteBoards, name) && slices.Contains(o.Off, name)
+	})
 
 	// every feed at once; results are merged in feed order, so a run is repeatable
 	type answer struct {

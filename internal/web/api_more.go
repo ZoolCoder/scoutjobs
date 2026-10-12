@@ -432,7 +432,7 @@ func (v *server) apiSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
-	res := search.Run(ctx, search.Options{Queries: in.Queries, Boards: in.Boards, Remote: in.Remote, Limit: in.Limit, BaseURL: v.cfg.SearchBaseURL})
+	res := search.Run(ctx, search.Options{Queries: in.Queries, Boards: in.Boards, Remote: in.Remote, Off: v.remoteOff(), Limit: in.Limit, BaseURL: v.cfg.SearchBaseURL})
 	type row struct {
 		search.Posting
 		ID      int64 `json:"id,omitempty"`

@@ -38,12 +38,9 @@
     <a class="btn" href="https://claude.ai/settings/connectors" rel="noopener noreferrer" target="_blank">Connect Outlook &rsaquo;</a>
     <small class="muted">In Claude, connect Microsoft 365.</small></div>
 </div>
-<div class="option rec" id="ai"><h3>Then pick your AI agent</h3>
-{{if .Agents}}<ul class="agents">{{$cur := .Agent}}{{range .Agents}}<li data-mail-check="/mail/agent/check?agent={{.}}"><b class="agentname">{{.}}</b> <span class="conns muted"><span class="spin" aria-hidden="true"></span>looking for mail connectors…</span>
-  {{if eq . $cur}}<span class="badge done">in use</span> <form class="inline" method="post" action="/mail/agent/off"><button class="mini">Stop using it</button></form>{{else}}<form class="inline" method="post" action="/mail/agent"><input type="hidden" name="agent" value="{{.}}"><button class="mini primary">Use {{.}}</button></form>{{end}}
-  <button class="mini" type="button" data-recheck>Check again</button></li>{{end}}</ul>
-<p class="muted small">Using Codex? <code>codex mcp add</code> your mail server, then <code>codex mcp login &lt;name&gt;</code>.</p>
-{{else}}<p class="callout">Install <a href="https://claude.com/claude-code" rel="noopener noreferrer" target="_blank">Claude Code</a> or Codex to use this.</p>{{end}}</div>
+<div class="option rec" id="ai"><h3>Then let your AI assistant read it</h3>
+<p class="muted">Pick <b>Use my AI assistant's mail connector</b> on Connections, where all your tools are set up.</p>
+<a class="btn primary" href="/connections#mail">Open Connections</a></div>
 <p class="or"><span>Or choose another option</span></p>{{end}}
 <div class="alts">
   {{with .Google}}{{if and .Offered (not .Connected)}}<div class="alt"><b>Your own Google client</b><p class="muted">No AI reads your mail, and it syncs in the background. About 3 minutes in Google Cloud.</p><a class="btn" href="#google" data-open="google">Set up</a></div>{{end}}{{end}}

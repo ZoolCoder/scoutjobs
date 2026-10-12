@@ -308,8 +308,13 @@ func mailSource(s *store.Store, cfg Config, via string) (string, error) {
 	case "agent", "gmail", "imap":
 		return via, nil
 	case "", "auto":
-		if s.Setting(runner.MailVia) == "agent" {
+		switch s.Setting(runner.MailVia) {
+		case "agent":
 			return "agent", nil
+		case "imap":
+			if cfg.IMAPHost != "" {
+				return "imap", nil
+			}
 		}
 		if gmailClient(s, cfg).Connected() {
 			return "gmail", nil
@@ -360,17 +365,28 @@ func sentSince(mails []mail.Mail, start time.Time) []mail.Mail {
 func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 	return web.MailHooks{
 		Status: func() (string, string) {
-			if s.Setting(runner.MailVia) == "agent" {
-				return "agent", mailAgentName(s, cfg)
-			}
-			c := gmailClient(s, cfg)
-			if c.Connected() {
-				return "gmail", c.Account()
-			}
-			if cfg.IMAPHost != "" {
-				return "imap", imapAccount(cfg).User
+			src, _ := mailSource(s, cfg, "")
+			switch src {
+			case "agent":
+				return src, mailAgentName(s, cfg)
+			case "gmail":
+				return src, gmailClient(s, cfg).Account()
+			case "imap":
+				return src, imapAccount(cfg).User
 			}
 			return "", cfg.EmailFrom
+		},
+		Test: func() error {
+			src, err := mailSource(s, cfg, "")
+			switch src {
+			case "gmail":
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_, err = gmailClient(s, LoadConfig(s.Home)).Fetch(ctx, time.Now(), 1)
+			case "imap":
+				_, err = imapAccount(cfg).Fetch(time.Now(), 1)
+			}
+			return err
 		},
 		Sync:  func() (int, error) { return SyncMail(s, cfg) },
 		Gmail: func() *gmail.Client { return gmailClient(s, LoadConfig(s.Home)) }, // config.yaml edits apply without a restart

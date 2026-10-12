@@ -58,6 +58,14 @@ func TestRunAgainstFakeBoards(t *testing.T) {
 	if len(r.Errors) != 3 || !strings.Contains(r.Errors[0], `"bogus"`) || !strings.Contains(r.Errors[1], "jobicy") || !strings.Contains(r.Errors[2], "hn:go: no who-is-hiring thread") {
 		t.Errorf("errors: %v", r.Errors)
 	}
+	off := Run(context.Background(), Options{
+		Queries: []string{"go"}, Remote: true, Off: []string{"remoteok", "jobicy", "hn"}, Limit: 10, Client: srv.Client(),
+		BaseURL: map[string]string{"remotive": srv.URL + "/remotive", "remoteok": srv.URL + "/remoteok",
+			"arbeitnow": srv.URL + "/arbeitnow", "jobicy": srv.URL + "/jobicy", "himalayas": srv.URL + "/himalayas", "hn": srv.URL + "/hn"},
+	})
+	if len(off.Postings) != 1 || off.Postings[0].Source != "remotive" || len(off.Errors) != 0 {
+		t.Errorf("boards turned off were searched: %+v %v", off.Postings, off.Errors)
+	}
 }
 
 func TestWordsMatch(t *testing.T) {

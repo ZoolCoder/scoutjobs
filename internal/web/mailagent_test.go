@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/runner"
+	"github.com/zoolcoder/scoutjobs/internal/search"
 )
 
 // fakeCodex is a codex CLI that has a signed-in Gmail server and does nothing when run.
@@ -47,7 +48,7 @@ func TestInboxAgentConnect(t *testing.T) {
 	}
 
 	b := get(h, "/inbox").Body.String()
-	if !strings.Contains(b, "Connect your email &amp; calendar") || !strings.Contains(b, `data-mail-check="/mail/agent/check?agent=codex"`) || !strings.Contains(b, "Use codex") {
+	if !strings.Contains(b, "Connect your email &amp; calendar") || !strings.Contains(b, `href="/connections#mail"`) {
 		t.Fatalf("inbox does not offer the agent:\n%s", b)
 	}
 	if b := get(h, "/mail/agent/check?agent=codex").Body.String(); !strings.Contains(b, `"name":"gmail"`) || !strings.Contains(b, `"ready":true`) || strings.Contains(b, "context7") || strings.Contains(b, "hint") {
@@ -115,15 +116,15 @@ func TestConnections(t *testing.T) {
 	}
 
 	b := get(h, "/connections").Body.String()
-	for _, want := range []string{"AI assistant", "Mail", "Calendar", "Job sources", `name="agent" value="codex"`, "/calendar.ics"} {
+	for _, want := range []string{"AI assistant", "Mail", "Calendar", "Job sources", `name="via" value="codex"`, "Remotive", `data-test="mail"`} {
 		if !strings.Contains(b, want) {
 			t.Errorf("page lacks %q", want)
 		}
 	}
-	if loc := post("/connections/agent", "agent=nope"); !strings.Contains(loc, "err=") || s.Setting(runner.DefaultAgent) != "" {
+	if loc := post("/connections/agent", "via=nope"); !strings.Contains(loc, "err=") || s.Setting(runner.DefaultAgent) != "" {
 		t.Errorf("unknown agent accepted: %s", loc)
 	}
-	if loc := post("/connections/agent", "agent=codex"); !strings.Contains(loc, "msg=") || s.Setting(runner.DefaultAgent) != "codex" {
+	if loc := post("/connections/agent", "via=codex"); !strings.Contains(loc, "msg=") || s.Setting(runner.DefaultAgent) != "codex" {
 		t.Errorf("agent not saved: %s", loc)
 	}
 	if post("/connections/calendar", "via=agent"); s.Setting(runner.CalendarVia) != "agent" {
@@ -137,5 +138,23 @@ func TestConnections(t *testing.T) {
 	}
 	if post("/connections/calendar", "via=off"); s.Setting(runner.CalendarVia) != "" {
 		t.Error("calendar via agent not turned off")
+	}
+	if post("/connections/calendar", "via=apple"); !strings.Contains(get(h, "/connections").Body.String(), "/calendar.ics") {
+		t.Error("no subscribe link once Apple Calendar is picked")
+	}
+	if loc := post("/connections/mail", "via=imap"); loc != "/inbox?connect=1#imap" {
+		t.Errorf("imap not set up yet should open its setup: %s", loc)
+	}
+	if post("/connections/mail", "via=agent"); s.Setting(runner.MailVia) != "agent" || s.Setting(runner.MailAgent) != "codex" {
+		t.Error("mail via the agent not saved")
+	}
+	if post("/connections/sources", "source=remoteok"); s.Setting(search.OffSetting) != "remoteok" {
+		t.Errorf("remoteok not turned off: %q", s.Setting(search.OffSetting))
+	}
+	if post("/connections/sources", "source=remoteok&on=1"); s.Setting(search.OffSetting) != "" {
+		t.Errorf("remoteok not turned back on: %q", s.Setting(search.OffSetting))
+	}
+	if b := get(h, "/connections/test?card=ai").Body.String(); !strings.Contains(b, `"ok":true`) || !strings.Contains(b, "gmail") {
+		t.Errorf("ai test: %s", b)
 	}
 }

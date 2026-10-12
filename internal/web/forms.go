@@ -273,7 +273,7 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 		pr.Places = splitList(f.Filter.Location) // the place searched for is the place to score against
 	}
 	f.Ranked = !pr.Empty()
-	opts := search.Options{Queries: splitList(f.Queries), Boards: boards, Remote: f.Remote, Limit: f.Limit, BaseURL: v.cfg.SearchBaseURL}
+	opts := search.Options{Queries: splitList(f.Queries), Boards: boards, Remote: f.Remote, Off: v.remoteOff(), Limit: f.Limit, BaseURL: v.cfg.SearchBaseURL}
 	now := time.Now()
 	opts.Keep = func(p search.Posting) bool {
 		switch {
@@ -361,3 +361,6 @@ func splitList(s string) []string {
 	}
 	return out
 }
+
+// remoteOff lists the remote boards turned off on the Connections page.
+func (v *server) remoteOff() []string { return splitList(v.s.Setting(search.OffSetting)) }

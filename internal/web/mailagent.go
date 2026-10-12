@@ -120,7 +120,7 @@ func (v *server) cancelAgent(w http.ResponseWriter, r *http.Request) {
 			v.cfg.Runner.Cancel(run.ID)
 		}
 	}
-	http.Redirect(w, r, "/inbox#agent", http.StatusSeeOther)
+	http.Redirect(w, r, back(r, "/inbox#agent"), http.StatusSeeOther)
 }
 
 // startAgentSync has the agent read the mail since the last sync, at most two weeks back.
