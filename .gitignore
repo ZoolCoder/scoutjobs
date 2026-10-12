@@ -16,6 +16,5 @@
 # plugin eval runs
 /evals/results/
 
-# chatgpt-design sessions: mockups, screenshots, answers
-/design/chatgpt/
-/design/jams/
+# design work: mockups, screenshots, logo sources (kept local)
+/design/

@@ -1,7 +1,7 @@
 <p align="center">
 <picture>
-<source media="(prefers-color-scheme: dark)" srcset="design/logo/logo-dark.svg">
-<img src="design/logo/logo-light.svg" width="340" alt="ScoutJobs">
+<source media="(prefers-color-scheme: dark)" srcset="docs/modules/ROOT/images/logo-dark.svg">
+<img src="docs/modules/ROOT/images/logo-light.svg" width="340" alt="ScoutJobs">
 </picture>
 </p>
 
@@ -374,7 +374,7 @@ make docs      # user manual into build/site (Antora, needs Node 22 and kroki.io
 claude plugin validate .
 ```
 
-Go 1.27 or newer. The only dependency is `modernc.org/sqlite` (pure Go, no cgo). Templates are stdlib `html/template`, embedded. Design tokens, logo (`design/logo/`, the violet magnifier with the four-point spark) and the per-page mockups live in `design/`.
+Go 1.27 or newer. The only dependency is `modernc.org/sqlite` (pure Go, no cgo). Templates are stdlib `html/template`, embedded. Design tokens live in `internal/web/templates/style.css`; the logo, a violet magnifier with a four-point spark, is in `docs/modules/ROOT/images/`.
 
 ## Security and privacy
 
