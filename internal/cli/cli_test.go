@@ -308,6 +308,12 @@ func TestStatsAndExport(t *testing.T) {
 	if js := run(t, "stats", "--json"); !strings.Contains(js, `"total": 1`) {
 		t.Errorf("stats json: %s", js)
 	}
+	if f := run(t, "stats", "--funnel"); !strings.Contains(f, "by source") {
+		t.Errorf("stats --funnel:\n%s", f)
+	}
+	if js := run(t, "stats", "--funnel", "--json"); !strings.Contains(js, `"applied": 1`) {
+		t.Errorf("stats --funnel --json: %s", js)
+	}
 	var dump map[string]any
 	if err := json.Unmarshal([]byte(run(t, "export")), &dump); err != nil {
 		t.Fatal(err)

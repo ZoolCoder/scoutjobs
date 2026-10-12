@@ -9,7 +9,8 @@
 |===
 | Tool | CLI command
 
-| `brief`, `stats`, `doctor` | `scoutjobs brief --compact`, `scoutjobs stats --json`, `scoutjobs doctor --json`
+| `brief`, `stats`, `funnel`, `doctor` | `scoutjobs brief --compact`, `scoutjobs stats --json`, `scoutjobs stats --funnel --json`, `scoutjobs doctor --json`
+| `daily` | `scoutjobs daily --json`: the daily chores, nothing sent
 | `job_list`, `job_show`, `job_add`, `job_set`, `job_fit`, `job_check`, `job_review`, `job_skip` | `scoutjobs job ...`
 | `search` | `scoutjobs search --json --compact`, ranked by the profile match; `location` and `hide_mismatches` narrow it, `add: true` tracks the matches
 | `cv_files`, `cv_log`, `cv_list`, `cv_export` | `scoutjobs cv ...`

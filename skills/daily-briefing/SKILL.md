@@ -10,10 +10,13 @@ One command gives everything:
 
 ```bash
 scoutjobs email sync --json 2>/dev/null || true   # when imap_host is set: log replies first so the brief knows who answered
+scoutjobs daily --json      # due daily searches and follow-up drafts; idempotent, sends nothing
 scoutjobs brief --compact   # full payload: `scoutjobs brief` (only when a section needs notes or urls)
 ```
 
-It returns `stats`, `upcoming_interviews`, `new_jobs`, `ranked_jobs`, `drafted_jobs`, `learning`, `preferences`, `recent_activity`, and `config` as JSON.
+`daily` reports `added` (jobs the daily searches tracked) and `follow_ups` (drafts waiting on the job's Emails tab): mention both in **Do next** when not empty, as "review the follow-up to X", never as sent.
+
+`brief` returns `stats`, `upcoming_interviews`, `new_jobs`, `ranked_jobs`, `drafted_jobs`, `learning`, `preferences`, `recent_activity`, and `config` as JSON.
 
 ## Output (keep under 15 lines)
 

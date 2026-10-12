@@ -121,6 +121,7 @@ $ scoutjobs learn list | set <id> --status in_progress --hours 2
 [source,console]
 ----
 $ scoutjobs stats                         # funnel, weekly numbers, follow-ups due, stale
+$ scoutjobs stats --funnel                # what works: answers, interviews, offers by source, fit band, month applied
 $ scoutjobs brief [--compact]             # everything the daily briefing needs, as JSON
 ----
 
