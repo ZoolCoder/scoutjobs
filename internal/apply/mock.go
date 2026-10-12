@@ -128,7 +128,7 @@ func StartMock(s *store.Store, j store.Job) (Mock, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Mock{}, err
 	}
-	m := Mock{N: 1, Started: time.Now().UTC().Format(time.RFC3339)}
+	m := Mock{N: 1, Started: time.Now().Format(time.RFC3339)}
 	if list := Mocks(dir); len(list) > 0 {
 		m.N = list[0].N + 1
 	}
