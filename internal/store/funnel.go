@@ -3,6 +3,7 @@ package store
 import (
 	"sort"
 	"strings"
+	"time"
 )
 
 // FunnelRow counts, for one group of jobs that were applied to, how far they got.
@@ -12,6 +13,8 @@ type FunnelRow struct {
 	Responded int    `json:"responded"` // any answer: interview, offer or rejection
 	Interview int    `json:"interview"`
 	Offer     int    `json:"offer"`
+	Days      int    `json:"days,omitempty"` // median days from applying to the first answer, once three answers are known
+	waits     []int
 }
 
 // Rate is the share of applications that got an answer, 0-100.
@@ -39,6 +42,8 @@ const funnelMonths = 6
 func (s *Store) Funnel() (Funnel, error) {
 	rows, err := s.DB.Query(`SELECT j.source, j.fit_score, j.status,
 		COALESCE((SELECT MIN(e.at) FROM events e WHERE e.job_id=j.id AND e.kind='status' AND e.note LIKE '%-> applied'), j.updated_at),
+		COALESCE((SELECT MIN(e.at) FROM events e WHERE e.job_id=j.id AND e.kind='status'
+			AND (e.note LIKE '%-> interview' OR e.note LIKE '%-> rejected' OR e.note LIKE '%-> offer')), ''),
 		EXISTS(SELECT 1 FROM interviews i WHERE i.job_id=j.id)
 		FROM jobs j WHERE j.status IN ('applied','interview','offer','hired','rejected','no_response','withdrawn','offer_declined')`)
 	if err != nil {
@@ -47,17 +52,21 @@ func (s *Store) Funnel() (Funnel, error) {
 	defer rows.Close()
 	source, fit, month := map[string]*FunnelRow{}, map[string]*FunnelRow{}, map[string]*FunnelRow{}
 	for rows.Next() {
-		var src, status, at string
+		var src, status, at, answered string
 		var score int64
 		var interviewed bool
-		if err := rows.Scan(&src, &score, &status, &at, &interviewed); err != nil {
+		if err := rows.Scan(&src, &score, &status, &at, &answered, &interviewed); err != nil {
 			return Funnel{}, err
 		}
+		wait, waited := daysBetween(at, answered)
 		if src = strings.TrimSpace(src); src == "" {
 			src = "manual"
 		}
 		if len(at) >= 7 {
 			at = at[:7]
+		}
+		if waited {
+			group(source, src).waits = append(group(source, src).waits, wait)
 		}
 		for _, g := range []*FunnelRow{group(source, src), group(fit, fitBand(score)), group(month, at)} {
 			g.Applied++
@@ -77,6 +86,9 @@ func (s *Store) Funnel() (Funnel, error) {
 		return Funnel{}, err
 	}
 	var f Funnel
+	for _, r := range source {
+		r.Days = median(r.waits)
+	}
 	f.Source = flatten(source)
 	sort.SliceStable(f.Source, func(i, k int) bool { return f.Source[i].Applied > f.Source[k].Applied })
 	for _, b := range FitBands {
@@ -101,6 +113,46 @@ func (f Funnel) Best() *FunnelRow {
 		}
 	}
 	return best
+}
+
+// AnswerDays is how many days the source usually takes to answer; false while too few answers are known.
+func (f Funnel) AnswerDays(source string) (int, bool) {
+	if source = strings.TrimSpace(source); source == "" {
+		source = "manual"
+	}
+	for _, r := range f.Source {
+		if r.Group == source && r.Days > 0 {
+			return r.Days, true
+		}
+	}
+	return 0, false
+}
+
+// minAnswers is how many answers a source needs before its typical wait means anything.
+const minAnswers = 3
+
+func median(waits []int) int {
+	if len(waits) < minAnswers {
+		return 0
+	}
+	sort.Ints(waits)
+	return max(1, waits[len(waits)/2])
+}
+
+func daysBetween(from, to string) (int, bool) {
+	a, errA := parseAt(from)
+	b, errB := parseAt(to)
+	if errA != nil || errB != nil || b.Before(a) {
+		return 0, false
+	}
+	return int(b.Sub(a).Hours() / 24), true
+}
+
+func parseAt(s string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+	return time.Parse("2006-01-02", s[:min(len(s), 10)])
 }
 
 func group(m map[string]*FunnelRow, key string) *FunnelRow {

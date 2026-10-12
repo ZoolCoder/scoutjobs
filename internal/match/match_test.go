@@ -101,3 +101,31 @@ func TestSuggest(t *testing.T) {
 		t.Errorf("Suggest =\n%+v\nwant\n%+v", got, want)
 	}
 }
+
+func TestSourceAnswersMoveTheScore(t *testing.T) {
+	f := store.Funnel{Source: []store.FunnelRow{
+		{Group: "greenhouse", Applied: 6, Responded: 4},
+		{Group: "remotive", Applied: 10, Responded: 0},
+		{Group: "lever", Applied: 2, Responded: 2},
+		{Group: "ashby", Applied: 6, Responded: 1},
+	}}
+	rates := SourceRates(f) // overall 7 of 24, 29%
+	if _, ok := rates["lever"]; ok {
+		t.Error("two applications are too few to judge a source")
+	}
+	if _, ok := rates["ashby"]; ok {
+		t.Error("ashby at 16% is within the gap of 29% overall")
+	}
+	pr := testProfile()
+	p := posting("Senior Backend Engineer (Go)", "Europe", "remote", "Go and Postgres. Full-time.")
+	base := pr.Score(p).Score
+	pr.Answers = rates
+	p.Source = "Greenhouse"
+	if up := pr.Score(p); up.Score != min(100, base+sourceWeight) || !strings.Contains(strings.Join(up.Why, ";"), "Greenhouse answered 66% of your 6") {
+		t.Errorf("greenhouse = %+v, base %d", up, base)
+	}
+	p.Source = "remotive"
+	if down := pr.Score(p); down.Score != base-sourceWeight || len(down.Miss) == 0 {
+		t.Errorf("remotive = %+v, base %d", down, base)
+	}
+}

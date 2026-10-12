@@ -1,8 +1,10 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 )
 
 func open(t *testing.T) *Store {
@@ -260,6 +262,32 @@ func TestSearchDailyAndLastRun(t *testing.T) {
 	}
 }
 
+func TestFunnelAnswerDays(t *testing.T) {
+	s := open(t)
+	for i, wait := range []int{2, 9, 4, 30} {
+		j, _, err := s.UpsertJob(Job{Company: fmt.Sprintf("C%d", i), Title: "Engineer", Source: "lever", Status: "rejected"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		applied := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+		for _, e := range [][2]string{{"new -> applied", applied.Format(time.RFC3339)}, {"applied -> rejected", applied.AddDate(0, 0, wait).Format(time.RFC3339)}} {
+			if _, err := s.DB.Exec(`INSERT INTO events(job_id, kind, note, at) VALUES(?, 'status', ?, ?)`, j.ID, e[0], e[1]); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	f, err := s.Funnel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d, ok := f.AnswerDays("lever"); !ok || d != 9 {
+		t.Errorf("lever answers in %d days (%v), want the median 9", d, ok)
+	}
+	if _, ok := f.AnswerDays("greenhouse"); ok {
+		t.Error("a source with no answers has no typical wait")
+	}
+}
+
 func TestFunnelGroupsAppliedJobs(t *testing.T) {
 	s := open(t)
 	add := func(company, source string, fit int64, path ...string) {
@@ -281,7 +309,8 @@ func TestFunnelGroupsAppliedJobs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(f.Source) != 2 || f.Source[0] != (FunnelRow{"greenhouse", 3, 2, 1, 1}) || f.Source[1] != (FunnelRow{"manual", 1, 0, 0, 0}) {
+	counts := func(r FunnelRow) [5]any { return [5]any{r.Group, r.Applied, r.Responded, r.Interview, r.Offer} }
+	if len(f.Source) != 2 || counts(f.Source[0]) != [5]any{"greenhouse", 3, 2, 1, 1} || counts(f.Source[1]) != [5]any{"manual", 1, 0, 0, 0} {
 		t.Errorf("source = %+v", f.Source)
 	}
 	if b := f.Best(); b == nil || b.Group != "greenhouse" || b.Rate() != 66 {

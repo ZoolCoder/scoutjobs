@@ -41,7 +41,7 @@
   <div class="panel-h"><h2>What works</h2><span class="act muted">how many applications got an answer, from every job you applied to</span></div>
   {{with .Best}}<p class="callout">Your best source is <b>{{.Group}}</b>: {{.Rate}}% of {{.Applied}} applications got an answer.</p>{{else}}<p class="small muted">Apply to three or more jobs from one source to compare sources.</p>{{end}}
   <div class="worksgrid">
-    <div><h3>By source</h3>{{template "worktable" .Source}}</div>
+    <div><h3>By source</h3>{{template "worktable" .Source}}{{$w := false}}{{range .Source}}{{if .Days}}{{$w = true}}{{end}}{{end}}{{if $w}}<p class="small muted">Usual wait for an answer: {{$n := 0}}{{range .Source}}{{if .Days}}{{if $n}}, {{end}}{{$n = 1}}{{.Group}} {{.Days}} {{if eq .Days 1}}day{{else}}days{{end}}{{end}}{{end}}.</p>{{end}}</div>
     <div><h3>By fit</h3>{{template "worktable" .Fit}}</div>
     <div><h3>By month applied</h3>{{template "worktable" .Month}}</div>
   </div>
