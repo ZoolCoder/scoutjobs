@@ -39,7 +39,7 @@
   <div class="dcards">
   {{range .Cards}}{{$d := .Main}}{{$step := .Step}}<article class="dcard{{if not $d.Exists}} missing{{end}}">
     <div class="dhead">{{template "ico-doc"}}<b>{{.Label}}</b></div>
-    {{if $d.Exists}}<small class="muted">Updated {{$d.Mod}}</small>
+    {{if $d.Exists}}<small class="muted">Updated {{when $d.Mod}}</small>
     <div class="dacts"><a class="btn mini" href="/jobs/{{$j.ID}}/files/{{$d.Name}}">Preview</a><a class="btn mini" href="/jobs/{{$j.ID}}/files/{{$d.Name}}?edit=1">Edit</a></div>
     {{else}}<small class="muted">Not written yet</small>
     <div class="dacts">{{with $.Data.RunP}}{{if and .Agents (not .Active)}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/run" data-busy="Starting…"><input type="hidden" name="step" value="{{$step}}"><button class="mini go" type="submit">Write with AI</button></form>{{end}}{{end}}</div>{{end}}
@@ -140,7 +140,7 @@
 {{else if eq $tab "files"}}
 {{range .FileGroups}}{{if .Files}}<section class="panel">
   <div class="panel-h"><h2>{{.Title}}</h2><span class="n">{{len .Files}}</span></div>
-  <ul class="filelist">{{range .Files}}<li>{{template "ico-doc"}}<span><b>{{.Label}}</b><small class="muted">{{with .Note}}{{.}} · {{end}}updated {{.Mod}}</small></span>
+  <ul class="filelist">{{range .Files}}<li>{{template "ico-doc"}}<span><b>{{.Label}}</b><small class="muted">{{with .Note}}{{.}} · {{end}}updated {{when .Mod}}</small></span>
     <span class="facts-acts">{{if .Preview}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}">Preview</a>{{end}}{{if .Editable}}<a class="btn mini" href="/jobs/{{$j.ID}}/files/{{.Name}}?edit=1">Edit</a>{{end}}{{if .Download}}<a class="btn mini" href="/jobs/{{$j.ID}}/download/{{.Name}}">Download</a>{{end}}</span></li>{{end}}</ul>
 </section>{{end}}{{end}}
 {{if not .Files}}<section class="panel"><div class="panel-h"><h2>Files</h2></div><p class="empty">No files yet<small>The assistant saves the drafts here when it prepares this application. <a href="/jobs/{{$j.ID}}">Start on Overview</a>.</small></p></section>{{end}}
