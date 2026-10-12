@@ -9,7 +9,7 @@ type SavedSearch struct {
 	Queries   string `json:"queries"`
 	Boards    string `json:"boards"`
 	Remote    bool   `json:"remote"`
-	Filters   string `json:"filters"` // url-encoded result filters, e.g. remote_only=1&exclude=senior
+	Filters   string `json:"filters"`  // url-encoded result filters, e.g. remote_only=1&exclude=senior
 	Daily     bool   `json:"daily"`    // the autopilot runs it once a day and tracks the good matches
 	LastRun   string `json:"last_run"` // RFC3339 of the last autopilot run, "" when never
 	CreatedAt string `json:"created_at"`

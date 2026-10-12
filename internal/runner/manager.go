@@ -268,6 +268,19 @@ func (m *Manager) drain() {
 	}
 }
 
+// Running returns the ids of the jobs an agent is preparing now.
+func (m *Manager) Running() []int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []int64
+	for id, r := range m.latest {
+		if id != 0 && r.Snapshot().State == Running {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // Busy counts the jobs being prepared now plus those waiting in the queue, for the navigation.
 func (m *Manager) Busy() int {
 	m.mu.Lock()

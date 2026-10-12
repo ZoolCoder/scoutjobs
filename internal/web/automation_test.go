@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -130,4 +131,55 @@ func mustHandler(t *testing.T, s *store.Store, cfg Config) http.Handler {
 		t.Fatal(err)
 	}
 	return h
+}
+
+func TestPrepareSelectedJobs(t *testing.T) {
+	s := testStore(t)
+	g, _, _ := s.UpsertJob(store.Job{Company: "Globex", Title: "SRE"})
+	applied := "applied"
+	_ = s.UpdateJob(g.ID, store.JobPatch{Status: &applied})
+	if b := get(mustHandler(t, s, Config{}), "/pipeline?view=list").Body.String(); strings.Contains(b, "Prepare selected") {
+		t.Error("batch form without an assistant")
+	}
+	agent := filepath.Join(s.Home, "agent.sh")
+	_ = os.WriteFile(agent, []byte("#!/bin/sh\ncat >/dev/null\n"), 0o700)
+	m := runner.NewManager(&runner.Runner{Store: s, Exe: "scoutjobs", Custom: agent})
+	h := mustHandler(t, s, Config{Runner: m})
+	b := get(h, "/pipeline?view=list").Body.String()
+	if !strings.Contains(b, `form="batch" name="job" value="1"`) || strings.Contains(b, fmt.Sprintf(`name="job" value="%d"`, g.ID)) {
+		t.Error("only open jobs get a checkbox")
+	}
+	req := httptest.NewRequest("POST", "/pipeline/prepare", strings.NewReader("job=1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("cross-site prepare: %d", rec.Code)
+	}
+	rec = post(h, "/pipeline/prepare", url.Values{"job": {"1", fmt.Sprint(g.ID), "x"}, "back": {"/pipeline?view=list"}})
+	if loc := rec.Header().Get("Location"); rec.Code != http.StatusSeeOther || !strings.Contains(loc, "1+job+queued") || !strings.Contains(loc, "view=list") {
+		t.Fatalf("prepare: %d %s", rec.Code, loc)
+	}
+	waitIdle(t, m)
+	if m.Latest(1) == nil || m.Latest(g.ID) != nil {
+		t.Error("wrong jobs prepared")
+	}
+	if rec := get(h, "/pipeline/queue"); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"waiting":0`) {
+		t.Errorf("queue: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := post(h, "/pipeline/prepare", url.Values{}); !strings.Contains(rec.Header().Get("Location"), "Tick+at+least") {
+		t.Errorf("empty pick: %s", rec.Header().Get("Location"))
+	}
+}
+
+func waitIdle(t *testing.T, m *runner.Manager) {
+	t.Helper()
+	for i := 0; i < 200; i++ {
+		if m.Busy() == 0 && m.Latest(1) != nil {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatal("queue never drained")
 }

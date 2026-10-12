@@ -505,3 +505,25 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && host) hide(); });
   window.addEventListener('scroll', function () { if (host) hide(); }, true);
 })();
+
+// Pipeline queue strip: follow the AI assistant through the queued jobs until it is done.
+(function () {
+  var strip = document.querySelector('[data-queue]');
+  if (!strip) return;
+  var timer = setInterval(function () {
+    fetch('/pipeline/queue', { cache: 'no-store', credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (q) {
+      var running = q.running || [];
+      if (!running.length && !q.waiting) {
+        clearInterval(timer);
+        strip.textContent = 'Your assistant finished the queue. Reload to see the drafts.';
+        return;
+      }
+      var text = (running.length ? 'Preparing ' + running.join(', ') : 'Starting the next job') + (q.waiting ? ' · ' + q.waiting + ' waiting' : '') + ' · ';
+      strip.textContent = text;
+      var a = document.createElement('a');
+      a.href = '/activity';
+      a.textContent = 'Activity';
+      strip.appendChild(a);
+    }).catch(function () {});
+  }, 4000);
+})();

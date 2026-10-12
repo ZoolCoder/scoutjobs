@@ -202,15 +202,16 @@ var funcs = template.FuncMap{
 		}
 		return parts
 	},
-	"gaps":      cvGaps,
-	"statuses":  func() []string { return store.Statuses },
-	"next":      func(st string) []string { return store.NextStatuses[st] },
-	"initial":   initial,
-	"hue":       hue,
-	"today":     func() string { return time.Now().Format("2006-01-02") },
-	"add":       func(a, b int) int { return a + b },
-	"colcap":    func() int { return colCap },
-	"prepItems": func() []store.PrepItem { return store.PrepItems },
+	"gaps":       cvGaps,
+	"statuses":   func() []string { return store.Statuses },
+	"next":       func(st string) []string { return store.NextStatuses[st] },
+	"initial":    initial,
+	"hue":        hue,
+	"today":      func() string { return time.Now().Format("2006-01-02") },
+	"add":        func(a, b int) int { return a + b },
+	"colcap":     func() int { return colCap },
+	"prepItems":  func() []store.PrepItem { return store.PrepItems },
+	"preparable": preparable,
 	"prepArgs": func(i store.Interview, back string) map[string]any {
 		return map[string]any{"I": i, "Back": back}
 	},
@@ -328,6 +329,8 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /jobs/{id}/view/{name}", srv.jobView)
 	mux.HandleFunc("POST /jobs/{id}/emails/{kind}", srv.saveEmail)
 	mux.HandleFunc("POST /jobs/prepare-all", srv.prepareAll)
+	mux.HandleFunc("POST /pipeline/prepare", srv.preparePicked)
+	mux.HandleFunc("GET /pipeline/queue", srv.queueJSON)
 	mux.HandleFunc("POST /gmail/client", srv.gmailSetClient)
 	mux.HandleFunc("GET /gmail/detect", srv.gmailDetect)
 	mux.HandleFunc("POST /gmail/connect", srv.gmailConnect)
