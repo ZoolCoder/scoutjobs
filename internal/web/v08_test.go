@@ -170,3 +170,13 @@ func TestPrepPackStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestSkipLinkAndPaletteCount(t *testing.T) {
+	h := mustHandler(t, testStore(t), Config{})
+	b := get(h, "/").Body.String()
+	for _, want := range []string{`<a class="skiplink" href="#main">`, `<main id="main" tabindex="-1">`, `aria-live="polite" data-palcount`} {
+		if !strings.Contains(b, want) {
+			t.Errorf("layout lacks %s", want)
+		}
+	}
+}

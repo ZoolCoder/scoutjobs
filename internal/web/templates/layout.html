@@ -11,6 +11,7 @@
 <script src="/app.js" defer></script>
 </head>
 <body>
+<a class="skiplink" href="#main">Skip to content</a>
 <div class="shell{{if .Mini}} mini{{end}}">
 <aside class="side">
   <div class="sidetop">
@@ -50,7 +51,7 @@
   <div><h1 class="pg{{if eq .Active "overview"}} greet{{end}}">{{if eq .Active "overview"}}{{greet}}{{else}}{{title .Title}}{{end}}</h1><p class="sub">{{.Sub}}</p></div>
   <span class="now">{{.Now}}</span>
 </header>{{end}}
-<main>
+<main id="main" tabindex="-1">
 {{end}}
 
 {{define "foot"}}
@@ -58,6 +59,7 @@
 <dialog class="palette" id="palette" aria-label="Search and jump">
   <input type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" aria-label="Search jobs, pages and actions" placeholder="Search jobs, pages and actions" autocomplete="off" spellcheck="false">
   <ul id="palette-list" role="listbox" aria-label="Results"></ul>
+  <p class="sr-only" aria-live="polite" data-palcount></p>
   <p class="palfoot muted"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close · <kbd>?</kbd> all shortcuts</p>
 </dialog>
 <dialog class="palette keys" id="keys" aria-labelledby="keys-h">

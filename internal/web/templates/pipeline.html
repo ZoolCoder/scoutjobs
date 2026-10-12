@@ -29,7 +29,7 @@
 {{if eq $f.View "list"}}
 {{if .Batch}}<form id="batch" class="batchbar" method="post" action="/pipeline/prepare" data-busy="Queuing…"><input type="hidden" name="back" value="{{$.Path}}"><button class="mini go" type="submit">Prepare selected with AI</button><small class="muted">Tick new or ranked jobs. Your AI assistant tailors the CV and writes the cover letter for each, one at a time. Nothing is sent.</small></form>{{end}}
 <div class="panel tight listview"><table class="issues">
-  <thead><tr>{{if .Batch}}<th><span class="sr-only">Select</span></th>{{end}}<th>Key</th><th>Job</th><th>Where</th><th>Status</th><th>Fit</th><th>Due</th><th>Updated</th><th></th></tr></thead>
+  <thead><tr>{{if .Batch}}<th><span class="sr-only">Select</span></th>{{end}}<th>Key</th><th>Job</th><th>Where</th><th>Status</th><th>Fit</th><th>Due</th><th>Updated</th><th><span class="sr-only">Actions</span></th></tr></thead>
   <tbody>{{range .Jobs}}<tr class="{{if eq .ID $sel}}sel{{end}}">
     {{if $.Data.Batch}}<td class="pick">{{if preparable .}}<input type="checkbox" form="batch" name="job" value="{{.ID}}" aria-label="Prepare {{.Company}}">{{end}}</td>{{end}}
     <td class="mono key"><a href="{{$f.JobURL .ID}}" data-issue>SJ-{{.ID}}</a></td>

@@ -537,6 +537,7 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
   if (!dlg || !dlg.showModal) return;
   var input = dlg.querySelector('input');
   var list = dlg.querySelector('ul');
+  var count = dlg.querySelector('[data-palcount]');
   var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   document.querySelectorAll('[data-palkey]').forEach(function (k) { k.textContent = mac ? '⌘K' : 'Ctrl K'; });
 
@@ -613,6 +614,7 @@ document.querySelectorAll('[data-expand]').forEach(function (btn) {
       none.textContent = 'Nothing matches';
       list.appendChild(none);
     }
+    count.textContent = shown.length === 1 ? '1 result' : shown.length + ' results';
     mark();
   }
 
