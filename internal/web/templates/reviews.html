@@ -40,10 +40,15 @@
 {{with .Works}}{{if .Source}}<section class="panel" id="what-works">
   <div class="panel-h"><h2>What works</h2><span class="act muted">how many applications got an answer, from every job you applied to</span></div>
   {{with .Best}}<p class="callout">Your best source is <b>{{.Group}}</b>: {{.Rate}}% of {{.Applied}} applications got an answer.</p>{{else}}<p class="small muted">Apply to three or more jobs from one source to compare sources.</p>{{end}}
+  {{with $.Data.Outlook}}<div class="outlook" id="forecast"><h3>Next 30 days</h3>
+  {{if .Enough}}<p>{{.Waiting}} {{if eq .Waiting 1}}application is{{else}}applications are{{end}} still waiting for an answer. From your record they should bring about <b>{{.Expected}} {{if eq .Expected 1.0}}interview{{else}}interviews{{end}}</b> <small class="muted">(likely {{.Low}}–{{.High}})</small>{{if .Scheduled}}, on top of the {{.Scheduled}} already booked{{end}}.</p>
+  {{if .ToApply}}<p class="small muted">So far {{.Rate}} in 100 applications led to an interview: about {{.ToApply}} more applications bring one more interview.</p>{{end}}
+  {{else}}<p class="small muted">Not enough data yet: the forecast starts after {{minforecast}} applications ({{.Basis}} so far).</p>{{end}}</div>{{end}}
   <div class="worksgrid">
     <div><h3>By source</h3>{{template "worktable" .Source}}{{$w := false}}{{range .Source}}{{if .Days}}{{$w = true}}{{end}}{{end}}{{if $w}}<p class="small muted">Usual wait for an answer: {{$n := 0}}{{range .Source}}{{if .Days}}{{if $n}}, {{end}}{{$n = 1}}{{.Group}} {{.Days}} {{if eq .Days 1}}day{{else}}days{{end}}{{end}}{{end}}.</p>{{end}}</div>
     <div><h3>By fit</h3>{{template "worktable" .Fit}}</div>
     <div><h3>By month applied</h3>{{template "worktable" .Month}}</div>
+    {{with .Quality}}<div><h3>By quality checks</h3>{{template "worktable" .}}<p class="small muted">Recorded when you mark a drafted job applied.</p></div>{{end}}
   </div>
 </section>{{end}}{{end}}
 {{end}}

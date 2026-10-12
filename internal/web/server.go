@@ -129,7 +129,7 @@ var funcs = template.FuncMap{
 	},
 	"kindcls":   func(s string) string { k, _, _ := strings.Cut(s, ":"); return k },
 	"evrow":     activityRowOf,
-	"gatelabel": gateLabel, "steplabel": stepLabel, "plain": plainDetail, "filelabel": fileLabel,
+	"gatelabel": gateLabel, "minforecast": func() int { return store.ForecastMin }, "steplabel": stepLabel, "plain": plainDetail, "filelabel": fileLabel,
 	"mailto": func(m any) string {
 		switch m := m.(type) {
 		case *mail.Message:
@@ -411,6 +411,7 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	api.HandleFunc("POST /api/jobs/{id}/note", srv.apiNote)
 	api.HandleFunc("GET /api/stats", srv.apiStats)
 	api.HandleFunc("GET /api/funnel", srv.apiFunnel)
+	api.HandleFunc("GET /api/forecast", srv.apiForecast)
 	api.HandleFunc("GET /api/brief", srv.apiBrief)
 	api.HandleFunc("GET /api/events", srv.apiEvents)
 	api.HandleFunc("GET /api/jobs/{id}/check", srv.apiCheck)
@@ -722,7 +723,8 @@ func (v *server) job(w http.ResponseWriter, r *http.Request) {
 		"Gates": gates, "Portal": v.portal(j, gates, events), "Review": review, "HasReview": reviewErr == nil, "Contacts": contacts, "ContactCount": v.s.ContactCount(),
 		"Checklist": jobChecklist(j, kit, gates, events, dir), "Keywords": apply.KeywordGaps(dir, v.cvGaps(j.ID)), "StoryMap": v.storyMap(dir), "RunP": v.runPanel(j), "RunErr": r.URL.Query().Get("runerr"),
 		"Cards": docCards(docs(dir, "resume.md", "cover-letter.md", "resume.pdf", "resume.docx", "cover-letter.docx", "cover-letter.pdf")), "Points": fitPoints(review, 6), "CoverBuild": apply.ProvenanceOf(dir), "Emails": apply.Proposals(v.s, j, v.cfg.FollowUpDays, time.Now()),
-		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(),
+		"CanGmail": v.canDraft(), "DraftLabel": v.draftLabel(), "Score": gates.Score(), "Chance": v.chance(j),
+		"CanOverride": preApply[j.Status] && gates.Failed > 0 && apply.HasDrafts(v.s, j), "OpenOverride": r.URL.Query().Get("override") != "",
 		"Msg": r.URL.Query().Get("msg"), "Err": r.URL.Query().Get("err"), "Drafted": gmailLink(r.URL.Query().Get("drafted"))})
 }
 
@@ -851,7 +853,8 @@ func (v *server) reviews(w http.ResponseWriter, r *http.Request) {
 		up = up[:3]
 	}
 	works, _ := v.s.Funnel()
-	v.render(w, r, "reviews.html", "reviews", map[string]any{"Works": works, "Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
+	outlook, _ := v.s.Outlook(works, time.Now().UTC())
+	v.render(w, r, "reviews.html", "reviews", map[string]any{"Works": works, "Outlook": outlook, "Reviews": list, "Current": current, "Label": label, "HTML": mdHTML(body),
 		"Older": older, "Newer": newer, "Upcoming": up,
 		"Funnel": funnelOf(st), "Stats": st, "Target": v.cfg.WeeklyApplyTarget, "ThisWeek": v.s.WeeklyCounts("status", "%applied%", 1)})
 }
@@ -862,7 +865,12 @@ func (v *server) setStatus(w http.ResponseWriter, r *http.Request) {
 		fail(w, err)
 		return
 	}
-	if err := v.changeStatus(id, r.FormValue("status"), r.FormValue("reason")); err != nil {
+	if err := v.changeStatus(id, r.FormValue("status"), r.FormValue("reason"), r.FormValue("override")); err != nil {
+		var cf checksFailed
+		if errors.As(err, &cf) {
+			http.Redirect(w, r, gatesURL(id, err), http.StatusSeeOther)
+			return
+		}
 		fail(w, err)
 		return
 	}
@@ -870,13 +878,24 @@ func (v *server) setStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // changeStatus is shared by the form and the API; terminal choices are logged as decisions so learn-preferences sees them.
-func (v *server) changeStatus(id int64, st, reason string) error {
+// Marking a drafted job applied runs the sending checks first; override is the reason to apply
+// despite a failing one.
+func (v *server) changeStatus(id int64, st, reason, override string) error {
 	if !store.ValidStatus(st) {
 		return fmt.Errorf("bad status %q", st)
+	}
+	j, err := v.s.JobByID(id)
+	if err != nil {
+		return err
+	}
+	note, err := v.qualityNote(j, st, override)
+	if err != nil {
+		return err
 	}
 	if err := v.s.UpdateJob(id, store.JobPatch{Status: &st}); err != nil {
 		return err
 	}
+	v.logQuality(id, note)
 	if kind, ok := map[string]string{"skipped": "skip", "withdrawn": "withdraw", "offer_declined": "decline_offer"}[st]; ok {
 		_ = v.s.AddDecision(id, kind, reason, "{}")
 	}
@@ -1302,16 +1321,21 @@ func (v *server) apiSetStatus(w http.ResponseWriter, r *http.Request) {
 		apiErr(w, 400, err)
 		return
 	}
-	var in struct{ Status, Reason string }
+	var in struct{ Status, Reason, Override string }
 	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&in); err != nil {
 			apiErr(w, 400, err)
 			return
 		}
 	} else {
-		in.Status, in.Reason = r.FormValue("status"), r.FormValue("reason")
+		in.Status, in.Reason, in.Override = r.FormValue("status"), r.FormValue("reason"), r.FormValue("override")
 	}
-	if err := v.changeStatus(id, in.Status, in.Reason); err != nil {
+	if err := v.changeStatus(id, in.Status, in.Reason, in.Override); err != nil {
+		var cf checksFailed
+		if errors.As(err, &cf) {
+			apiErr(w, http.StatusConflict, err)
+			return
+		}
 		apiErr(w, 400, err)
 		return
 	}

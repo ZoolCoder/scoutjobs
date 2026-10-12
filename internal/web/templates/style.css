@@ -1301,3 +1301,13 @@ dialog.keys dd{margin:0}
 .skiplink{position:absolute;left:12px;top:-48px;z-index:100;padding:8px 14px;border-radius:8px;background:var(--acc);color:#fff;font-weight:600}
 .skiplink:focus{top:12px}
 main:focus{outline:none}
+
+/* quality score and forecast */
+.panel-h .score{font-weight:700;font-size:1.05rem;font-variant-numeric:tabular-nums;color:var(--ok)}
+.panel-h .score small{font-weight:400;color:var(--muted);font-size:.75rem}
+.panel-h .score.warn{color:var(--warn)}
+.panel-h .score.fail{color:var(--bad)}
+.odds{margin:.25rem 0}
+.odds b{font-variant-numeric:tabular-nums}
+.outlook{margin:0 0 1rem}
+.outlook p{margin:.25rem 0}

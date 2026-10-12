@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -83,8 +84,12 @@ func (v *server) markApplied(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	st := "applied"
-	if err := v.s.UpdateJob(j.ID, store.JobPatch{Status: &st}); err != nil {
+	if err := v.changeStatus(j.ID, "applied", "", r.FormValue("override")); err != nil {
+		var cf checksFailed
+		if errors.As(err, &cf) {
+			http.Redirect(w, r, gatesURL(j.ID, err), http.StatusSeeOther)
+			return
+		}
 		fail(w, err)
 		return
 	}

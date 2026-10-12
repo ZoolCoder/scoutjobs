@@ -30,6 +30,24 @@ type Funnel struct {
 	Source []FunnelRow `json:"source"`
 	Fit    []FunnelRow `json:"fit"`
 	Month  []FunnelRow `json:"month"`
+	// Quality groups by what the quality checks said when the job was marked applied.
+	Quality []FunnelRow `json:"quality"`
+}
+
+// QualityGroups are the quality groups, in display order.
+var QualityGroups = []string{"Checks passed", "Sent with open checks", "Applied without drafts", "Not recorded"}
+
+// qualityGroup reads the note of the quality event logged when a job was marked applied.
+func qualityGroup(note string) string {
+	switch {
+	case strings.HasPrefix(note, "pass"):
+		return QualityGroups[0]
+	case strings.HasPrefix(note, "override"):
+		return QualityGroups[1]
+	case strings.HasPrefix(note, "no drafts"):
+		return QualityGroups[2]
+	}
+	return QualityGroups[3]
 }
 
 // FitBands are the fit groups, in display order.
@@ -44,18 +62,19 @@ func (s *Store) Funnel() (Funnel, error) {
 		COALESCE((SELECT MIN(e.at) FROM events e WHERE e.job_id=j.id AND e.kind='status' AND e.note LIKE '%-> applied'), j.updated_at),
 		COALESCE((SELECT MIN(e.at) FROM events e WHERE e.job_id=j.id AND e.kind='status'
 			AND (e.note LIKE '%-> interview' OR e.note LIKE '%-> rejected' OR e.note LIKE '%-> offer')), ''),
-		EXISTS(SELECT 1 FROM interviews i WHERE i.job_id=j.id)
+		EXISTS(SELECT 1 FROM interviews i WHERE i.job_id=j.id),
+		COALESCE((SELECT e.note FROM events e WHERE e.job_id=j.id AND e.kind='quality' ORDER BY e.at DESC, e.id DESC LIMIT 1), '')
 		FROM jobs j WHERE j.status IN ('applied','interview','offer','hired','rejected','no_response','withdrawn','offer_declined')`)
 	if err != nil {
 		return Funnel{}, err
 	}
 	defer rows.Close()
-	source, fit, month := map[string]*FunnelRow{}, map[string]*FunnelRow{}, map[string]*FunnelRow{}
+	source, fit, month, quality := map[string]*FunnelRow{}, map[string]*FunnelRow{}, map[string]*FunnelRow{}, map[string]*FunnelRow{}
 	for rows.Next() {
-		var src, status, at, answered string
+		var src, status, at, answered, checked string
 		var score int64
 		var interviewed bool
-		if err := rows.Scan(&src, &score, &status, &at, &answered, &interviewed); err != nil {
+		if err := rows.Scan(&src, &score, &status, &at, &answered, &interviewed, &checked); err != nil {
 			return Funnel{}, err
 		}
 		wait, waited := daysBetween(at, answered)
@@ -68,7 +87,7 @@ func (s *Store) Funnel() (Funnel, error) {
 		if waited {
 			group(source, src).waits = append(group(source, src).waits, wait)
 		}
-		for _, g := range []*FunnelRow{group(source, src), group(fit, fitBand(score)), group(month, at)} {
+		for _, g := range []*FunnelRow{group(source, src), group(fit, fitBand(score)), group(month, at), group(quality, qualityGroup(checked))} {
 			g.Applied++
 			switch status {
 			case "interview", "offer", "hired", "rejected", "offer_declined":
@@ -94,6 +113,11 @@ func (s *Store) Funnel() (Funnel, error) {
 	for _, b := range FitBands {
 		if r := fit[b]; r != nil {
 			f.Fit = append(f.Fit, *r)
+		}
+	}
+	for _, g := range QualityGroups {
+		if r := quality[g]; r != nil {
+			f.Quality = append(f.Quality, *r)
 		}
 	}
 	f.Month = flatten(month)

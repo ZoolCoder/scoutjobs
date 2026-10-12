@@ -65,9 +65,15 @@
 </section>{{end}}
 <div class="grid-2 jobpair">
 <section class="panel" id="gates">
-  <div class="panel-h"><h2>Ready to send?</h2>{{if .Gates.OK}}<span class="badge done">All good</span>{{else}}<span class="n">{{.Gates.Failed}} to fix</span>{{end}}</div>
+  <div class="panel-h"><h2>Ready to send?</h2>{{if .Score}}<span class="score {{if .Gates.OK}}{{if .Gates.Warned}}warn{{else}}done{{end}}{{else}}fail{{end}}" title="Passed checks count fully, warnings half">{{.Score}}<small>/100</small></span>{{end}}{{if .Gates.OK}}<span class="badge done">All good</span>{{else}}<span class="n">{{.Gates.Failed}} to fix</span>{{end}}</div>
   <ul class="ready">{{range .Gates.Gates}}<li class="{{.State}}"><span class="tick" aria-hidden="true"></span><div><b>{{gatelabel .Name}}</b>{{if ne .State "pass"}}{{if or .Items (gt (len .Detail) 140)}}<details class="gdet"><summary>{{plain .Detail}}</summary>{{if .Items}}<ul>{{range .Items}}<li>{{.}}</li>{{end}}</ul>{{else}}<p>{{plain .Detail}}</p>{{end}}</details>{{else}}<small>{{plain .Detail}}</small>{{end}}{{end}}</div></li>{{end}}</ul>
   {{if not .Gates.OK}}<p class="small muted">Sending is blocked until every check passes. Fix the drafts or let the assistant redo them.</p>
+  {{if .CanOverride}}<details class="gdet" id="override"{{if .OpenOverride}} open{{end}}><summary>I applied anyway</summary><form method="post" action="/jobs/{{$j.ID}}/status" class="ackform">
+    <input type="hidden" name="status" value="applied"><input type="hidden" name="back" value="/jobs/{{$j.ID}}">
+    <label>Why you sent it with open checks <input type="text" name="override" maxlength="300" required placeholder="e.g. the figure is from a project not in my CV yet"></label>
+    <div class="runbar"><button class="go" type="submit">Mark applied with open checks</button></div>
+    <small class="muted">Saved on the job. Reviews compares how these applications do against the ones that passed.</small>
+  </form></details>{{end}}
   {{else if .Draft}}<div class="runbar">{{if .CanGmail}}<form class="inline" method="post" action="/jobs/{{$j.ID}}/gmail-draft"><input type="hidden" name="back" value="/jobs/{{$j.ID}}"><button class="primary">{{template "ico-send"}}{{.DraftLabel}}</button></form>{{end}}<a class="btn" href="{{mailto .Draft}}">Open in mail app</a></div>
   <p class="small muted">Nothing is sent without you.</p>{{end}}
   {{with .Portal}}<div class="dlg-sec" id="portal"><p class="lbl">Applying on the company site{{if .Acked}} · gaps accepted {{date .Acked}}{{end}}</p>
@@ -98,6 +104,10 @@
   {{if $j.FitNotes}}<p class="pre">{{$j.FitNotes}}</p>{{end}}
   {{if $j.Notes}}<h3>Notes</h3><p class="pre">{{$j.Notes}}</p>{{end}}
   </details>{{end}}
+  {{with .Chance}}<div class="dlg-sec" id="forecast"><p class="lbl">What to expect</p>
+  {{if .Enough}}<p class="odds"><b>{{.Answer}}%</b> chance of an answer <small class="muted">({{.Low}}–{{.High}}%)</small> · <b>{{.Interview}}%</b> of an interview{{with .Days}} · answers usually come in {{.}} {{if eq . 1}}day{{else}}days{{end}}{{end}}</p>
+  <small class="muted">From your {{.Basis}} applications, by where the job came from and how well it fits.</small>
+  {{else}}<p class="small muted">Not enough data yet: forecasts start after {{minforecast}} applications ({{.Basis}} so far).</p>{{end}}</div>{{end}}
 </section>
 </div>
 {{else if eq $tab "mail"}}

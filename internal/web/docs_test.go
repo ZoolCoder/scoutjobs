@@ -268,11 +268,21 @@ func TestProceedWithGapsFlow(t *testing.T) {
 	if !strings.Contains(page, "Sending is blocked") {
 		t.Error("e-mail sending stays blocked")
 	}
-	if code := post("/jobs/1/applied", "note=ref+42"); code != 303 {
+	post("/jobs/1/applied", "note=ref+42")
+	if got, _ := s.JobByID(1); got.Status == "applied" {
+		t.Fatal("marked applied while a sending check fails")
+	}
+	if !strings.Contains(get(), "Mark applied with open checks") {
+		t.Error("no override form")
+	}
+	if code := post("/jobs/1/applied", "note=ref+42&override=sent+from+the+portal"); code != 303 {
 		t.Fatalf("applied %d", code)
 	}
 	if got, _ := s.JobByID(1); got.Status != "applied" {
 		t.Errorf("status %s", got.Status)
+	}
+	if ev, _ := s.Events(1, 30); !hasKind(ev, "check:override") || !hasKind(ev, "quality") {
+		t.Error("override not logged")
 	}
 }
 
