@@ -144,7 +144,7 @@ func (a IMAP) connect() (*imapConn, error) {
 	}
 	var conn net.Conn
 	if port == "993" {
-		conn, err = tls.Dial("tcp", a.Host, &tls.Config{ServerName: host})
+		conn, err = tls.Dial("tcp", a.Host, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 	} else {
 		conn, err = net.DialTimeout("tcp", a.Host, 20*time.Second)
 	}
@@ -164,7 +164,7 @@ func (a IMAP) connect() (*imapConn, error) {
 			}
 			return c, nil
 		}
-		tc := tls.Client(conn, &tls.Config{ServerName: host})
+		tc := tls.Client(conn, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 		c.conn, c.r = tc, bufio.NewReader(tc)
 	}
 	return c, nil
