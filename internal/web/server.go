@@ -573,7 +573,7 @@ func (v *server) theme(w http.ResponseWriter, r *http.Request) {
 	if t != "dark" && t != "light" && t != "auto" {
 		t = "light"
 	}
-	http.SetCookie(w, &http.Cookie{Name: "theme", Value: t, Path: "/", MaxAge: 365 * 24 * 3600, SameSite: http.SameSiteLaxMode})
+	http.SetCookie(w, &http.Cookie{Name: "theme", Value: t, Path: "/", MaxAge: 365 * 24 * 3600, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 	http.Redirect(w, r, back(r, "/"), http.StatusSeeOther)
 }
 
