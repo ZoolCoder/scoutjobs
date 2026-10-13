@@ -22,10 +22,7 @@
 {{if .Log}}<details class="runlog"{{if eq .State "running"}} open{{end}}><summary>Log</summary><pre>{{range .Log}}{{.}}
 {{end}}</pre></details>{{end}}
 </section>{{end}}{{end}}{{end}}
-{{with .Google}}{{if and .Offered .Connected}}{{if .Problem}}<div class="callout bad">{{.Problem}}. <form class="inline" method="post" action="/gmail/connect"><button class="mini primary">Connect Google again</button></form></div>{{end}}
-{{with .Missing}}<div class="callout bad">Google was not allowed {{join . ", "}}. <form class="inline" method="post" action="/gmail/connect"><button class="mini primary">Connect Google again</button></form> and tick every box.</div>{{end}}
-{{if .Testing}}<p class="callout">Your Google Cloud app is in Testing mode, so Google disconnects ScoutJobs on {{.Ends.Format "Jan 2"}}. <a href="https://console.cloud.google.com/auth/audience" rel="noopener noreferrer" target="_blank">Publish it</a> (Audience &rsaquo; Publish app), then connect Google again.</p>{{end}}
-{{end}}{{end}}
+{{with .Google}}{{if and .Offered .Connected}}{{template "google-alerts" .}}{{end}}{{end}}
 {{if .Choose}}<section class="panel connect" id="connect">
 <div class="connect-h"><h2>Connect your email &amp; calendar</h2>
 <p class="muted">ScoutJobs reads replies to your applications, files drafts and adds interviews to your calendar. It never sends, deletes or changes anything else.</p></div>
@@ -57,29 +54,7 @@
   <div class="alt"><b>Another AI app</b><p class="muted">Claude Desktop, ChatGPT, Cursor or any MCP app with a mail connector.</p><a class="btn" href="#mcp" data-open="mcp">See instructions</a></div>
 </div>
 {{with .Google}}{{if and .Offered (not .Connected)}}<details class="option" id="google"{{if .Client}} open{{end}}><summary><b>Your own Google client</b> (advanced): replies are matched on this machine, no AI reads your mail, and it syncs in the background</summary>
-{{if .Client}}<p>Your Google client is saved. Press Connect Google, pick your account, and <b>tick every box</b> Google offers; Google sends you back here.</p>
-<form method="post" action="/gmail/connect"><button class="primary">Connect Google</button></form>
-<p class="muted small">Google says it has not verified the app: it is your own, so choose Advanced &rsaquo; Go to ScoutJobs.</p>
-{{else}}<p>Once, about 3 minutes, in your own Google Cloud project, so your mail goes to no one else. Each link opens the right page.</p>
-<ol class="setup">
-  <li><a href="https://console.cloud.google.com/projectcreate" rel="noopener noreferrer" target="_blank">Create a project</a>, any name, and keep it selected.</li>
-  <li><a href="https://console.cloud.google.com/flows/enableapi?apiid=gmail.googleapis.com,calendar-json.googleapis.com" rel="noopener noreferrer" target="_blank">Enable the Gmail and Calendar APIs</a>: one page, press Enable.</li>
-  <li><a href="https://console.cloud.google.com/auth/overview/create" rel="noopener noreferrer" target="_blank">Set up the consent screen</a>: app name ScoutJobs, your e-mail, audience <b>External</b>.</li>
-  <li><a href="https://console.cloud.google.com/auth/audience" rel="noopener noreferrer" target="_blank">Publish the app</a> (Audience &rsaquo; Publish app). <b>Do not skip it</b>: while it is in Testing, Google disconnects you every 7 days.</li>
-  <li><a href="https://console.cloud.google.com/auth/clients/create" rel="noopener noreferrer" target="_blank">Create an OAuth client</a> of type <b>Desktop app</b>, then press <b>Download JSON</b>.</li>
-</ol>
-{{if .Blind}}<p class="callout">ScoutJobs cannot look in your Downloads folder: macOS keeps it private from the terminal that started the dashboard. Add the downloaded file below.</p>
-{{else}}<div class="detect" data-gmail-detect>{{if .Download}}<form method="post" action="/gmail/client"><input type="hidden" name="detected" value="1">
-  <p>Found <code>{{.Download}}</code> in Downloads.</p><button class="primary">Import it</button></form>
-{{else}}<p class="muted"><span class="spin" aria-hidden="true"></span>Watching Downloads for the client JSON Google gives you; this page offers to import it when it lands.</p>{{end}}</div>{{end}}
-<details class="manual"{{if .Blind}} open{{end}}><summary>Downloaded somewhere else? Add the file by hand</summary>
-<form class="gmail-client" method="post" action="/gmail/client" enctype="multipart/form-data">
-  <label>Client file <input type="file" name="file" accept=".json,application/json"></label>
-  <label>or paste it <textarea name="client" rows="3" placeholder='{"installed":{"client_id":"….apps.googleusercontent.com", …}}'></textarea></label>
-  <button class="primary">Save client</button>
-</form></details>
-<p class="muted small">Saved to <code>{{.Home}}/gmail-client.json</code> (0600). In a terminal, <code>scoutjobs gmail setup</code> does the same.</p>
-{{end}}</details>{{end}}{{end}}
+{{template "google-setup" .}}</details>{{end}}{{end}}
 <details class="option" id="imap"><summary><b>IMAP</b>: iCloud Mail, Fastmail, Yahoo and other mailboxes, with an app password</summary>
 <p>Add <code>imap_host: imap.mail.me.com:993</code> (iCloud) and <code>imap_user: you@icloud.com</code> to <code>config.yaml</code>, set <code>SCOUTJOBS_IMAP_PASSWORD</code> to an app-specific password (Apple: account.apple.com &rsaquo; Sign-In and Security), and restart <code>scoutjobs serve</code>. It reads only: no drafts, no calendar.</p></details>
 <details class="option" id="mcp"><summary><b>Another AI app</b>: Claude Desktop, ChatGPT, Cursor or any MCP client with a mail connector</summary>

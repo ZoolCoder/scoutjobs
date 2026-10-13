@@ -173,7 +173,13 @@ func mailChecks(cfg Config) []check {
 
 func gmailCheck(home string, cfg Config) check {
 	c := gmail.Client{Home: home}
+	st := c.Status()
 	switch {
+	case st.Problem != "":
+		return check{"fail", "gmail", st.Problem, "scoutjobs google reconnect"}
+	case st.Testing:
+		return check{"warn", "gmail", "connected as " + orDash(c.Account()) + ", app in Testing mode: Google disconnects it on " + st.Ends.Format("Jan 2"),
+			"publish the app (scoutjobs google status lists the steps), then scoutjobs google reconnect"}
 	case c.Connected() && !c.HasCalendar():
 		return check{"warn", "gmail", "connected as " + orDash(c.Account()) + ", Calendar not allowed", "scoutjobs gmail connect, and allow Calendar (read-only)"}
 	case c.Connected():

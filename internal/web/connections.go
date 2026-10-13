@@ -67,6 +67,7 @@ type connectionsView struct {
 	Tab            string // remote | careers
 	Remote, Career []source
 	SearchRemote   bool
+	Google         googleView
 	Msg, Err       string
 }
 
@@ -80,6 +81,8 @@ func (v *server) connections(w http.ResponseWriter, r *http.Request) {
 	c.AIOn = slices.ContainsFunc(c.AI, func(o option) bool { return o.On })
 	c.Mail, c.MailOff = v.mailOptions()
 	c.MailOn = slices.ContainsFunc(c.Mail, func(o option) bool { return o.On })
+	c.Google = v.googleView()
+	c.Google.For = "connections"
 	c.FeedURL, c.FeedNote = v.feedURL(r)
 	c.Cal, c.CalOn = v.calendarOptions()
 	switch c.CalOn {
@@ -298,7 +301,7 @@ func (v *server) setMailVia(w http.ResponseWriter, r *http.Request) {
 	via := r.FormValue("via")
 	switch {
 	case via == "gmail" && !v.googleView().Connected:
-		http.Redirect(w, r, "/inbox?connect=1#google", http.StatusSeeOther)
+		http.Redirect(w, r, "/connections#google", http.StatusSeeOther)
 		return
 	case via == "imap" && src != "imap" && !v.cfg.IMAP:
 		http.Redirect(w, r, "/inbox?connect=1#imap", http.StatusSeeOther)
@@ -454,6 +457,8 @@ func (v *server) test(ctx context.Context, card string) (bool, string) {
 			return false, "Could not read " + account + ": " + err.Error()
 		}
 		return true, "Connected: ScoutJobs can read " + account + "."
+	case "google":
+		return v.verifyGoogle(ctx)
 	case "calendar":
 		_, on := v.calendarOptions()
 		switch on {

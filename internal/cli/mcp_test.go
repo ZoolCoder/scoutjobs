@@ -115,6 +115,9 @@ func TestMCPDeniesGoogleToTheRunner(t *testing.T) {
 	if !mcpDenied([]string{"job", "run", "3"}) {
 		t.Error("an agent may start a nested run")
 	}
+	if !mcpDenied([]string{"google", "reconnect"}) || mcpDenied([]string{"google", "verify"}) {
+		t.Error("an agent may replace the Google connection, or cannot verify it")
+	}
 	t.Setenv("SCOUTJOBS_RUNNER", "1")
 	if !mcpDenied([]string{"gmail", "draft", "3"}) {
 		t.Error("a job run reaches Gmail")

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -152,9 +153,9 @@ func mcpDenied(args []string) bool {
 	case "daily":
 		// it starts agent runs, which must not nest
 		return os.Getenv("SCOUTJOBS_RUNNER") != ""
-	case "gmail":
+	case "gmail", "google":
 		// an unattended job run gets no Google access at all
-		return os.Getenv("SCOUTJOBS_RUNNER") != "" || len(args) > 1 && (args[1] == "connect" || args[1] == "disconnect")
+		return os.Getenv("SCOUTJOBS_RUNNER") != "" || len(args) > 1 && slices.Contains([]string{"setup", "connect", "reconnect", "disconnect"}, args[1])
 	case "calendar":
 		return os.Getenv("SCOUTJOBS_RUNNER") != "" && (len(args) < 2 || args[1] != "save")
 	case "job":

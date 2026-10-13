@@ -29,6 +29,20 @@
   <p class="testout" data-test-out role="status" hidden></p>
 </section>
 
+{{with .Google}}{{if .Offered}}<section class="panel conncard" id="google">
+  <div class="connhead"><span class="connico">{{template "ico-mail"}}</span>
+    <div><h2>Your own Google client</h2><p>Gmail and Google Calendar through an OAuth client in your own Google Cloud project: no AI reads your mail, and it syncs in the background.</p></div>
+    {{template "connbadge" .Connected}}</div>
+  {{if .Connected}}<p class="small">Connected as <b>{{.Account}}</b>{{with .IDFrom}}, client from <code>{{.}}</code>{{end}}.{{if not .Testing}} Google set no end date on this connection.{{end}}</p>
+  {{template "google-alerts" .}}
+  <form id="f-google-re" method="post" action="/gmail/connect">{{template "google-for" .}}</form>
+  <form id="f-google-off" method="post" action="/gmail/disconnect"><input type="hidden" name="back" value="/connections#google"></form>
+  <div class="cfoot"><button class="primary" type="button" data-test="google">Verify</button><button form="f-google-re" type="submit">Reconnect Google</button>
+    <button class="danger push" form="f-google-off" type="submit">Disconnect</button></div>
+  <p class="testout" data-test-out role="status" hidden></p>
+  {{else}}<div class="gsetup">{{template "google-setup" .}}</div>{{end}}
+</section>{{end}}{{end}}
+
 <section class="panel conncard" id="calendar">
   <div class="connhead"><span class="connico">{{template "ico-calendar"}}</span>
     <div><h2>Calendar</h2><p>Sync your interviews with your calendar, both ways.</p></div>
