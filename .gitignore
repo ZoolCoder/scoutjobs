@@ -3,7 +3,9 @@
 *.db
 *.db-*
 .DS_Store
-# personal data never belongs in this repo
+# personal data and secrets never belong in this repo
+.env*
+.dev.vars*
 /data/
 /profile*.md
 /preferences*.md
@@ -18,3 +20,8 @@
 
 # design work: mockups, screenshots, logo sources (kept local)
 /design/
+.webscan/
+
+# Ruby gems for the PDF build. Not vendor/: Go would treat it as a vendor
+# directory.
+/.bundle/
