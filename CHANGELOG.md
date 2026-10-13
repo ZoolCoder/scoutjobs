@@ -7,6 +7,35 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-13
+
+### Added
+- `scoutjobs google setup | check | reconnect | verify` (`gmail` still works).
+  `google check` names where the client ID and secret come from, which source
+  wins and what is missing, without printing the secret.
+- After each connect, and with `google verify` or *Verify*, ScoutJobs checks
+  the account, Gmail and Calendar and reports each one apart.
+- *Your own Google client* card on Connections: setup steps, *Verify*,
+  *Reconnect Google* and *Disconnect*.
+- While the Google app is in Testing, the CLI, Inbox and Connections list the
+  Branding and Audience steps to publish it, and say that publishing ends the
+  7-day expiry but not the unverified-app warning.
+- Manual: *Your own Google client* page, a PDF of the whole manual, a
+  Markdown copy of each page and `llms.txt`.
+
+### Changed
+- Google failures are sorted by kind (client, API disabled, missing
+  permission, Testing expiry, revoked, denied, rate limit, Google error), each
+  with its fix; retryable ones say so.
+- *Reconnect Google* needs no Disconnect first; the saved connection is
+  replaced only when the new sign-in succeeds.
+- The manual uses the ZoolCoder docs UI (zc-supplemental-ui v0.2.1).
+
+### Security
+- IMAP and SMTP require TLS 1.2 or later.
+- The dashboard's theme cookie is HttpOnly.
+- GitHub Actions are pinned by commit SHA; Dependabot waits 7 days.
+
 ## [0.9.0] - 2026-10-12
 
 ### Added
@@ -399,7 +428,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.6.0...v0.7.0
