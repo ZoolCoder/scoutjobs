@@ -42,7 +42,7 @@ evals: ## run the plugin eval suite (evals/), needs the claude CLI
 
 docs:
 	[ -d node_modules ] || npm ci
-	npx antora antora-playbook.yml
+	npm run docs
 
 docs-serve: docs
 	npx --yes http-server build/site -p 8080 -c-1
