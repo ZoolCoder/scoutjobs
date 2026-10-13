@@ -2,14 +2,23 @@
   "name": "scoutjobs-docs",
   "private": true,
   "description": "Antora toolchain for the ScoutJobs user manual. Not part of the Go module.",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "docs": "antora --fetch antora-playbook.yml",
+    "docs": "npm run docs:theme && antora --fetch antora-playbook.yml && npm run docs:root",
+    "docs:theme": "rm -rf build/pdf-theme && mkdir -p build/pdf-theme && curl -fsSL -o build/zc-pdf-theme.zip https://github.com/zoolcoder/zc-supplemental-ui/releases/download/v0.2.1/zc-pdf-theme.zip && unzip -qo build/zc-pdf-theme.zip -d build/pdf-theme",
+    "docs:local": "rm -rf build/pdf-theme && mkdir -p build/pdf-theme && cp ../../Framework/kits/zc-supplemental-ui/pdf/* build/pdf-theme/ && antora --ui-bundle-url ../../Framework/kits/zc-supplemental-ui/build/ui-bundle.zip antora-playbook.yml && npm run docs:root",
+    "docs:root": "cp docs/root.html build/site/index.html",
     "docs:serve": "npx --yes http-server build/site -p 8080 -c-1"
   },
   "devDependencies": {
     "@antora/cli": "3.2.1",
-    "@antora/lunr-extension": "^1.0.0-alpha.13",
+    "@antora/lunr-extension": "1.0.0-alpha.13",
+    "@antora/pdf-extension": "1.0.1",
     "@antora/site-generator": "3.2.1",
-    "asciidoctor-kroki": "^0.18.1"
+    "@asciidoctor/tabs": "1.0.0-beta.6",
+    "asciidoctor-kroki": "^0.18.1",
+    "zc-supplemental-ui": "github:zoolcoder/zc-supplemental-ui#v0.2.1"
   }
 }

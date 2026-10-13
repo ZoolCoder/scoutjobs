@@ -7,6 +7,9 @@ on:
     paths:
       - 'docs/**'
       - 'antora-playbook.yml'
+      - 'antora-assembler.yml'
+      - 'Gemfile'
+      - 'Gemfile.lock'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/docs.yml'
@@ -27,36 +30,47 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          # Antora reads the git history of this worktree, so a shallow clone
-          # would hide the branch it is told to build.
+          # Antora reads the git history of this worktree, and the "Last
+          # updated" date comes from it, so a shallow clone would hide both.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           cache: npm
 
+      # asciidoctor-pdf renders the PDF export. bundler-cache runs bundle
+      # install into vendor/bundle and caches it by Gemfile.lock.
+      - uses: ruby/setup-ruby@651ff0d62c5c79bed6d53ec518387aae20e72c1a # v1.329.0
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+
       - name: Install Antora
         run: npm ci
 
-      - name: Build the site
-        run: npx antora --fetch antora-playbook.yml
-
-      - name: Fail on a broken cross-reference
+      - name: Build the site and the PDF
+        # `npm run docs` fetches the PDF theme from the pinned
+        # zc-supplemental-ui release, then runs Antora with Assembler and
+        # fetches the diagrams from kroki.io.
+        #
         # Antora reports an unresolved xref as a warning and still emits a page
         # with a broken link. A docs site whose navigation silently rots is not
         # worth publishing, so treat any warning as a build failure.
         run: |
-          npx antora --fetch antora-playbook.yml 2>&1 | tee build.log
+          npm run docs 2>&1 | tee build.log
+          test "${PIPESTATUS[0]}" -eq 0
           if grep -q '"level":"warn"' build.log; then
             echo "::error::Antora emitted warnings; see the log above."
             grep '"level":"warn"' build.log
             exit 1
           fi
+          test -s build/site/scoutjobs/_exports/index.pdf
+          test -s build/site/llms.txt
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: build/site
 
@@ -71,4 +85,4 @@ jobs:
       id-token: write
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
