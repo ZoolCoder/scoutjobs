@@ -5,6 +5,10 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
+    # Wait a week before a new release lands, so a bad or malicious one is
+    # caught upstream first.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
   - package-ecosystem: gomod
@@ -12,6 +16,8 @@ updates:
     target-branch: develop
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: build
   - package-ecosystem: npm
@@ -19,9 +25,20 @@ updates:
     target-branch: develop
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: build
     ignore:
       # 1.x breaks the Antora build (`block.$!= is not a function`)
       - dependency-name: asciidoctor-kroki
         update-types: ["version-update:semver-major"]
+  - package-ecosystem: bundler
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: build
