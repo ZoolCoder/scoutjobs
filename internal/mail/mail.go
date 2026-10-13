@@ -139,7 +139,7 @@ func (a SMTP) dial(user string) (*smtp.Client, error) {
 	}
 	var c *smtp.Client
 	if port == "465" {
-		conn, err := tls.Dial("tcp", a.Host, &tls.Config{ServerName: host})
+		conn, err := tls.Dial("tcp", a.Host, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +151,7 @@ func (a SMTP) dial(user string) (*smtp.Client, error) {
 			return nil, err
 		}
 		if ok, _ := c.Extension("STARTTLS"); ok {
-			if err := c.StartTLS(&tls.Config{ServerName: host}); err != nil {
+			if err := c.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
 				return nil, err
 			}
 		}

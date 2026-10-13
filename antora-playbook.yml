@@ -1,18 +1,30 @@
 # Antora playbook for the ScoutJobs user manual.
 #
 # Build locally with:
-#   make docs            (npm ci + npx antora antora-playbook.yml)
-# then open build/site/index.html
+#   make docs            (npm ci + npm run docs)
+# then open build/site/index.html. `npm run docs:local` builds against a
+# checkout of zc-supplemental-ui in ~/Developer/Framework/kits instead of the
+# release.
 #
 # The content source is this working tree, so a local build documents what is
 # checked out right now, uncommitted edits included (worktrees: true).
 antora:
   extensions:
+    # Builds a client-side lunr index at generation time; the UI shows its
+    # search field when the extension is loaded.
     - require: '@antora/lunr-extension'
       index_latest_only: true
+    # Assembles every page into one PDF, configured by antora-assembler.yml.
+    - require: '@antora/pdf-extension'
+    # From zc-supplemental-ui: "Last updated" from git, a Markdown copy of
+    # each page plus llms.txt, and a link-preview card per page.
+    - zc-supplemental-ui/extensions/last-updated
+    - zc-supplemental-ui/extensions/llms
+    - zc-supplemental-ui/extensions/og-image
 
 site:
   title: ScoutJobs
+  # Required for canonical URLs, og:url and sitemap generation.
   url: https://zoolcoder.github.io/scoutjobs
   start_page: scoutjobs::index.adoc
   robots: allow
@@ -23,16 +35,17 @@ content:
       start_path: docs
       branches: HEAD
       worktrees: true
+      edit_url: 'https://github.com/zoolcoder/scoutjobs/edit/develop/{path}'
 
 ui:
   bundle:
-    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
-    snapshot: true
-  # Brand layer over the default UI, shared with the other ZoolCoder tool sites.
-  supplemental_files: ./docs/supplemental-ui
+    # The ZoolCoder docs UI. Pinned to a release so a change to the bundle
+    # reaches this site only by a bump here.
+    url: https://github.com/zoolcoder/zc-supplemental-ui/releases/download/v0.2.1/ui-bundle.zip
 
 asciidoc:
   extensions:
+    - '@asciidoctor/tabs'
     # Renders the [mermaid] blocks in docs/modules/ROOT/partials/diagrams/.
     - asciidoctor-kroki
   attributes:
@@ -43,8 +56,17 @@ asciidoc:
     go-version: '1.27'
     source-highlighter: highlight.js
     # Fetch the SVG at build time so the published site has no runtime
-    # dependency on kroki.io. Needs network access during the build.
+    # dependency on kroki.io and the UI's self-only CSP holds. Needs network
+    # access during the build.
     kroki-fetch-diagram: true
+    # Read by the UI bundle: header buttons, footer and link previews.
+    page-zc-repo: https://github.com/zoolcoder/scoutjobs
+    page-zc-pdf: scoutjobs/_exports/index.pdf
+    page-zc-tagline: User manual
+    page-zc-site: https://zoolcoder.com/
+    page-zc-site-name: zoolcoder.com
+    page-zc-owner: ZoolCoder
+    page-zc-license: MIT licensed
 
 output:
   dir: ./build/site

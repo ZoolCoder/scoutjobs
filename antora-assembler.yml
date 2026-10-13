@@ -1,0 +1,17 @@
+# Antora Assembler: the whole manual as one PDF, linked from the PDF button in
+# the header. zc-pdf prints it with asciidoctor-pdf from the Gemfile (bundle
+# install). The theme comes from the zc-supplemental-ui release, unpacked by
+# `npm run docs:theme`.
+root_level: 0
+build:
+  command: npx zc-pdf -a pdf-themesdir=build/pdf-theme -a pdf-theme=zc
+  publish: true
+asciidoc:
+  attributes:
+    doctype: book
+    toc: ''
+    toclevels: 2
+    title-page: ''
+    source-highlighter: rouge
+    zc-owner: ZoolCoder
+    zc-print: ''

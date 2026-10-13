@@ -34,9 +34,10 @@ Usage: scoutjobs <command> [subcommand] [flags]
   email draft|show|send   application e-mail from the cover letter; send needs --yes
   email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
   email log <job>         record a message an agent's Gmail connector matched to a job
-  gmail setup [--file client.json]|connect|status|test|disconnect|draft <job>
-                                     Gmail API with your own OAuth client: setup links the Google Cloud pages, imports the
-                                     downloaded client from ~/Downloads and connects; reads replies, creates drafts (never sends)
+  google setup [--file client.json]|check|connect|reconnect|verify|status|test|disconnect|draft <job>
+                                     Gmail and Calendar with your own OAuth client (gmail is the same command): setup checks
+                                     the client, links the Google Cloud pages, imports the download from ~/Downloads, connects
+                                     and verifies mail and calendar; reconnect replaces an expiring Testing-mode token
   decision log|summary
   pref set|list|rm|render|propose|review|confirm|reject
   interview add|list|set     --duration 45 --location <meeting link or address>
@@ -109,7 +110,7 @@ func Run(args []string, out io.Writer) error {
 		return runSession(s, rest, out)
 	case "learn":
 		return runLearn(s, rest, out)
-	case "gmail":
+	case "gmail", "google":
 		return runGmail(s, cfg, rest, out)
 	case "calendar":
 		return runCalendar(s, cfg, rest, out)
