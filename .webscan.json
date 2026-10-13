@@ -1,0 +1,74 @@
+{
+  "name": "scoutjobs",
+  "urls": {
+    "prod": "https://zoolcoder.github.io/scoutjobs",
+    "local": "http://127.0.0.1:8643/scoutjobs"
+  },
+  "pages": [
+    "/",
+    "/scoutjobs/",
+    "/scoutjobs/google.html",
+    "/scoutjobs/flows.html",
+    "/scoutjobs/dashboard.html",
+    "/scoutjobs/cli.html"
+  ],
+  "dist": "build/site",
+  "admin": "",
+  "login": "",
+  "loginCredentialField": "",
+  "allowExposed": [],
+  "ignore": {
+    "osv.GHSA-9pmc-p236-855h.css_parser": "dev-only: pulled in by asciidoctor-pdf (pins css_parser ~> 1.6, fix is 3.0); parses only our own theme CSS while CI prints the PDF, never served",
+    "osv.GHSA-vfj7-8cjw-p6xm.braces": "dev-only: Antora build dependency, never served",
+    "live.httpNoRedirect": "GitHub Pages host: http on the shared host answers its own 404 for unknown paths; site paths redirect",
+    "hdr.nosniff": "GitHub Pages sends no custom headers; cannot be set from a <meta>",
+    "hdr.permissions": "GitHub Pages sends no custom headers; the site uses no powerful features",
+    "hdr.coop": "GitHub Pages sends no custom headers",
+    "hdr.corp": "GitHub Pages sends no custom headers",
+    "hdr.server": "GitHub Pages sets the Server header",
+    "csp.meta": "GitHub Pages sends no headers; the policy is a <meta> from the UI bundle",
+    "dist.bigChunks": "search-index.js is the Lunr index Antora writes; it loads only when search opens",
+    "html/": "generator meta is written by Antora",
+    "live.securityTxt": "belongs to the zoolcoder.github.io user site, not this project site",
+    "dist.localhost": "docs show the dashboard on 127.0.0.1 and localhost, which Google's loopback redirect requires; examples, not dev URLs",
+    "trivy.CVE-2026-53727.css_parser": "dev-only: pulled in by asciidoctor-pdf (pins css_parser ~> 1.6, fix is 3.0); parses only our own theme CSS while CI prints the PDF, never served",
+    "semgrep.go.lang.security.audit.net.cookie-missing-secure": "theme cookie on the dashboard, which serves plain http on 127.0.0.1; Secure would drop it in Safari, and it holds only light/dark/auto"
+  },
+  "budgets": {
+    "performance": 70,
+    "accessibility": 90,
+    "best-practices": 90,
+    "seo": 90,
+    "lcpMs": 4000,
+    "tbtMs": 600,
+    "cls": 0.1,
+    "cssUnusedKb": 60
+  },
+  "a11y": {
+    "wait": 500,
+    "hide": ""
+  },
+  "semgrep": [
+    "p/owasp-top-ten",
+    "p/nodejs",
+    "p/typescript",
+    "p/jwt",
+    "p/secrets",
+    "p/github-actions",
+    "p/xss",
+    "p/sql-injection",
+    "p/command-injection"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-*",
+    ".wrangler",
+    "docs",
+    "coverage",
+    ".cache",
+    "build",
+    ".bundle",
+    "evals/results"
+  ]
+}
