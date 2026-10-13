@@ -1,0 +1,150 @@
+= Your own Google client
+:description: Connect Gmail and Google Calendar through an OAuth client in your own Google Cloud project, keep it connected past 7 days, and fix what Google refuses.
+
+ScoutJobs can read replies, file drafts and sync interviews through an OAuth client that lives in your own Google Cloud project. No AI reads your mail, nothing leaves your computer except the calls to Google, and the token stays in your data directory.
+
+One Desktop client and one sign-in cover both Gmail and Google Calendar.
+
+== Set it up
+
+In a terminal:
+
+[source,console]
+----
+$ scoutjobs google setup
+----
+
+On the dashboard, open *Connections* and use the *Your own Google client* card. The Inbox page offers the same steps.
+
+Both paths go through the same steps:
+
+. *Check the client.* ScoutJobs says where the client ID and secret come from and what is missing, before any Google page opens. It never prints the secret, only whether there is one.
+. *Google Cloud steps.* Each step links the right console page:
+.. Create a project.
+.. Enable the Gmail and Calendar APIs.
+.. Set up the consent screen with audience *External*.
+.. Publish the app (see <<production>>).
+.. Create an OAuth client of type *Desktop app* and download its JSON.
+. *Import the JSON.* ScoutJobs watches `~/Downloads` for the `client_secret_….json` file and imports it into `gmail-client.json` (0600). A Web client is refused: it must be a Desktop app.
+. *Sign in.* Pick your account and tick every box: mail, drafts and calendar.
+. *Verify.* ScoutJobs makes one light read of each integration and reports each one on its own: the account, Gmail (your profile) and Calendar (your primary calendar). Nothing is written.
+
+Run `scoutjobs google verify`, or press *Verify* on the Connections card, to check again later.
+
+=== Which client wins
+
+[cols="1,2"]
+|===
+| Source | Used when
+
+| `gmail_client_id` in `config.yaml`
+| It is set. It wins over the import.
+
+| `gmail-client.json`
+| `config.yaml` has no client ID. A `config.yaml` ID without a secret also takes the secret from here, when the IDs match.
+
+| `$SCOUTJOBS_GMAIL_CLIENT_SECRET`
+| It is set. It replaces the secret from either file.
+|===
+
+`scoutjobs google check` prints the source of each part. Edits apply on the next connect, without a restart.
+
+[#production]
+== Keep it connected: Testing or In production
+
+A new consent screen starts in *Testing*. In Testing, Google ends the refresh token after 7 days. ScoutJobs warns before that day and says so after it.
+
+ScoutJobs detects Testing mode when you connect. `scoutjobs google status`, the Inbox and the Connections card then show this checklist:
+
+. https://console.cloud.google.com/auth/branding[Branding]:
+** User support email: your address.
+** App home page: `https://zoolcoder.github.io/scoutjobs`.
+** Privacy policy: `https://github.com/zoolcoder/scoutjobs#security-and-privacy`.
+** Authorised domains: `github.com` and `zoolcoder.github.io`.
+** Developer contact: your address.
+. https://console.cloud.google.com/auth/audience[Audience]: user type External. Press *Publish app*, then *Confirm*. Publishing status reads *In production*.
+. *Reconnect Google*, once. The new token replaces the Testing one.
+
+In production removes the 7-day expiry. It does not remove Google's "Google hasn't verified this app" screen. Only Google's verification removes that warning.
+
+=== Personal use: External, In production, unverified
+
+This is the path for one person using their own client:
+
+* Audience External, publishing status In production, not verified.
+* Google shows the unverified-app warning at each sign-in. Choose *Advanced*, then *Go to ScoutJobs (unsafe)*: the app is yours.
+* An unverified app with sensitive scopes allows up to 100 users. One person is far below that.
+* The connection does not expire after 7 days.
+
+=== Verified app
+
+Verification is for a client that other people sign in to. Google reviews the app before the warning goes away:
+
+* the branding and a home page on a domain you own
+* a privacy policy
+* a video of the consent flow
+* for Gmail's restricted scope, a security assessment
+
+A personal ScoutJobs client does not need it.
+
+== Reconnect
+
+`scoutjobs google reconnect`, or *Reconnect Google* on the Inbox or Connections page, signs in again. Use it in these cases:
+
+* to replace a Testing-mode token after you publish
+* after Google ended the connection
+* to add a permission you left unticked
+
+You do not need to disconnect first. ScoutJobs replaces the saved token only when the new sign-in succeeds. If it fails, the old connection stays as it was and the same button tries again.
+
+*Disconnect* is a separate action. It revokes the access at Google and deletes the token and the cache.
+
+== When Google refuses
+
+ScoutJobs sorts each failure into one kind, with its own fix:
+
+[cols="1,2,2"]
+|===
+| Kind | What you see | Fix
+
+| Client missing or refused
+| `the Google OAuth client secret is missing`, or Google answers `invalid_client`
+| Download the Desktop client JSON again and import it, or set both `gmail_client_id` and `gmail_client_secret`.
+
+| API not enabled
+| `an API is not enabled in your Google Cloud project`
+| Enable Gmail and Calendar, wait a minute, then verify again.
+
+| Permission left out
+| `Google was not allowed your calendar`, or `did not grant this permission`
+| Reconnect and tick every box.
+
+| Testing-mode expiry
+| `Google ended the connection after 7 days because your Google Cloud app is in Testing mode`
+| Publish the app (<<production>>), then reconnect.
+
+| Access revoked
+| `Google ended the connection (access was revoked or the password changed)`
+| Reconnect.
+
+| Stopped at Google's screen
+| `google refused: access_denied`
+| You cancelled, or stopped at the unverified-app warning. Reconnect, choose *Advanced*, then *Go to ScoutJobs*.
+
+| Rate limit
+| `gmail is busy for this account (rate limit)`
+| Safe to retry after a minute. Messages already read are kept.
+
+| Google error
+| a `5xx` answer, a timeout or a network error
+| Safe to retry. Nothing was changed.
+|===
+
+Error messages name the setting or the console page. They never contain the client secret or a token.
+
+== What ScoutJobs does not do
+
+* It does not fill in Google's forms or click through the consent screen for you.
+* It never sends, labels or deletes mail.
+* In your calendar, it writes only the interviews it adds.
+* Everything stays on your computer: `gmail-client.json`, `gmail-token.json` and the message cache are in the data directory, mode 0600.

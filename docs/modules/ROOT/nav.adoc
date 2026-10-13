@@ -7,6 +7,7 @@
 ** xref:pipeline.adoc[Pipeline]
 ** xref:cv-and-cover-letter.adoc[CV and cover letter]
 ** xref:apply-by-email.adoc[Apply by e-mail]
+** xref:google.adoc[Your own Google client]
 ** xref:interviews.adoc[Interviews and learning]
 * Agents
 ** xref:agents.adoc[Claude Code, Codex, Cursor, Gemini, Copilot]

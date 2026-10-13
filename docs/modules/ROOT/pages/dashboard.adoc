@@ -165,6 +165,7 @@ One card per tool ScoutJobs uses, each with *Test connection*:
 
 AI assistant:: Claude (recommended), Codex, or a custom command from `config.yaml` (`agent_command`). It writes the tailored documents and runs the mail and calendar syncs.
 Mail:: A Google account through your own OAuth client (no AI reads your mail), any IMAP mailbox (read only), or the AI assistant's mail connector. *Disconnect* forgets the choice.
+Your own Google client:: The setup steps for the client, then *Verify*, *Reconnect Google* and *Disconnect*. While the app is in Testing mode, the card lists the steps to publish it. See xref:google.adoc[Your own Google client].
 Calendar:: Google Calendar, the AI assistant's calendar connector, or an Apple Calendar subscription link (read only). With the connector, *Sync now* opens a *Syncing your calendar* window like the Inbox's and syncs interviews both ways; *Sync the next* sets how many days ahead it looks (shorter is quicker).
 Job sources:: The job boards *Find jobs* searches, each with an on/off switch, and the career page systems it can read.
 
