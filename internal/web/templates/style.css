@@ -1331,3 +1331,7 @@ main:focus{outline:none}
 .mockq textarea{width:100%;resize:vertical}
 .mockq .rate{margin-top:6px;font-size:12.5px}
 .gdet.cta>summary{color:var(--acc);font-weight:500;font-size:13px;margin:6px 0}
+ol.setup ol{margin:6px 0 0;padding-left:18px;display:grid;gap:6px}
+.callout>p{margin:0 0 8px}.callout>p:last-child{margin:0}
+.callout ol.setup{margin:0 0 8px}
+.gsetup>p:first-child{margin-top:0}

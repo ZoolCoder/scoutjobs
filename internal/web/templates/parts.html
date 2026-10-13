@@ -87,3 +87,39 @@
   <p class="runnow" role="status">{{if eq .State "running"}}<span class="spin" aria-hidden="true"></span><b data-now>{{with .Current}}{{.}}{{else}}Starting{{end}}</b>{{else}}<b>{{title .State}}</b>{{end}}
   <span class="muted"> · <span data-count>{{.Finished}}/{{len .Steps}}</span> steps · <span data-elapsed></span>{{if eq .State "running"}} · <span data-ago>working</span>{{end}}</span></p>
 </div>{{end}}
+
+{{/* Google: the panels the Inbox and Connections share. The dot is a googleView. */}}
+{{define "google-for"}}{{with .For}}<input type="hidden" name="for" value="{{.}}">{{end}}{{end}}
+{{define "google-reconnect"}}<form class="inline" method="post" action="/gmail/connect">{{template "google-for" .}}<button class="mini primary">Reconnect Google</button></form>{{end}}
+{{define "google-alerts"}}{{if .Problem}}<div class="callout bad">{{.Problem}}. {{template "google-reconnect" .}} It replaces the old connection; there is no need to disconnect first.</div>{{end}}
+{{with .Missing}}<div class="callout bad">Google was not allowed {{join . ", "}}. {{template "google-reconnect" $}} and tick every box.</div>{{end}}
+{{if .Testing}}{{template "google-publish" .}}{{end}}{{end}}
+{{define "google-publish"}}<div class="callout"><p><b>Your Google Cloud app is in Testing mode</b>{{if not .Ends.IsZero}}, so Google disconnects ScoutJobs on {{.Ends.Format "Jan 2"}}{{end}}. Move it to In production, then reconnect:</p>
+<ol class="setup">{{range .Publish}}<li>{{if .URL}}<a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Title}}</a>{{else}}<b>{{.Title}}</b>{{end}}: {{.Do}}</li>{{end}}</ol>
+<p class="small">In production ends the 7-day limit. Google still says it has not verified the app; only Google's review removes that, and your own client does not need it.</p>
+<p>{{template "google-reconnect" .}}</p></div>{{end}}
+{{define "google-setup"}}{{if .Client}}<p>Your Google client is saved{{with .IDFrom}} (from <code>{{.}}</code>){{end}}. Press Connect Google, pick your account, and <b>tick every box</b> Google offers; Google sends you back here and checks Gmail and Calendar.</p>
+{{if not .HasSecret}}<p class="callout bad">The client has no secret. Import the Desktop client JSON again below, or set <code>gmail_client_secret</code> in config.yaml.</p>{{end}}
+<form method="post" action="/gmail/connect">{{template "google-for" .}}<button class="primary">Connect Google</button></form>
+<p class="muted small">Google says it has not verified the app: it is your own, so choose Advanced &rsaquo; Go to ScoutJobs. A client ID in <code>config.yaml</code> wins over the imported <code>gmail-client.json</code>.</p>
+{{end}}{{if or (not .Client) (not .HasSecret)}}{{if not .Client}}<p>Once, about 3 minutes, in your own Google Cloud project, so your mail goes to no one else. Each link opens the right page.</p>
+<ol class="setup">
+  <li><a href="https://console.cloud.google.com/projectcreate" rel="noopener noreferrer" target="_blank">Create a project</a>, any name, and keep it selected.</li>
+  <li><a href="https://console.cloud.google.com/flows/enableapi?apiid=gmail.googleapis.com,calendar-json.googleapis.com" rel="noopener noreferrer" target="_blank">Enable the Gmail and Calendar APIs</a>: one page, press Enable.</li>
+  <li><a href="https://console.cloud.google.com/auth/overview/create" rel="noopener noreferrer" target="_blank">Set up the consent screen</a>: app name ScoutJobs, your e-mail, audience <b>External</b>.</li>
+  <li>Publish the app. <b>Do not skip it</b>: while it is in Testing, Google disconnects you every 7 days.
+    <ol>{{range .Publish}}{{if .URL}}<li><a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Title}}</a>: {{.Do}}</li>{{end}}{{end}}</ol></li>
+  <li><a href="https://console.cloud.google.com/auth/clients/create" rel="noopener noreferrer" target="_blank">Create an OAuth client</a> of type <b>Desktop app</b>, then press <b>Download JSON</b>.</li>
+</ol>
+{{if .Blind}}<p class="callout">ScoutJobs cannot look in your Downloads folder: macOS keeps it private from the terminal that started the dashboard. Add the downloaded file below.</p>
+{{else}}<div class="detect" data-gmail-detect>{{if .Download}}<form method="post" action="/gmail/client"><input type="hidden" name="detected" value="1">{{template "google-for" .}}
+  <p>Found <code>{{.Download}}</code> in Downloads.</p><button class="primary">Import it</button></form>
+{{else}}<p class="muted"><span class="spin" aria-hidden="true"></span>Watching Downloads for the client JSON Google gives you; this page offers to import it when it lands.</p>{{end}}</div>{{end}}{{end}}
+<details class="manual"{{if .Blind}} open{{end}}><summary>Downloaded somewhere else? Add the file by hand</summary>
+<form class="gmail-client" method="post" action="/gmail/client" enctype="multipart/form-data">{{template "google-for" .}}
+  <label>Client file <input type="file" name="file" accept=".json,application/json"></label>
+  <label>or paste it <textarea name="client" rows="3" placeholder='{"installed":{"client_id":"….apps.googleusercontent.com", …}}'></textarea></label>
+  <button class="primary">Save client</button>
+</form></details>
+<p class="muted small">Saved to <code>{{.Home}}/gmail-client.json</code> (0600). In a terminal, <code>scoutjobs google setup</code> does the same and checks the client first.</p>
+{{end}}{{end}}

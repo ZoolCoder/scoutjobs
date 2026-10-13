@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -168,6 +169,34 @@ func TestGmailSetupImportsDownload(t *testing.T) {
 	}
 	if out := run(t, "gmail", "setup", "--no-connect"); !strings.Contains(out, "already set up") {
 		t.Errorf("second setup: %s", out)
+	}
+	t.Setenv("SCOUTJOBS_GMAIL_CLIENT_SECRET", "env-s3cr3t")
+	out = run(t, "google", "check")
+	for _, want := range []string{"client ID:     ok, from gmail-client.json", "client secret: set, from $SCOUTJOBS_GMAIL_CLIENT_SECRET", "checked after connecting"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("check lacks %q: %s", want, out)
+		}
+	}
+	if strings.Contains(out, "env-s3cr3t") {
+		t.Error("check printed the secret")
+	}
+	if err := Run([]string{"google", "verify"}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "google setup") {
+		t.Errorf("verify before connect: %v", err)
+	}
+}
+
+func TestGoogleCheckNamesWhatIsMissing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SCOUTJOBS_HOME", home)
+	t.Setenv("SCOUTJOBS_GMAIL_CLIENT_SECRET", "")
+	run(t, "init")
+	var buf bytes.Buffer
+	err := Run([]string{"google", "check"}, &buf)
+	if err == nil || !strings.Contains(err.Error(), "no client ID, no client secret") || !strings.Contains(buf.String(), "client ID:     missing") {
+		t.Errorf("check without a client: %v\n%s", err, buf.String())
+	}
+	if err := Run([]string{"google", "reconnect"}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "no client ID") {
+		t.Errorf("reconnect without a client went to Google: %v", err)
 	}
 }
 

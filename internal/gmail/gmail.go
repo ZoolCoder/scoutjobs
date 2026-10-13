@@ -40,13 +40,15 @@ const TokenFile = "gmail-token.json"
 // Client holds the OAuth client from config.yaml and where the token lives. The URLs default to Google's.
 type Client struct {
 	ID, Secret string
-	Home       string
-	HTTP       *http.Client
-	AuthURL    string
-	TokenURL   string
-	APIBase    string
-	RevokeURL  string
-	CalBase    string
+	// where ID and Secret came from (config.yaml, gmail-client.json, an env var), for setup to explain
+	IDFrom, SecretFrom string
+	Home               string
+	HTTP               *http.Client
+	AuthURL            string
+	TokenURL           string
+	APIBase            string
+	RevokeURL          string
+	CalBase            string
 }
 
 // Token is what gmail-token.json holds. The refresh token is the long-lived secret; the file is 0600.

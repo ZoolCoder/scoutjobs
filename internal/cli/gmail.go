@@ -25,14 +25,87 @@ import (
 // gmailClient takes the OAuth client from config.yaml when set there, else from the file gmail setup
 // imported. A config.yaml ID without a secret takes the secret of the imported client with the same ID.
 func gmailClient(s *store.Store, cfg Config) *gmail.Client {
-	id, secret := cfg.GmailClientID, cfg.GmailSecret
-	if f := gmail.LoadCredentials(s.Home); id == "" || (secret == "" && f.ID == id) {
-		id, secret = f.ID, f.Secret
+	c := &gmail.Client{ID: cfg.GmailClientID, Secret: cfg.GmailSecret, Home: s.Home, IDFrom: "config.yaml", SecretFrom: "config.yaml"}
+	if f := gmail.LoadCredentials(s.Home); c.ID == "" || (c.Secret == "" && f.ID == c.ID) {
+		if c.ID == "" {
+			c.IDFrom = gmail.ClientFile
+		}
+		c.ID, c.Secret, c.SecretFrom = f.ID, f.Secret, gmail.ClientFile
 	}
 	if env := os.Getenv("SCOUTJOBS_GMAIL_CLIENT_SECRET"); env != "" {
-		secret = env
+		c.Secret, c.SecretFrom = env, "$SCOUTJOBS_GMAIL_CLIENT_SECRET"
 	}
-	return &gmail.Client{ID: id, Secret: secret, Home: s.Home}
+	if c.ID == "" {
+		c.IDFrom = ""
+	}
+	if c.Secret == "" {
+		c.SecretFrom = ""
+	}
+	return c
+}
+
+// checkClient prints where the client comes from and what is wrong with it, before any OAuth.
+// It never prints the secret, only whether there is one.
+func checkClient(s *store.Store, cfg Config, out io.Writer) error {
+	c := gmailClient(s, cfg)
+	fmt.Fprintln(out, "Google client check")
+	var problems []string
+	switch {
+	case c.ID == "":
+		fmt.Fprintln(out, "  client ID:     missing")
+		problems = append(problems, "no client ID")
+	case !strings.HasSuffix(c.ID, ".apps.googleusercontent.com"):
+		fmt.Fprintf(out, "  client ID:     not a Google OAuth client ID, from %s\n", c.IDFrom)
+		problems = append(problems, "the client ID does not end in .apps.googleusercontent.com")
+	default:
+		fmt.Fprintf(out, "  client ID:     ok, from %s\n", c.IDFrom)
+	}
+	if c.Secret == "" {
+		fmt.Fprintln(out, "  client secret: missing")
+		problems = append(problems, "no client secret")
+	} else {
+		fmt.Fprintf(out, "  client secret: set, from %s\n", c.SecretFrom)
+	}
+	if cfg.GmailClientID != "" && gmail.LoadCredentials(s.Home).ID != "" && gmail.LoadCredentials(s.Home).ID != cfg.GmailClientID {
+		fmt.Fprintf(out, "  note:          config.yaml gmail_client_id wins over the imported %s; remove it to use the import\n", gmail.ClientFile)
+	}
+	fmt.Fprintf(out, "  APIs:          Gmail and Calendar must be enabled in the same project (%s); checked after connecting\n", gmail.EnableAPIs)
+	if len(problems) > 0 {
+		return errors.New(strings.Join(problems, ", ") + ": import the Desktop client JSON again with scoutjobs google setup --file <client_secret_….json>")
+	}
+	return nil
+}
+
+// printVerify reports each integration on its own after a light read of each.
+func printVerify(out io.Writer, checks []gmail.Check) error {
+	failed := false
+	for _, ch := range checks {
+		state := "ok  "
+		if !ch.OK {
+			state, failed = "FAIL", true
+		}
+		fmt.Fprintf(out, "  %-9s %s %s\n", ch.Name+":", state, ch.Detail)
+		if ch.Retry {
+			fmt.Fprintln(out, "            safe to retry: scoutjobs google verify")
+		}
+	}
+	if failed {
+		return errors.New("google verify failed")
+	}
+	return nil
+}
+
+// printPublish lists the console steps that move a Testing-mode app to In production.
+func printPublish(out io.Writer) {
+	fmt.Fprintln(out, "\nMove the app to In production (personal use, no verification needed):")
+	for i, st := range gmail.PublishSteps {
+		fmt.Fprintf(out, "  %d. %s: %s\n", i+1, st.Title, st.Do)
+		if st.URL != "" {
+			fmt.Fprintf(out, "     %s\n", st.URL)
+		}
+	}
+	fmt.Fprintln(out, "In production removes the 7-day expiry. Google still warns that it has not verified the app;")
+	fmt.Fprintln(out, "that warning goes away only after Google verifies it, which a personal client does not need.")
 }
 
 // Google Cloud pages for a Desktop OAuth client, in the order setup needs them.
@@ -44,8 +117,11 @@ const gmailSteps = `Google setup: a Desktop OAuth client in your own Google Clou
      ` + gmail.EnableAPIs + `
   3. Configure the consent screen: Get started, app name ScoutJobs, audience External, your e-mail:
      https://console.cloud.google.com/auth/overview/create
-  4. Publish the app (Publish app). Do not skip it: in Testing mode Google disconnects you every 7 days.
-     https://console.cloud.google.com/auth/audience
+  4. Fill Branding (support email, home page ` + gmail.HomePage + `, privacy policy
+     ` + gmail.PrivacyURL + `, authorised domains github.com and zoolcoder.github.io),
+     then Audience > Publish app. Do not skip it: in Testing mode Google disconnects you every 7 days.
+     ` + gmail.BrandingURL + `
+     ` + gmail.AudienceURL + `
   5. Create the client: Application type Desktop app, Create, then Download JSON:
      https://console.cloud.google.com/auth/clients/create
 
@@ -91,9 +167,6 @@ func setupGmail(s *store.Store, cfg Config, file string, wait time.Duration, out
 		return err
 	}
 	fmt.Fprintf(out, "\nclient imported from %s into %s (0600); you can delete the download\n", file, filepath.Join(s.Home, gmail.ClientFile))
-	if cfg.GmailClientID != "" {
-		fmt.Fprintln(out, "note: gmail_client_id in config.yaml still wins; remove it to use the imported client")
-	}
 	return nil
 }
 
@@ -110,11 +183,19 @@ func connectGmail(s *store.Store, cfg Config, out io.Writer) error {
 		openBrowser(u)
 	})
 	if err != nil {
-		return err
+		f := gmail.Classify(err)
+		if f.Retry {
+			return fmt.Errorf("%w (safe to retry: scoutjobs google reconnect; the saved connection was not changed)", f)
+		}
+		return f
 	}
 	fmt.Fprintf(out, "google connected as %s; token in %s (keep it private)\n", orDash(t.Email), filepath.Join(s.Home, gmail.TokenFile))
-	printGrant(out, gmailClient(s, cfg).Status())
-	return nil
+	c := gmailClient(s, cfg)
+	printGrant(out, c.Status())
+	ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	fmt.Fprintln(out, "\nChecking each integration:")
+	return printVerify(out, c.Verify(ctx))
 }
 
 // printGrant warns about boxes left unticked on Google's screen and about a Testing-mode app.
@@ -133,8 +214,9 @@ func printGrant(out io.Writer, st gmail.State) {
 		fmt.Fprintf(out, "not allowed: %s. Run scoutjobs gmail connect again and tick every box.\n", strings.Join(missing, ", "))
 	}
 	if st.Testing {
-		fmt.Fprintf(out, "your Google Cloud app is in Testing mode: Google disconnects it on %s. Publish it at "+
-			"https://console.cloud.google.com/auth/audience, then run scoutjobs gmail connect again\n", st.Ends.Format("Jan 2"))
+		fmt.Fprintf(out, "your Google Cloud app is in Testing mode: Google disconnects it on %s.\n", st.Ends.Format("Jan 2"))
+		printPublish(out)
+		fmt.Fprintln(out, "Then run scoutjobs google reconnect: it replaces the Testing token, no disconnect needed.")
 	}
 }
 
@@ -182,12 +264,37 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		if err := setupGmail(s, cfg, *file, *wait, out); err != nil {
 			return err
 		}
-		if *noConnect || c.Connected() && *file == "" {
+		fmt.Fprintln(out)
+		if err := checkClient(s, cfg, out); err != nil {
+			return err
+		}
+		if *noConnect {
+			return nil
+		}
+		if c.Connected() && *file == "" {
+			if st := c.Status(); st.Testing || st.Problem != "" {
+				printGrant(out, st)
+				return nil
+			}
+			fmt.Fprintln(out, "\nalready connected; scoutjobs google verify checks it, scoutjobs google reconnect replaces it")
 			return nil
 		}
 		return connectGmail(s, cfg, out)
-	case "connect":
+	case "connect", "reconnect":
+		// a new grant replaces the saved token only when it succeeds, so no disconnect comes first
+		if err := checkClient(s, cfg, io.Discard); err != nil {
+			return err
+		}
 		return connectGmail(s, cfg, out)
+	case "check":
+		return checkClient(s, cfg, out)
+	case "verify":
+		if !c.Connected() {
+			return errors.New("google not connected: run scoutjobs google setup")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		return printVerify(out, c.Verify(ctx))
 	case "status":
 		fs := flag.NewFlagSet("gmail status", flag.ContinueOnError)
 		asJSON := fs.Bool("json", false, "")
@@ -202,6 +309,10 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 			switch {
 			case st.Problem != "":
 				fmt.Fprintf(out, "gmail: disconnected by Google: %s\n", st.Problem)
+				if st.Testing {
+					printPublish(out)
+				}
+				fmt.Fprintln(out, "scoutjobs google reconnect replaces the connection, no disconnect needed")
 			case c.Connected():
 				fmt.Fprintf(out, "gmail: connected as %s; calendar %s\n", orDash(c.Account()), calendarState(c))
 				printGrant(out, st)
@@ -242,7 +353,7 @@ func runGmail(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 			fmt.Fprintf(out, "draft created in Gmail for %s; review and send it there:\n  %s\n", j.Company, link)
 		})
 	}
-	return errors.New("usage: gmail setup [--file client.json] | connect | status | test | disconnect | draft <job>")
+	return errors.New("usage: google setup [--file client.json] | check | connect | reconnect | verify | status | test | disconnect | draft <job>")
 }
 
 // gmailDraft uploads the job's application e-mail (email.json from `email draft`) as a Gmail draft with

@@ -411,3 +411,75 @@ func TestPreferenceForms(t *testing.T) {
 		t.Error("not deleted")
 	}
 }
+
+func TestGoogleReconnectFromConnections(t *testing.T) {
+	s := testStore(t)
+	calendarDown := false
+	google := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			_, _ = w.Write([]byte(`{"access_token":"at","refresh_token":"rt","expires_in":3600,"refresh_token_expires_in":604800,
+				"scope":"` + gmail.Scopes + `"}`))
+		case "/api/profile":
+			_, _ = w.Write([]byte(`{"emailAddress":"me@x.test"}`))
+		case "/cal/calendars/primary":
+			if calendarDown {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"error":{"status":"PERMISSION_DENIED","message":"Calendar API has not been used in project 1"}}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"id":"me@x.test"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer google.Close()
+	_ = gmail.SaveCredentials(s.Home, gmail.Credentials{ID: "1-a.apps.googleusercontent.com", Secret: "s"})
+	client := func() *gmail.Client {
+		c := gmail.LoadCredentials(s.Home)
+		return &gmail.Client{ID: c.ID, Secret: c.Secret, Home: s.Home, IDFrom: gmail.ClientFile, HTTP: google.Client(), AuthURL: "https://auth.test/o",
+			TokenURL: google.URL + "/token", APIBase: google.URL + "/api", CalBase: google.URL + "/cal"}
+	}
+	h, _ := Handler(s, Config{Mail: MailHooks{Gmail: client}})
+	send := func(method, path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Host = "127.0.0.1:7070"
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	connect := func() *url.URL {
+		loc, _ := url.Parse(send("POST", "/gmail/connect", "for=connections").Header().Get("Location"))
+		back, _ := url.Parse(send("GET", "/gmail/callback?code=c&state="+loc.Query().Get("state"), "").Header().Get("Location"))
+		return back
+	}
+
+	if b := get(h, "/connections").Body.String(); !strings.Contains(b, `id="google"`) || !strings.Contains(b, "Connect Google") || !strings.Contains(b, `name="for" value="connections"`) {
+		t.Fatal("connections lacks the Google setup")
+	}
+	back := connect()
+	if back.Path != "/connections" || back.Fragment != "google" || !strings.Contains(back.Query().Get("msg"), "checked: Gmail and Google Calendar both answer") ||
+		!strings.Contains(back.Query().Get("msg"), "Testing mode") {
+		t.Fatalf("connect: %s", back)
+	}
+	b := get(h, "/connections").Body.String()
+	for _, want := range []string{"Reconnect Google", gmail.BrandingURL, gmail.AudienceURL, gmail.HomePage, "zoolcoder.github.io", "has not verified the app", `data-test="google"`} {
+		if !strings.Contains(b, want) {
+			t.Errorf("connections lacks %q", want)
+		}
+	}
+	if b := get(h, "/connections/test?card=google").Body.String(); !strings.Contains(b, `"ok":true`) || !strings.Contains(b, "Gmail answers for me@x.test") {
+		t.Errorf("verify: %s", b)
+	}
+
+	// reconnecting needs no disconnect, and the post-connect check reports Calendar on its own
+	calendarDown = true
+	back = connect()
+	if e := back.Query().Get("err"); !strings.Contains(e, "Google connected as me@x.test, but calendar:") || strings.Contains(e, "mail:") {
+		t.Errorf("reconnect check: %s", back)
+	}
+	if b := get(h, "/connections/test?card=google").Body.String(); !strings.Contains(b, `"ok":false`) || !strings.Contains(b, "enable Gmail and Calendar") {
+		t.Errorf("verify with Calendar off: %s", b)
+	}
+}
