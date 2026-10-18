@@ -5,6 +5,7 @@ package search
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -108,6 +109,16 @@ func (f fetcher) url(source string) string {
 	return defaultBase[source]
 }
 
+// ErrGone marks a posting the ATS no longer serves: closed, filled or taken down.
+var ErrGone = errors.New("posting gone")
+
+func httpError(u string, code int) error {
+	if code == http.StatusNotFound || code == http.StatusGone {
+		return fmt.Errorf("%s: http %d: %w", u, code, ErrGone)
+	}
+	return fmt.Errorf("%s: http %d", u, code)
+}
+
 func (f fetcher) getJSON(ctx context.Context, u string, v any) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
@@ -121,7 +132,7 @@ func (f fetcher) getJSON(ctx context.Context, u string, v any) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return fmt.Errorf("%s: http %d", u, res.StatusCode)
+		return httpError(u, res.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(res.Body, 20<<20))
 	if err != nil {
