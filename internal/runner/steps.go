@@ -59,7 +59,13 @@ func (rn *Runner) done(j store.Job, name string) (bool, string) {
 	case "prep":
 		return rn.prepDone(j, dir)
 	case "intel":
-		return exists(dir, apply.IntelName), apply.IntelName
+		if exists(dir, apply.IntelName) {
+			return true, apply.IntelName
+		}
+		if at, ok := apply.ReuseIntel(rn.Store, j, IntelMaxAge); ok {
+			return true, "reused the company research from " + at.Format("2 Jan 2006")
+		}
+		return false, apply.IntelName
 	case "mock":
 		return apply.MockScored(dir)
 	case "offer":
@@ -67,6 +73,9 @@ func (rn *Runner) done(j store.Job, name string) (bool, string) {
 	}
 	return false, ""
 }
+
+// IntelMaxAge is how long company research from an earlier job there is reused instead of paying an agent to redo it.
+const IntelMaxAge = 60 * 24 * time.Hour
 
 // PrepName is the prep sheet the prep step writes in the application folder.
 const PrepName = "interview-prep.md"

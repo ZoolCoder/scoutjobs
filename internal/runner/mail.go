@@ -193,23 +193,31 @@ func (a Agent) mailCommand(exe, home, dir string, conns []Connector) ([]string, 
 	switch a.Name {
 	case "claude":
 		mcp, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"scoutjobs": map[string]any{
-			"command": exe, "args": []string{"mcp"}, "env": map[string]string{"SCOUTJOBS_HOME": home, "SCOUTJOBS_RUNNER": "1"}}}})
+			"command": exe, "args": []string{"mcp"}, "env": map[string]string{"SCOUTJOBS_HOME": home, "SCOUTJOBS_RUNNER": "1", "SCOUTJOBS_MCP_TOOLS": MailTools}}}})
 		allowed := []string{"mcp__scoutjobs"}
 		for _, c := range conns {
 			allowed = append(allowed, c.Tools...)
 		}
+		if a.Model == "" {
+			a.Model = "sonnet"
+		}
+		// --tools "" loads no built-in tool at all: the inbox agent works through MCP tools only
 		argv := []string{a.Path, "-p", "--restricted", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
-			"--model", "sonnet", "--permission-mode", "dontAsk", "--mcp-config", string(mcp), "--allowedTools"}
+			"--permission-mode", "dontAsk", "--mcp-config", string(mcp), "--tools", "", "--allowedTools"}
 		argv = append(argv, allowed...)
-		return append(argv, "--disallowedTools", "Bash", "WebFetch", "WebSearch", "Read", "Glob", "Grep", "Edit", "Write", "NotebookEdit", "Task"), nil
+		argv = append(argv, "--disallowedTools", "Bash", "WebFetch", "WebSearch", "Read", "Glob", "Grep", "Edit", "Write", "NotebookEdit", "Task")
+		return append(argv, a.claudeTuning()...), nil
 	case "codex":
-		env := `{SCOUTJOBS_HOME=` + strconv.Quote(home) + `,SCOUTJOBS_RUNNER="1"}`
+		env := `{SCOUTJOBS_HOME=` + strconv.Quote(home) + `,SCOUTJOBS_RUNNER="1",SCOUTJOBS_MCP_TOOLS=` + strconv.Quote(MailTools) + `}`
 		return []string{a.Path, "exec", "--json", "--skip-git-repo-check", "--cd", dir, "--sandbox", "read-only",
 			"-c", "mcp_servers.scoutjobs.command=" + strconv.Quote(exe), "-c", `mcp_servers.scoutjobs.args=["mcp"]`,
 			"-c", "mcp_servers.scoutjobs.env=" + env, "-c", `approval_policy="never"`, "-"}, nil
 	}
 	return nil, fmt.Errorf("%s cannot read mail for ScoutJobs: use Claude Code or Codex", a.Name)
 }
+
+// MailTools are the scoutjobs MCP tools the inbox agent sees: the ones its prompts call.
+const MailTools = "job_list,job_set,email_log,interview_add,interview_list,calendar_save"
 
 // ReadyConnectors keeps the servers the agent is signed in to.
 func ReadyConnectors(conns []Connector) (mailboxes, calendars []Connector) {
