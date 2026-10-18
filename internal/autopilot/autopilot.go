@@ -1,5 +1,5 @@
 // Package autopilot does the daily chores while nobody watches: it runs the saved searches marked
-// daily, drafts the follow-ups that are due, and asks for the interview prep packs. It never sends
+// daily, skips postings their ATS closed, drafts the follow-ups that are due, and asks for the interview prep packs. It never sends
 // anything and never submits an application.
 package autopilot
 
@@ -59,6 +59,7 @@ type Report struct {
 	Added     int         `json:"added"`
 	FollowUps []string    `json:"follow_ups"` // "Globex: followup"
 	Prep      []string    `json:"prep"`       // companies whose prep pack was queued
+	Closed    []string    `json:"closed"`     // postings skipped because the ATS closed them
 	Errors    []string    `json:"errors,omitempty"`
 }
 
@@ -66,6 +67,7 @@ type Report struct {
 func Daily(ctx context.Context, s *store.Store, o Options, now time.Time) Report {
 	var r Report
 	r.searches(ctx, s, o, now)
+	r.verify(ctx, s, o, now)
 	if s.Setting(FollowUpsSetting) == "on" {
 		r.followUps(s, o, now)
 	}
@@ -146,6 +148,9 @@ func runSearch(ctx context.Context, s *store.Store, o Options, x store.SavedSear
 			_ = s.AddEvent(j.ID, DigestEvent, x.Name)
 		}
 	}
+	if run.Added > 0 {
+		_, _ = apply.Rank(s, false)
+	}
 	return run
 }
 
@@ -156,6 +161,19 @@ func known(s *store.Store, p search.Posting) bool {
 	}
 	_, ok := s.JobByURL(p.URL)
 	return ok
+}
+
+// verify checks a batch of tracked postings and skips the ones closed for good.
+func (r *Report) verify(ctx context.Context, s *store.Store, o Options, now time.Time) {
+	checks, err := Verify(ctx, s, o, nil, now)
+	if err != nil {
+		r.Errors = append(r.Errors, err.Error())
+	}
+	for _, c := range checks {
+		if c.Result == "closed" {
+			r.Closed = append(r.Closed, c.Company+": "+c.Title)
+		}
+	}
 }
 
 // followUps saves the follow-up and thank-you e-mails that are due and not written yet, for the
@@ -220,6 +238,9 @@ func (r Report) Summary() string {
 	}
 	if n := len(r.FollowUps); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d %s drafted", n, plural(n, "follow-up", "follow-ups")))
+	}
+	if n := len(r.Closed); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d closed %s skipped", n, plural(n, "posting", "postings")))
 	}
 	if n := len(r.Prep); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d prep %s queued", n, plural(n, "pack", "packs")))
