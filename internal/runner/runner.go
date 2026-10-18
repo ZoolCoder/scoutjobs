@@ -126,6 +126,7 @@ type Status struct {
 	Last    string      `json:"last"` // when the run last logged or changed a step: proof the agent is alive
 	Ended   string      `json:"ended,omitempty"`
 	DryRun  bool        `json:"dry_run,omitempty"`
+	CostUSD float64     `json:"cost_usd,omitempty"`   // what the agent sessions reported spending
 	Keep    bool        `json:"keep_going,omitempty"` // a "fix" review verdict warns instead of stopping
 }
 
@@ -222,6 +223,10 @@ type Runner struct {
 	// letter whose layout every tailored document keeps
 	CVSource      string
 	CoverTemplate string
+	Model         string  // config.yaml agent_model: the claude model of unattended sessions
+	Effort        string  // config.yaml agent_effort
+	Budget        float64 // config.yaml agent_budget_usd: the most one session may spend
+	CheapModel    string  // config.yaml agent_cheap_model: the model scoring steps run on; "off" keeps the usual one
 }
 
 // Agents lists the agent CLIs found on this machine.
@@ -284,6 +289,8 @@ func (rn *Runner) pick(name string) (Agent, error) {
 	}
 	ag, ok := Pick(rn.Agents(), name)
 	if ok {
+		ag.Model, ag.Effort, ag.Budget = rn.Model, rn.Effort, rn.Budget
+		ag.Cheap = CheapModel(ag, rn.CheapModel)
 		return ag, nil
 	}
 	if name == "" || name == "auto" {
@@ -368,13 +375,20 @@ func (rn *Runner) exec(ctx context.Context, run *Run, ag Agent, j store.Job) err
 			run.logf("%s: %s", s.Name, detail)
 			continue
 		}
-		// consecutive AI steps share one agent session
+		// consecutive AI steps share one agent session; with a cheap model at hand, the scoring
+		// steps get a session of their own on it
+		cheap := ag.Cheap != "" && CheapSteps[s.Name]
 		group := []int{i}
-		for i+1 < len(run.Steps) && run.Steps[i+1].AI() && run.Steps[i+1].State != Skipped {
+		for i+1 < len(run.Steps) && run.Steps[i+1].AI() && run.Steps[i+1].State != Skipped &&
+			(ag.Cheap == "" || CheapSteps[run.Steps[i+1].Name] == cheap) {
 			i++
 			group = append(group, i)
 		}
-		if err := rn.session(ctx, run, ag, j, group); err != nil {
+		sag := ag
+		if cheap {
+			sag = ag.Light()
+		}
+		if err := rn.session(ctx, run, sag, j, group); err != nil {
 			return err
 		}
 	}
@@ -393,7 +407,11 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 		steps = append(steps, run.Steps[i].Step)
 		run.set(i, Running, "")
 	}
-	run.logf("%s: %s", ag.Name, labels(steps))
+	if ag.light {
+		run.logf("%s (%s): %s", ag.Name, ag.Cheap, labels(steps))
+	} else {
+		run.logf("%s: %s", ag.Name, labels(steps))
+	}
 	since := time.Now()
 	stop := make(chan struct{})
 	go rn.watch(run, j, group, since, stop)
@@ -467,13 +485,29 @@ func (rn *Runner) agentArgv(ctx context.Context, run *Run, ag Agent, argv []stri
 	}
 	sc := bufio.NewScanner(out)
 	sc.Buffer(make([]byte, 1<<20), 8<<20)
+	var cost float64
 	for sc.Scan() {
+		if c, ok := Cost(sc.Text()); ok {
+			cost += c
+		}
 		if line := summarize(sc.Text()); line != "" {
 			run.logf("  %s", line)
 		}
 	}
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("%s exited: %v %s", ag.Name, err, stderr.String())
+	err = cmd.Wait()
+	if cost > 0 {
+		run.mu.Lock()
+		run.CostUSD += cost
+		run.mu.Unlock()
+		run.logf("  spent $%.2f", cost)
+		_ = rn.Store.AddEvent(run.JobID, CostEvent, fmt.Sprintf("%.4f %s %s", cost, ag.Name, ag.Model))
+	}
+	if err != nil {
+		msg := stderr.String()
+		if ag.Name == "claude" && strings.Contains(msg, "unknown option") {
+			msg += " (this Claude Code is too old for the runner: run claude update)"
+		}
+		return fmt.Errorf("%s exited: %v %s", ag.Name, err, msg)
 	}
 	return nil
 }
@@ -541,8 +575,12 @@ func Prompt(j store.Job, dir, exe string, steps []Step) string {
 	for n, s := range steps {
 		fmt.Fprintf(&b, "Step %d, %s: %s\n", n+1, strings.ToLower(s.Label), strings.NewReplacer("{id}", fmt.Sprint(j.ID), "{company}", store.CompanyKey(j.Company)).Replace(s.Task))
 	}
+	seen := map[string]bool{}
 	for _, s := range steps {
-		fmt.Fprintf(&b, "\n\n===== skill %s =====\n\n%s", s.Skill, skills.Text(s.Skill))
+		if !seen[s.Skill] {
+			seen[s.Skill] = true
+			fmt.Fprintf(&b, "\n\n===== skill %s =====\n\n%s", s.Skill, skills.Unattended(s.Skill))
+		}
 	}
 	return b.String()
 }

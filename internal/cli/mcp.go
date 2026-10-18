@@ -10,6 +10,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
 // `scoutjobs mcp` is a stdio MCP server: newline-delimited JSON-RPC 2.0 on stdin/stdout. Every tool
@@ -50,10 +52,10 @@ var mcpTools = []mcpTool{
 		p("open", "boolean", "only open applications", "open"),
 		p("limit", "integer", "max rows", "limit")}, true},
 	{"job_show", "One job with its events, interviews and application folder.", []string{"job", "show"}, []mcpProp{jobRef}, true},
-	{"job_add", "Track a posting. Same company and title upserts. from=<posting url> on Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, Recruitee or BambooHR fills the fields you leave out, description into notes.", []string{"job", "add"}, []mcpProp{
+	{"job_add", "Track a posting; same company and title upserts. from=<ATS posting URL> fills the fields left out.", []string{"job", "add"}, []mcpProp{
 		p("from", "string", "posting URL on a supported ATS", "from"), p("company", "string", "required unless from is given", "company"), p("title", "string", "required unless from is given", "title"), p("url", "string", "", "url"),
 		p("location", "string", "", "location"), p("remote", "string", "remote|hybrid|onsite|unknown", "remote"),
-		p("source", "string", "linkedin|greenhouse|lever|ashby|manual|...", "source"), p("posted", "string", "YYYY-MM-DD", "posted"),
+		p("source", "string", "", "source"), p("posted", "string", "YYYY-MM-DD", "posted"),
 		p("deadline", "string", "YYYY-MM-DD", "deadline"), p("currency", "string", "", "currency"),
 		p("salary_min", "integer", "", "salary-min"), p("salary_max", "integer", "", "salary-max"),
 		p("tags", "string", "comma separated", "tags"), p("notes", "string", "", "notes"),
@@ -66,13 +68,21 @@ var mcpTools = []mcpTool{
 		p("notes", "string", "replace the notes", "notes"), p("contact", "string", "", "contact"), p("veto", "string", "hard eligibility failure that blocks sending; empty clears it", "veto"), p("note", "string", "append an event note", "note")}, false},
 	{"job_fit", "Store the evidence-backed fit review: one row per material requirement (requirement, kind must|nice, evidence, strength direct|adjacent|partial|gap, confidence, wording, risk), vetoes outside the score, score 0-100, notes. Writes fit-review.json and sets score, notes and veto on the job.", []string{"job", "fit"}, []mcpProp{jobRef,
 		req("review", "string", `json: {"requirements":[{"requirement":"...","kind":"must","evidence":"profile.md: ...","strength":"direct","confidence":"high","wording":"...","risk":"..."}],"vetoes":[{"rule":"...","reason":"..."}],"score":72,"notes":"..."}`, "review")}, true},
+	{"job_rank", "Score new jobs against the profile locally: free, no posting text in context. Sets fit (quick: notes) and moves new jobs to ranked; agent scores are kept. Run before any agent fit scoring and deep-score only the top ones.", []string{"job", "rank"}, []mcpProp{
+		p("all", "boolean", "rescore every open job an agent has not scored", "all")}, false},
 	{"job_check", "Run the application quality gates (documents, fit review, coverage, grounding, duplicates, ATS text layer, filenames). Fails while a gate fails.", []string{"job", "check"}, []mcpProp{jobRef}, true},
 	{"job_review", "Log the draft-reviewer verdict for the grounding gate: send when every claim is backed by the profile, fix otherwise.", []string{"job", "review"}, []mcpProp{jobRef,
 		req("verdict", "string", "send | fix", "verdict"), p("notes", "string", "what was checked, or what must change", "notes")}, false},
+	{"job_followup", "List applied jobs with follow-ups sent (at most 2) and what is next: due, in Nd, sweep, done. With job, log a follow-up the user confirmed they sent; nothing is sent from here.", []string{"job", "followup"}, []mcpProp{
+		p("job", "string", "job id, or company/title; only after the user confirms sending", ""), p("note", "string", "what was sent", "note")}, true},
+	{"job_sweep", "List applied and interviewing jobs quiet past stale_days. yes=true marks them no_response; ask the user first (all, pick ids, or skip).", []string{"job", "sweep"}, []mcpProp{
+		p("ids", "array", "close only these job ids", ""), p("yes", "boolean", "close them", "yes")}, true},
+	{"job_verify", "Check that new and ranked postings are still open on their ATS (free, no posting text). Closed ones are skipped after 3 failed checks over 2 days. Run before scoring a batch.", []string{"job", "verify"}, []mcpProp{
+		p("ids", "array", "check only these job ids", "")}, true},
 	{"job_skip", "Skip a job with the reason the preference learner reads.", []string{"job", "skip"}, []mcpProp{jobRef,
 		req("reason", "string", "why, in the user's words", "reason"), p("signals", "string", `json object, e.g. {"remote":"onsite","stack":["java"]}`, "signals")}, false},
-	{"search", "Search company boards (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr, rss) and remote boards. Each posting carries derived skills, level, employment type, regions and visa, and a match score against the profile (best first). add=true tracks the matches as status new.", []string{"search", "--compact"}, []mcpProp{
-		p("query", "array", "keyword queries; every word of a query must appear", "query"), p("board", "array", "source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, or the careers page URL", "board"),
+	{"search", "Search company ATS boards and remote boards. Postings come best match first with derived skills, level, regions and visa. add=true tracks them as new.", []string{"search", "--compact"}, []mcpProp{
+		p("query", "array", "keyword queries; every word of a query must appear", "query"), p("board", "array", "source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, or a careers page URL", "board"),
 		p("remote", "boolean", "also query the remote boards", "remote"), p("limit", "integer", "max postings", "limit"), p("add", "boolean", "add matches to the tracker", "add"),
 		p("location", "string", "comma separated cities, countries or regions; remote jobs match when open to them", "location"),
 		p("hide_mismatches", "boolean", "drop postings that break a must in the profile (place, engagement, salary floor)", "hide-mismatches")}, true},
@@ -83,16 +93,25 @@ var mcpTools = []mcpTool{
 	{"cv_list", "CV check history.", []string{"cv", "list"}, []mcpProp{p("limit", "integer", "", "limit")}, true},
 	{"cv_export", "Render resume.md (master cv/ or a job's folder) to PDF next to it.", []string{"cv", "export"}, []mcpProp{
 		p("job", "string", "job id; omit for the master resume", ""), p("file", "string", "markdown file, default resume.md", "file")}, true},
+	{"cv_verify", "Check a PDF CV the way an ATS reads it: page count, text layer, e-mail, required phrases, date-range dashes. Runs locally; read its result instead of the PDF.", []string{"cv", "verify"}, []mcpProp{
+		p("job", "string", "job id, or a PDF path; omit for cv/resume.pdf", ""), p("file", "string", "PDF in the folder, default resume.pdf", "file"),
+		p("pages", "integer", "most pages allowed, default 2", "pages"), p("contains", "array", "phrases the text must hold", "contains")}, true},
+	{"profile_expand", "Skills found in cv/, linkedin/ and the user's public GitHub repos that profile.md does not list yet, with where each showed up. Runs locally. Pass add only with skills the user confirmed.", []string{"profile", "expand"}, []mcpProp{
+		p("github", "string", "GitHub user; default the link in profile.md", "github"), p("add", "string", "comma separated confirmed skills to append to Working", "add")}, true},
+	{"country_show", "What a country implies for the search: currency, local job boards, posting languages, time zone, CV norms, work-rights note. Changes nothing.", []string{"country", "show"}, []mcpProp{
+		req("country", "string", "ISO code or name, e.g. DK or Denmark", "")}, true},
+	{"country_set", "Set the user's country: writes country, currency and local boards to config.yaml and proposes locations, languages, timezone and cv_norms for the user to confirm with pref review. Never suggests salary.", []string{"country", "set"}, []mcpProp{
+		req("country", "string", "ISO code or name, e.g. DK or Denmark", "")}, true},
 	{"cv_cover", "Fill the Word cover letter template (cover_template in config.yaml) with cover-letter.slots.json: writes cover-letter.docx, cover-letter.md and, with LibreOffice, cover-letter.pdf, and reports template and page problems.", []string{"cv", "cover"}, []mcpProp{jobRef,
 		p("template", "string", "Word template; default cover_template", "template")}, true},
 	{"email_draft", "Build the application e-mail (email.json and email.eml) from the cover letter. Nothing is sent.", []string{"email", "draft"}, []mcpProp{jobRef,
 		p("to", "string", "recipient; default the job's contact", "to"), p("subject", "string", "", "subject"),
 		p("body", "string", "file in the application folder used as body", "body"), p("attach", "array", "extra files to attach", "attach")}, true},
 	{"email_show", "Show the e-mail draft of a job.", []string{"email", "show"}, []mcpProp{jobRef}, true},
-	{"email_sync", "Read the inbox on this machine (Gmail API after gmail setup, or IMAP; when the user chose the AI agent on the Inbox page this fails, so read the mail through your connector and log replies with email_log), log replies matched to applications (rejections and interview invitations move the status), and return under review the few unmatched messages that look like they concern the search. Use this before reading mail through a connector: it costs no message bodies.", []string{"email", "sync"}, []mcpProp{
+	{"email_sync", "Read the inbox locally (Gmail API or IMAP), log replies matched to applications (rejections and invites move the status) and list unmatched ones under review. Try before a mail connector: no message bodies in context. Fails when the user chose the AI agent for mail; then use email_log.", []string{"email", "sync"}, []mcpProp{
 		p("since", "string", "14d, 3w, or YYYY-MM-DD", "since"), p("limit", "integer", "", "limit"), p("dry_run", "boolean", "show matches, change nothing", "dry-run"),
 		p("via", "string", "gmail | imap | auto", "via")}, true},
-	{"email_log", "Record a message matched to a job through a Gmail connector, so the dashboard shows it on the job and in the inbox. Repeat runs with the same message_id are ignored.", []string{"email", "log"}, []mcpProp{jobRef,
+	{"email_log", "Record a mail message read through a connector against its job. Same message_id is ignored.", []string{"email", "log"}, []mcpProp{jobRef,
 		req("subject", "string", "", "subject"), p("from", "string", "sender address", "from"), p("snippet", "string", "one or two lines, no more", "snippet"),
 		p("date", "string", "RFC3339 or YYYY-MM-DD", "date"), p("thread", "string", "Gmail thread id", "thread"), p("message_id", "string", "Message-ID or connector message id", "message-id"),
 		p("kind", "string", "rejected|interview|offer|request|ack", "kind"), p("dir", "string", "in (received, default) or out (sent)", "dir"),
@@ -211,7 +230,11 @@ func (t mcpTool) args(in map[string]any) ([]string, error) {
 			}
 		case "array":
 			for _, s := range anyStrings(v) {
-				flags = append(flags, "--"+pr.Flag, s)
+				if pr.Flag == "" {
+					args = append(args, s)
+				} else {
+					flags = append(flags, "--"+pr.Flag, s)
+				}
 			}
 		default:
 			s := scalar(v)
@@ -317,8 +340,16 @@ func mcpHandle(req rpcRequest) (rpcResponse, bool) {
 		resp.Result = map[string]any{}
 	case "tools/list":
 		var list []map[string]any
+		mailOff := mcpMailOff()
 		for _, t := range mcpTools {
-			list = append(list, map[string]any{"name": t.Name, "description": t.Desc, "inputSchema": t.schema()})
+			if !mcpOffered(t.Name) || mailOff && slices.Contains(mcpMailTools, t.Name) {
+				continue
+			}
+			tool := map[string]any{"name": t.Name, "description": t.Desc, "inputSchema": t.schema()}
+			if t.readOnly() {
+				tool["annotations"] = map[string]any{"readOnlyHint": true}
+			}
+			list = append(list, tool)
 		}
 		resp.Result = map[string]any{"tools": list}
 	case "tools/call":
@@ -351,7 +382,7 @@ var errNoTool = errors.New("unknown tool")
 
 func mcpCall(name string, in map[string]any) (string, error) {
 	for _, t := range mcpTools {
-		if t.Name != name {
+		if t.Name != name || !mcpOffered(name) {
 			continue
 		}
 		args, err := t.args(in)
@@ -363,9 +394,45 @@ func mcpCall(name string, in map[string]any) (string, error) {
 		}
 		var buf mcpOutput
 		err = Run(args, &buf)
-		return strings.TrimSpace(buf.String()), err
+		return capOutput(strings.TrimSpace(buf.String())), err
 	}
 	return "", fmt.Errorf("%w: %s", errNoTool, name)
+}
+
+// mcpOffered reports whether this server offers a tool. SCOUTJOBS_MCP_TOOLS, a comma separated list,
+// narrows the set: an unattended session gets the few tools its steps call, because every listed
+// tool's schema is sent with every request.
+func mcpOffered(name string) bool {
+	only := os.Getenv("SCOUTJOBS_MCP_TOOLS")
+	return only == "" || slices.Contains(strings.Split(only, ","), name)
+}
+
+// mcpMailTools read the mailbox; with email_sync off their schemas would only cost every request tokens.
+var mcpMailTools = []string{"email_sync", "email_log", "email_show", "gmail_status", "gmail_draft"}
+
+func mcpMailOff() bool {
+	s, err := store.Open()
+	if err != nil {
+		return false
+	}
+	defer s.Close()
+	return emailMode(s, LoadConfig(s.Home)) == "off"
+}
+
+// mcpReadOnly are the tools that change nothing, so a client may run them without asking.
+var mcpReadOnly = []string{"brief", "stats", "funnel", "doctor", "job_list", "job_show", "cv_files", "cv_list", "cv_verify", "country_show",
+	"email_show", "gmail_status", "decision_summary", "pref_list", "pref_review", "interview_list", "contacts", "session_list", "learn_list"}
+
+func (t mcpTool) readOnly() bool { return slices.Contains(mcpReadOnly, t.Name) }
+
+// mcpMaxOutput bounds one tool result: a long listing would otherwise fill the client's context.
+const mcpMaxOutput = 40_000
+
+func capOutput(s string) string {
+	if len(s) <= mcpMaxOutput {
+		return s
+	}
+	return s[:mcpMaxOutput] + fmt.Sprintf("\n… cut at %d of %d bytes; narrow the query (status, q, limit) for the rest", mcpMaxOutput, len(s))
 }
 
 // mcpOutput collects a tool's output and tells commands that an AI client called them.

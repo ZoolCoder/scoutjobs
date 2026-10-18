@@ -176,6 +176,39 @@ func locate(u *url.URL) (source, slug, id string, ok bool) {
 	return "", "", "", false
 }
 
+// PostingLive reports whether a posting is still served: through the ATS API when its host has one,
+// otherwise by the page's HTTP status. A closed posting gives an error wrapping ErrGone.
+func PostingLive(ctx context.Context, rawURL string, client *http.Client, base map[string]string) error {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || u.Host == "" {
+		return fmt.Errorf("%q: not a URL", rawURL)
+	}
+	if _, _, id, ok := locate(u); (ok && id != "") || strings.TrimPrefix(u.Hostname(), "www.") == "remotive.com" {
+		_, err := FetchPosting(ctx, rawURL, client, base)
+		return err
+	}
+	if client == nil {
+		client = &http.Client{Timeout: 20 * time.Second}
+	}
+	if err := robotsAllowed(ctx, client, u); err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", userAgent)
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	res.Body.Close()
+	if res.StatusCode >= 200 && res.StatusCode < 300 {
+		return nil
+	}
+	return httpError(u.String(), res.StatusCode)
+}
+
 // FetchPosting fetches one posting by its public URL on a supported ATS.
 func FetchPosting(ctx context.Context, rawURL string, client *http.Client, base map[string]string) (Posting, error) {
 	u, err := url.Parse(strings.TrimSpace(rawURL))
@@ -263,7 +296,7 @@ func pick(list []Posting, id string) (Posting, error) {
 			return p, nil
 		}
 	}
-	return Posting{}, fmt.Errorf("posting %s not found on the board (closed, or not published)", id)
+	return Posting{}, fmt.Errorf("posting %s not found on the board (closed, or not published): %w", id, ErrGone)
 }
 
 // Excerpt cuts text to n runes on a word boundary, for notes fields.

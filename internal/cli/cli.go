@@ -28,9 +28,13 @@ Usage: scoutjobs <command> [subcommand] [flags]
   version                    print the version
   update [--check] [--yes] [--version vX.Y.Z]   install the latest release over this binary (brew/deb/rpm installs are handed to their manager)
   job add [--from url]|list [--compact]|show|set|skip|rm|import
+  job rank [--all]           score jobs locally against profile.md, free, best fit first
+  job followup [<id>]        quiet applications and their follow-ups; with an id, log one you sent (at most 2)
+  job sweep [<id>...] [--yes]   close applications quiet past stale_days as no_response
+  job verify [<id>...]       check new and ranked postings are still open; skips closed ones after 3 checks over 2 days
   job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--keep-going] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
-  cv files|log|list|export|cover   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF, cover letter from a Word template
+  cv files|log|list|export|verify|cover   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF, ATS checks on a PDF, cover letter from a Word template
   email draft|show|send   application e-mail from the cover letter; send needs --yes
   email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
   email log <job>         record a message an agent's Gmail connector matched to a job
@@ -46,6 +50,8 @@ Usage: scoutjobs <command> [subcommand] [flags]
   contacts <job>|--company x who you know at a company (from the LinkedIn import)
   session log|list
   learn add|list|set
+  profile expand [--add s,s]  skills in cv/, linkedin/ and public GitHub repos that profile.md lacks
+  country list|show|set <c>  set currency and local boards from the country, propose the preferences it implies
   stats [--funnel]           funnel, weekly numbers, follow-ups due; --funnel: what works by source, fit, month
   brief [--compact]          everything the daily briefing needs (json)
   daily [--json]             daily searches, follow-up drafts, prep packs: what serve does every hour (sends nothing)
@@ -110,6 +116,10 @@ func Run(args []string, out io.Writer) error {
 		return runSession(s, rest, out)
 	case "learn":
 		return runLearn(s, rest, out)
+	case "profile":
+		return runProfile(s, rest, out)
+	case "country":
+		return runCountry(s, rest, out)
 	case "gmail", "google":
 		return runGmail(s, cfg, rest, out)
 	case "calendar":
@@ -172,11 +182,24 @@ func sub(rest []string) (string, []string) {
 func emit(out io.Writer, asJSON bool, v any, human func()) error {
 	if asJSON {
 		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
+		if terminal(out) {
+			enc.SetIndent("", "  ")
+		}
 		return enc.Encode(v)
 	}
 	human()
 	return nil
+}
+
+// terminal is true when a person reads the output. Agents, pipes and the MCP server get JSON without
+// indentation: the spaces are a third of a nested payload's tokens.
+func terminal(out io.Writer) bool {
+	f, ok := out.(*os.File)
+	if !ok {
+		return false
+	}
+	st, err := f.Stat()
+	return err == nil && st.Mode()&os.ModeCharDevice != 0
 }
 
 func table(out io.Writer, header string, rows [][]string) {
@@ -252,12 +275,18 @@ follow_up_days: 10      # quiet applications older than this get a follow-up sug
 stale_days: 60          # quiet applications older than this get a stale sweep
 weekly_apply_target: 5  # applications per week the dashboard measures against
 fit_apply_floor: 60     # the job-fit skill suggests skipping below this score
+country:                # where you search from; scoutjobs country set DK fills currency and local boards
 currency: EUR           # salaries converted to yearly figures in this currency, original kept in notes
 dashboard_addr: 127.0.0.1:7070
 theme: light            # dashboard: light | dark | auto (follow system)
 
 # job run and the dashboard's Prepare application: which agent CLI writes the drafts
 agent: auto             # claude | codex | custom | auto (the first one found)
+agent_model: sonnet     # claude model for unattended runs: sonnet (default), haiku (cheapest), opus (priciest) or default (the CLI's own)
+agent_effort:           # claude reasoning effort for unattended runs: low (cheapest), medium, high; empty keeps the CLI's
+agent_budget_usd: 3     # a claude session stops once it has spent this many US dollars; 0 sets no cap
+agent_cheap_model:      # fit review and ATS check run on this cheaper model; empty: haiku (claude), the affordable
+                        # codex model, flash (gemini); "off" runs them on agent_model
 agent_command:          # any other agent that reads the prompt on stdin, e.g. "gemini --yolo"; used as "custom"
 cv_source:              # the CV tailored resumes start from, e.g. cv/resume.md or "cv/My CV.docx" (default: cv/resume.md)
 cover_template:         # the cover letter whose format every letter keeps (default: cv/cover-letter.md)
@@ -273,6 +302,8 @@ smtp_host:              # smtp.gmail.com:587 (STARTTLS) or host:465 (TLS); passw
 smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
+email_sync:             # reading replies: off (no Inbox, no mail tools for the AI), manual (only when asked), auto (also daily);
+                        # empty: auto once Gmail or IMAP is connected, manual with the agent mailbox, else off
 
 # Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Google on the dashboard's Inbox page); it stores
 # the client in gmail-client.json, so these two stay empty unless you prefer them here
@@ -536,6 +567,14 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		return runJobReview(s, rest, out)
 	case "check":
 		return runJobCheck(s, rest, out)
+	case "rank":
+		return runJobRank(s, rest, out)
+	case "followup":
+		return runJobFollowup(s, rest, out)
+	case "sweep":
+		return runJobSweep(s, rest, out)
+	case "verify":
+		return runJobVerify(s, rest, out)
 	case "acknowledge":
 		return runJobAcknowledge(s, rest, out)
 	case "run":
@@ -554,7 +593,7 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, "removed #%d\n", j.ID)
 		return nil
 	}
-	return errors.New("usage: job add|list|show|set|fit|check|acknowledge|review|skip|rm")
+	return errors.New("usage: job add|list|show|set|fit|rank|check|acknowledge|review|skip|followup|sweep|verify|rm")
 }
 
 func appDir(s *store.Store, j store.Job) string { return apply.Dir(s, j) }
@@ -1012,13 +1051,13 @@ func runStats(s *store.Store, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, "applied this week: %d / target %d   response rate: %.0f%%   avg fit of applied: %.0f\n", st.AppliedWeek, cfg.WeeklyApplyTarget, st.ResponseRate*100, st.AvgFit)
 		fmt.Fprintf(out, "interviews this week: %d   practice sessions: %d   learning hours: %.1f   streak: %d days\n", st.InterviewsWeek, st.PracticeWeek, st.LearningHours, st.Streak)
 		if len(st.DueFollowUps) > 0 {
-			fmt.Fprintf(out, "\nfollow-ups due (%d+ days quiet):\n", cfg.FollowUpDays)
+			fmt.Fprintf(out, "\nfollow-ups due (%d+ days quiet; log one sent with scoutjobs job followup <id>):\n", cfg.FollowUpDays)
 			for _, j := range st.DueFollowUps {
 				fmt.Fprintf(out, "  #%d %s / %s (since %s)\n", j.ID, j.Company, j.Title, j.UpdatedAt[:10])
 			}
 		}
 		if len(st.Stale) > 0 {
-			fmt.Fprintf(out, "\nstale (%d+ days, consider no_response):\n", cfg.StaleDays)
+			fmt.Fprintf(out, "\nstale (%d+ days; close with scoutjobs job sweep --yes):\n", cfg.StaleDays)
 			for _, j := range st.Stale {
 				fmt.Fprintf(out, "  #%d %s / %s (since %s)\n", j.ID, j.Company, j.Title, j.UpdatedAt[:10])
 			}
@@ -1086,7 +1125,14 @@ func runBrief(s *store.Store, rest []string, out io.Writer) error {
 	slim := func(jobs []store.Job) []map[string]any {
 		out := make([]map[string]any, 0, len(jobs))
 		for _, j := range jobs {
-			out = append(out, map[string]any{"id": j.ID, "company": j.Company, "title": j.Title, "fit": j.FitScore, "remote": j.Remote, "updated": j.UpdatedAt[:10]})
+			row := map[string]any{"id": j.ID, "company": j.Company, "title": j.Title, "fit": j.FitScore, "remote": j.Remote, "updated": j.UpdatedAt[:10]}
+			if j.Deadline != "" {
+				row["deadline"] = j.Deadline
+			}
+			if j.Status == "applied" {
+				row["follow_ups"] = s.FollowUps(j.ID)
+			}
+			out = append(out, row)
 		}
 		return out
 	}

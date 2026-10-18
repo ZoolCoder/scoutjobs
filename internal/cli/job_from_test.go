@@ -25,7 +25,7 @@ func TestJobAddFrom(t *testing.T) {
 		t.Fatalf("add --from:\n%s", out)
 	}
 	show := run(t, "job", "show", "1", "--json")
-	for _, want := range []string{`"location": "Berlin"`, `"remote": "hybrid"`, `"source": "greenhouse"`, `"posted_at": "2026-10-01"`, `"notes": "Build services in Go"`, `"url": "https://boards.greenhouse.io/acme/jobs/1"`} {
+	for _, want := range []string{`"location":"Berlin"`, `"remote":"hybrid"`, `"source":"greenhouse"`, `"posted_at":"2026-10-01"`, `"notes":"Build services in Go"`, `"url":"https://boards.greenhouse.io/acme/jobs/1"`} {
 		if !strings.Contains(show, want) {
 			t.Errorf("job lacks %s:\n%s", want, show)
 		}

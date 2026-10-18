@@ -95,7 +95,7 @@ func atsServer(t *testing.T) *httptest.Server {
 func TestNewSources(t *testing.T) {
 	srv := atsServer(t)
 	base := map[string]string{"recruitee": srv.URL + "/recruitee", "bamboohr": srv.URL + "/bamboohr", "hn": srv.URL + "/hn",
-		"remotive": srv.URL + "/none", "remoteok": srv.URL + "/none", "arbeitnow": srv.URL + "/none", "jobicy": srv.URL + "/none", "himalayas": srv.URL + "/none"}
+		"remotive": srv.URL + "/none", "remoteok": srv.URL + "/none", "arbeitnow": srv.URL + "/none", "jobicy": srv.URL + "/none", "himalayas": srv.URL + "/none", "freehire": srv.URL + "/none"}
 	r := Run(context.Background(), Options{Queries: []string{"go"}, Boards: []string{"https://acme.recruitee.com/", "bamboohr:acme"}, Remote: true, Limit: 10, Client: srv.Client(), BaseURL: base})
 	got := map[string]Posting{}
 	for _, p := range r.Postings {

@@ -70,8 +70,12 @@ func Proposals(s *store.Store, j store.Job, followUpDays int, now time.Time) []P
 	switch j.Status {
 	case "applied":
 		applied := statusSince(events, "applied", j.UpdatedAt)
-		if !applied.IsZero() && now.Sub(applied) >= time.Duration(followUpDays)*24*time.Hour && lastIn.Before(applied) {
-			out = append(out, t.followup(int(now.Sub(applied).Hours()/24)))
+		last, sent := lastFollowUp(events)
+		if last.Before(applied) {
+			last = applied
+		}
+		if !applied.IsZero() && sent < store.MaxFollowUps && now.Sub(last) >= time.Duration(followUpDays)*24*time.Hour && lastIn.Before(applied) {
+			out = append(out, t.followup(int(now.Sub(applied).Hours()/24), sent))
 		}
 	case "interview":
 		for _, iv := range ivs {
@@ -171,9 +175,41 @@ func (t template) re() string {
 	return s
 }
 
-func (t template) followup(days int) Proposal {
+// followup is the nudge on a quiet application; sent is how many went before. The second and last one
+// is shorter and leaves the door open, since a third would only annoy.
+func (t template) followup(days, sent int) Proposal {
+	if sent > 0 {
+		body := fmt.Sprintf("Hello,\n\nI wanted to check in once more on my application for the %s position at %s. I remain interested and would welcome a short update whenever you have one.\n\nIf the role has been filled, a brief note would help me plan, and I would be glad to be considered for future openings.", t.job.Title, t.job.Company)
+		return Proposal{Kind: "followup", Label: "Last follow-up", Why: fmt.Sprintf("no reply %d days after applying and one follow-up", days), Msg: t.msg(t.re(), body)}
+	}
 	body := fmt.Sprintf("Hello,\n\nI applied for the %s position at %s %d days ago and wanted to follow up. I am still very interested in the role and would be glad to share anything else that helps your decision.\n\nIs there an update on the next steps?", t.job.Title, t.job.Company, days)
 	return Proposal{Kind: "followup", Label: "Follow-up", Why: fmt.Sprintf("no reply %d days after applying", days), Msg: t.msg(t.re(), body)}
+}
+
+// lastFollowUp is when the newest follow-up went out and how many did.
+func lastFollowUp(events []store.Event) (time.Time, int) {
+	var last time.Time
+	n := 0
+	for _, e := range events {
+		if e.Kind != store.FollowUpEvent {
+			continue
+		}
+		if n == 0 {
+			last, _ = time.Parse(time.RFC3339, e.At)
+		}
+		n++
+	}
+	return last, n
+}
+
+// FollowedUp records that the user sent the follow-up and drops the saved draft, so the next one,
+// if any, is written fresh.
+func FollowedUp(s *store.Store, j store.Job, note string) (int, error) {
+	n, err := s.FollowedUp(j.ID, note)
+	if err == nil {
+		_ = os.Remove(filepath.Join(Dir(s, j), DraftFile("followup")))
+	}
+	return n, err
 }
 
 func (t template) thanks(iv store.Interview) Proposal {

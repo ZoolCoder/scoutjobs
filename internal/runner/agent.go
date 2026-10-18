@@ -2,6 +2,7 @@ package runner
 
 import (
 	"encoding/json"
+	"github.com/zoolcoder/scoutjobs/internal/store"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +15,102 @@ type Agent struct {
 	Name string   // claude | codex | custom
 	Path string   // executable
 	Args []string // custom only: arguments before the prompt, which arrives on stdin
+	// Model is the claude model the sessions use; empty keeps the CLI's own default, which may be the priciest
+	Model string
+	// Effort is the claude reasoning effort (low, medium, high); empty keeps the CLI's default
+	Effort string
+	// Budget stops a claude session once it has spent this many US dollars; 0 sets no cap
+	Budget float64
+	// Cheap is the agent's cheaper model, which scoring steps run on; empty runs them on the usual one
+	Cheap string
+	// light runs this session on Cheap
+	light bool
+}
+
+// CheapSteps need reading and scoring more than writing, so a cheap model does them about as well.
+var CheapSteps = map[string]bool{"fit": true, "ats": true}
+
+// Light is the agent set to run a session of cheap steps, or itself when it has no cheap model.
+func (a Agent) Light() Agent {
+	a.light = a.Cheap != ""
+	return a
+}
+
+// CheapModel is the model scoring steps run on: the configured one ("off" turns it off), else the
+// agent's own cheap tier. Custom agents keep their command as written, except Gemini CLI.
+func CheapModel(a Agent, configured string) string {
+	switch {
+	case configured == "off":
+		return ""
+	case configured != "":
+		return configured
+	}
+	switch a.Name {
+	case "claude":
+		return "haiku"
+	case "codex":
+		return codexCheapModel()
+	case "custom":
+		if filepath.Base(a.Path) == "gemini" && !hasModelFlag(a.Args) {
+			return "flash"
+		}
+	}
+	return ""
+}
+
+// codexCheapModel is the first model Codex itself describes as affordable, from the model list
+// it caches; names change too often to hard-code one.
+func codexCheapModel() string {
+	h, _ := os.UserHomeDir()
+	data, err := os.ReadFile(filepath.Join(h, ".codex", "models_cache.json"))
+	if err != nil {
+		return ""
+	}
+	var cache struct {
+		Models []struct {
+			Slug        string `json:"slug"`
+			Description string `json:"description"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(data, &cache) != nil {
+		return ""
+	}
+	for _, m := range cache.Models {
+		if strings.Contains(strings.ToLower(m.Description), "affordable") {
+			return m.Slug
+		}
+	}
+	return ""
+}
+
+func hasModelFlag(args []string) bool {
+	for _, a := range args {
+		if a == "-m" || a == "--model" || strings.HasPrefix(a, "--model=") {
+			return true
+		}
+	}
+	return false
+}
+
+// PrepTools are the scoutjobs MCP tools a preparation session sees. Each tool's schema rides along with
+// every request, so the session gets the generic run tool and the two it calls most, not all of them.
+const PrepTools = "run,job_show,job_set"
+
+// claudeTuning is the model, effort and spending cap flags of a claude session.
+func (a Agent) claudeTuning() []string {
+	var out []string
+	if a.light {
+		out = append(out, "--model", a.Cheap)
+	} else if a.Model != "" {
+		out = append(out, "--model", a.Model)
+	}
+	if a.Effort != "" {
+		out = append(out, "--effort", a.Effort)
+	}
+	if a.Budget > 0 {
+		out = append(out, "--max-budget-usd", strconv.FormatFloat(a.Budget, 'f', 2, 64))
+	}
+	return out
 }
 
 // Known agents, in the order Detect prefers them.
@@ -71,21 +168,51 @@ func (a Agent) command(exe, home, dir string) []string {
 	switch a.Name {
 	case "claude":
 		mcp, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"scoutjobs": map[string]any{
-			"command": exe, "args": []string{"mcp"}, "env": map[string]string{"SCOUTJOBS_HOME": home, "SCOUTJOBS_RUNNER": "1"}}}})
+			"command": exe, "args": []string{"mcp"}, "env": map[string]string{"SCOUTJOBS_HOME": home, "SCOUTJOBS_RUNNER": "1", "SCOUTJOBS_MCP_TOOLS": PrepTools}}}})
 		// --restricted ignores the user's own permission settings and confines file tools to the working
 		// directories: the data folder is readable, writes are allowed only in the application folder.
 		abs := "/" + dir // permission rules write absolute paths with a leading //
-		return []string{a.Path, "-p", "--restricted", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
+		// --tools loads only these built-in tools, so the others' schemas are not sent with every request
+		return append([]string{a.Path, "-p", "--restricted", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
 			"--permission-mode", "dontAsk", "--mcp-config", string(mcp), "--strict-mcp-config", "--add-dir", home,
+			"--tools", "Read,Glob,Grep,Edit,Write",
+			// the same system prompt for every job folder, so queued jobs reuse the prompt cache
+			"--exclude-dynamic-system-prompt-sections",
 			"--allowedTools", "mcp__scoutjobs", "Read", "Glob", "Grep", "Edit(" + abs + "/**)", "Write(" + abs + "/**)",
-			"--disallowedTools", "Bash", "WebFetch", "WebSearch"}
+			"--disallowedTools", "Bash", "WebFetch", "WebSearch"}, a.claudeTuning()...)
 	case "codex":
-		env := `{SCOUTJOBS_HOME=` + strconv.Quote(home) + `,SCOUTJOBS_RUNNER="1"}`
-		return []string{a.Path, "exec", "--json", "--skip-git-repo-check", "--cd", dir, "--sandbox", "workspace-write",
+		env := `{SCOUTJOBS_HOME=` + strconv.Quote(home) + `,SCOUTJOBS_RUNNER="1",SCOUTJOBS_MCP_TOOLS=` + strconv.Quote(PrepTools) + `}`
+		argv := []string{a.Path, "exec", "--json", "--skip-git-repo-check", "--cd", dir, "--sandbox", "workspace-write",
 			"-c", "mcp_servers.scoutjobs.command=" + strconv.Quote(exe), "-c", `mcp_servers.scoutjobs.args=["mcp"]`,
-			"-c", "mcp_servers.scoutjobs.env=" + env, "-c", `approval_policy="never"`, "-"}
+			"-c", "mcp_servers.scoutjobs.env=" + env, "-c", `approval_policy="never"`}
+		if a.light {
+			argv = append(argv, "-m", a.Cheap)
+		}
+		return append(argv, "-")
 	}
-	return append([]string{a.Path}, a.Args...)
+	argv := append([]string{a.Path}, a.Args...)
+	if a.light {
+		argv = append(argv, "-m", a.Cheap)
+	}
+	return argv
+}
+
+// CostEvent is the job event an agent session's spend is logged under, in US dollars first.
+const CostEvent = store.SpendEvent
+
+// Cost reads what a session spent from Claude's stream-json result event.
+func Cost(line string) (float64, bool) {
+	if !strings.Contains(line, `"total_cost_usd"`) {
+		return 0, false
+	}
+	var ev struct {
+		Type string  `json:"type"`
+		Cost float64 `json:"total_cost_usd"`
+	}
+	if json.Unmarshal([]byte(line), &ev) != nil || ev.Type != "result" {
+		return 0, false
+	}
+	return ev.Cost, true
 }
 
 // summarize turns one line of the agent's output into a short log line, "" for noise. It knows Claude's
@@ -117,8 +244,21 @@ func summarize(line string) string {
 		}
 		return strings.Join(out, "\n")
 	case "result": // repeats the last assistant text; only an error is new
-		if ev["is_error"] == true {
-			return "error: " + clip(str(ev, "result"))
+		switch str(ev, "subtype") {
+		case "error_max_budget_usd":
+			return "error: stopped at the spend cap; raise agent_budget_usd in config.yaml to let it finish"
+		case "error_max_turns":
+			return "error: stopped at the turn limit before the work was done"
+		}
+		if ev["is_error"] == true || strings.HasPrefix(str(ev, "subtype"), "error") {
+			msg := str(ev, "result")
+			if errs, _ := ev["errors"].([]any); msg == "" && len(errs) > 0 {
+				msg, _ = errs[0].(string)
+			}
+			if msg == "" {
+				msg = str(ev, "subtype")
+			}
+			return "error: " + clip(msg)
 		}
 	case "item.completed": // codex
 		it, _ := ev["item"].(map[string]any)

@@ -32,7 +32,7 @@ func (f fetcher) fetch(ctx context.Context, method, u string, body []byte, accep
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf("%s: http %d", u, res.StatusCode)
+		return nil, httpError(u, res.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(res.Body, 20<<20))
 }

@@ -32,7 +32,7 @@ var Regions = map[string]string{
 	"colombia": LatAm, "chile": LatAm, "peru": LatAm, "uruguay": LatAm, "costa rica": LatAm,
 	"americas": Americas, "emea": EMEA,
 	"middle east": MEA, "africa": MEA, "israel": MEA, "uae": MEA, "united arab emirates": MEA, "saudi arabia": MEA,
-	"egypt": MEA, "nigeria": MEA, "kenya": MEA, "south africa": MEA, "turkey": MEA, "morocco": MEA, "jordan": MEA,
+	"egypt": MEA, "nigeria": MEA, "kenya": MEA, "south africa": MEA, "turkey": MEA, "türkiye": MEA, "morocco": MEA, "jordan": MEA,
 	"apac": APAC, "asia": APAC, "india": APAC, "singapore": APAC, "japan": APAC, "australia": APAC, "new zealand": APAC,
 	"philippines": APAC, "vietnam": APAC, "indonesia": APAC, "china": APAC, "south korea": APAC, "malaysia": APAC,
 	"thailand": APAC, "pakistan": APAC, "bangladesh": APAC,

@@ -318,6 +318,16 @@ func TestPosts(t *testing.T) {
 	if ls[0].Hours != 3.5 || ls[0].Status != "in_progress" {
 		t.Errorf("learning patch: %+v", ls[0])
 	}
+	if rec := post(h, "/jobs/1/followed-up", nil); rec.Code != 303 || s.FollowUps(1) != 1 {
+		t.Errorf("followed-up: %d, %d logged", rec.Code, s.FollowUps(1))
+	}
+	_, _ = s.DB.Exec(`UPDATE jobs SET updated_at='2000-01-01T00:00:00Z' WHERE id=1`)
+	if rec := post(h, "/jobs/sweep", nil); rec.Code != 303 {
+		t.Fatalf("sweep: %d %s", rec.Code, rec.Body.String())
+	}
+	if j, _ := s.JobByID(1); j.Status != "no_response" {
+		t.Errorf("swept job is %s", j.Status)
+	}
 }
 
 func TestAPIParity(t *testing.T) {
@@ -438,7 +448,7 @@ func TestSearchForm(t *testing.T) {
 	}
 	// a careers URL works as a board, and a tracked posting shows its stage instead of an Add button
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://boards.greenhouse.io/acme/"}})
-	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "In pipeline · new") || strings.Contains(b, `name="company" value="acme"`) {
+	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "In pipeline · ranked") || strings.Contains(b, `name="company" value="acme"`) {
 		t.Errorf("tracked mark: %d %s", rec.Code, b)
 	}
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://www.linkedin.com/jobs/"}})
@@ -654,5 +664,35 @@ func TestSplitPast(t *testing.T) {
 	ahead, past := splitPast([]store.Interview{{At: "2026-10-11T16:00"}, {At: "2026-10-12T08:00"}, {At: ""}, {At: "2026-10-13T14:00"}}, now)
 	if len(ahead) != 3 || len(past) != 1 || past[0].At != "2026-10-11T16:00" {
 		t.Errorf("ahead %v past %v", ahead, past)
+	}
+}
+
+func TestChangesMovesOnWrite(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5})
+	token := func() string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/changes", nil))
+		return rec.Body.String()
+	}
+	before := token()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if before == "" || !strings.Contains(rec.Body.String(), `data-changes="`+before+`"`) {
+		t.Fatalf("page not stamped with %q", before)
+	}
+	if token() != before {
+		t.Error("reading the page changed the token")
+	}
+	other, err := store.Open() // a second connection, as the MCP server or CLI holds
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	if err := other.AddEvent(1, "note", "from the assistant"); err != nil {
+		t.Fatal(err)
+	}
+	if token() == before {
+		t.Error("a write from another connection did not move the token")
 	}
 }

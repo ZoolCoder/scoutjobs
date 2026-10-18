@@ -1,7 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -55,22 +60,22 @@ func TestMCP(t *testing.T) {
 	if byID["1"].Result["protocolVersion"] != mcpProtocol {
 		t.Errorf("initialize: %v", byID["1"].Result)
 	}
-	if n := len(byID["2"].Result["tools"].([]any)); n != len(mcpTools) {
-		t.Errorf("tools/list: %d", n)
+	if n := len(byID["2"].Result["tools"].([]any)); n != len(mcpTools)-len(mcpMailTools) {
+		t.Errorf("tools/list: %d, want every tool but the mail ones (no mailbox)", n)
 	}
-	if !strings.Contains(text("12"), `"veto": "visa: no sponsorship"`) || isErr("12") {
+	if !strings.Contains(text("12"), `"veto":"visa: no sponsorship"`) || isErr("12") {
 		t.Errorf("job_fit: %s", text("12"))
 	}
-	if !strings.Contains(text("13"), `"ok": false`) || !isErr("13") {
+	if !strings.Contains(text("13"), `"ok":false`) || !isErr("13") {
 		t.Errorf("job_check must report the veto as an error: %s", text("13"))
 	}
-	if !strings.Contains(text("3"), `"created": true`) || isErr("3") {
+	if !strings.Contains(text("3"), `"created":true`) || isErr("3") {
 		t.Errorf("job_add: %s", text("3"))
 	}
 	if isErr("4") {
 		t.Errorf("job_set: %s", text("4"))
 	}
-	if !strings.Contains(text("5"), `"status": "applied"`) {
+	if !strings.Contains(text("5"), `"status":"applied"`) {
 		t.Errorf("job_list: %s", text("5"))
 	}
 	if !isErr("6") || !strings.Contains(text("6"), "title is required") {
@@ -79,7 +84,7 @@ func TestMCP(t *testing.T) {
 	if !isErr("7") || !strings.Contains(text("7"), "not available over MCP") {
 		t.Errorf("email send must be refused: %s", text("7"))
 	}
-	if !strings.Contains(text("8"), `"applied_total": 1`) {
+	if !strings.Contains(text("8"), `"applied_total":1`) {
 		t.Errorf("run stats: %s", text("8"))
 	}
 	if byID["9"].Error == nil || byID["10"].Error != nil || byID["null"].Error == nil || byID["11"].Error == nil || byID["11"].Error.Code != -32601 {
@@ -108,6 +113,24 @@ func TestMCP(t *testing.T) {
 	}
 }
 
+func TestMCPToolScope(t *testing.T) {
+	t.Setenv("SCOUTJOBS_MCP_TOOLS", "run,job_show")
+	resp, _ := mcpHandle(rpcRequest{ID: []byte("1"), Method: "tools/list"})
+	var names []string
+	for _, tool := range resp.Result.(map[string]any)["tools"].([]map[string]any) {
+		names = append(names, tool["name"].(string))
+	}
+	if strings.Join(names, ",") != "job_show,run" {
+		t.Errorf("scoped list %v", names)
+	}
+	if _, err := mcpCall("job_list", nil); !errors.Is(err, errNoTool) {
+		t.Errorf("a tool outside the scope ran: %v", err)
+	}
+	if got := capOutput(strings.Repeat("x", mcpMaxOutput+10)); len(got) > mcpMaxOutput+200 || !strings.Contains(got, "cut at") {
+		t.Errorf("uncapped output: %d bytes", len(got))
+	}
+}
+
 func TestMCPDeniesGoogleToTheRunner(t *testing.T) {
 	if mcpDenied([]string{"gmail", "status"}) {
 		t.Error("gmail status refused outside a run")
@@ -124,5 +147,43 @@ func TestMCPDeniesGoogleToTheRunner(t *testing.T) {
 	}
 	if !mcpDenied([]string{"calendar", "sync"}) || mcpDenied([]string{"calendar", "save", "--events", "[]"}) {
 		t.Error("a run may only save the events it listed, not sync Google Calendar")
+	}
+}
+
+func TestEmailSyncMode(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SCOUTJOBS_HOME", home)
+	run(t, "init")
+	listed := func() bool {
+		resp, _ := mcpHandle(rpcRequest{ID: []byte("1"), Method: "tools/list"})
+		for _, tool := range resp.Result.(map[string]any)["tools"].([]map[string]any) {
+			if tool["name"] == "email_sync" {
+				return true
+			}
+		}
+		return false
+	}
+	if listed() {
+		t.Error("no mailbox connected, yet the mail tools are offered")
+	}
+	setConfig := func(mode string) {
+		f, err := os.OpenFile(filepath.Join(home, "config.yaml"), os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Fprintf(f, "email_sync: %s\n", mode)
+		f.Close()
+	}
+	setConfig("manual")
+	if !listed() {
+		t.Error("email_sync: manual hides the mail tools")
+	}
+	if out := run(t, "email", "sync", "--auto"); !strings.Contains(out, "email_sync is manual: skipped") {
+		t.Errorf("--auto read the mail in manual mode: %q", out)
+	}
+	setConfig("off") // the last line wins
+	var b bytes.Buffer
+	if err := Run([]string{"email", "sync"}, &b); !errors.Is(err, errEmailOff) {
+		t.Errorf("email sync ran with email_sync: off: %v", err)
 	}
 }

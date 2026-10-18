@@ -18,6 +18,16 @@ scoutjobs path || echo "MISSING"
 - `MISSING` or command not found: tell the user to run `make install` in the scoutjobs repo (or `go install ./cmd/scoutjobs`). Stop until it works.
 - Otherwise run `scoutjobs init`. It is idempotent and prints which files it created.
 
+## 1b. Country first
+
+Ask one question: which country they search from (and live in, if different). Then run `scoutjobs country set <code or name> --json`. It costs no tokens beyond its output:
+
+- It writes `country`, `currency` and the country's local job boards to `config.yaml`.
+- It proposes `locations`, `languages`, `timezone` and `cv_norms` as pending preferences. Show them to the user as a short list. Confirm each one they accept with `scoutjobs pref confirm <key>`, or change it with `pref set ... --source stated`. Reject the rest with `pref reject <key>`.
+- Its `ask` list holds what the country cannot answer: salary floor (in the new currency), work mode, roles, work rights. Ask those in step 2. Never suggest a salary figure.
+
+An unknown country fails with a hint; `scoutjobs country list` shows the table. A country in the location filter but not the table (e.g. Kenya) gets no boards or currency, and the remote boards still apply.
+
 ## 2. Build the profile
 
 Read `$(scoutjobs path)/profile.md`. If it still has empty fields, collect the facts. Ask for the easiest source first:
@@ -33,6 +43,8 @@ Write the profile in the template's sections. Rules:
 - Keep it under 200 lines. Everything here may end up in a CV.
 
 Show the user the draft, apply corrections, then write it.
+
+Later, to grow an existing profile, run `scoutjobs profile expand --json`: it lists skills found in `cv/`, `linkedin/` and the user's public GitHub repositories that the profile lacks, with where each showed up, without reading those sources into the conversation. Ask which are true, then `scoutjobs profile expand --add <skill,skill>`. Never add one the user did not confirm.
 
 ## 3. Record stated preferences
 
@@ -50,7 +62,7 @@ Use short stable keys: `remote`, `roles`, `seniority`, `locations`, `salary_floo
 
 ## 4. Config
 
-Open `$(scoutjobs path)/config.yaml` and ask only about `weekly_apply_target`, `currency`, and `search_queries` (two or three role titles). If they named target companies, put the ATS slugs in `search_boards`. Leave the rest at defaults unless asked. `api_token` and `webhook_url` are only for automation tools (n8n); mention them once.
+Open `$(scoutjobs path)/config.yaml` and ask only about `weekly_apply_target` and `search_queries` (two or three role titles). `currency` and the local boards came from step 1b. If they named target companies, add their ATS slugs to `search_boards`. Leave the rest at defaults unless asked. `api_token` and `webhook_url` are only for automation tools (n8n); mention them once.
 
 ## 4b. CV check
 

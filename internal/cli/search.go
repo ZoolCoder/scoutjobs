@@ -28,7 +28,7 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	var queries, boards listFlag
 	fs.Var(&queries, "query", "keyword query, repeatable (all words must match; any query may)")
-	fs.Var(&boards, "board", "company board, repeatable: source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, or the careers page URL")
+	fs.Var(&boards, "board", "company board, repeatable: source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, the careers page URL, or a Danish board with an area: jobindex:dk, jobbank:aarhus, jobdanmark:odense")
 	var feeds listFlag
 	fs.Var(&feeds, "rss", "RSS or Atom job feed url, repeatable (same as --board rss:<url>)")
 	remote := fs.Bool("remote", cfg.SearchRemote, "query the remote boards too")
@@ -97,7 +97,7 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		return ok
 	}
 	if ranked {
-		opts.Rank = func(p search.Posting) int { return pr.Score(p).Score }
+		opts.Rank = func(p search.Posting) int { return rankKey(pr.Score(p)) }
 	}
 	r := search.Run(ctx, opts)
 	for _, e := range r.Errors {
@@ -131,6 +131,12 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 			}
 		}
 		rows = append(rows, rw)
+	}
+	if added > 0 {
+		// new jobs land ranked by the same local score, so no agent has to triage them
+		if _, err := apply.Rank(s, false); err != nil {
+			return err
+		}
 	}
 	if *asJSON {
 		enc := json.NewEncoder(out)
@@ -279,6 +285,8 @@ func runCV(s *store.Store, rest []string, out io.Writer) error {
 			_ = s.AddEvent(jobID, "cv:export", filepath.Base(dst))
 		}
 		return emit(out, *asJSON, map[string]any{"job": jobID, "file": dst, "bytes": size}, func() { fmt.Fprintf(out, "wrote %s (%d bytes)\n", dst, size) })
+	case "verify":
+		return runCVVerify(s, rest, out)
 	case "cover":
 		fs := flag.NewFlagSet("cv cover", flag.ContinueOnError)
 		tmpl := fs.String("template", "", "Word template with {{slot}} placeholders (default: cover_template in config.yaml)")
@@ -418,4 +426,13 @@ func stampATS(s *store.Store, c store.CVCheck) error {
 		return err
 	}
 	return apply.StampATS(apply.Dir(s, j), filepath.Base(c.File))
+}
+
+// rankKey sorts a posting that breaks a must after every one that does not, whatever its score:
+// a strong match in the wrong country must not push the local jobs out of the limit.
+func rankKey(m match.Result) int {
+	if len(m.Hard) > 0 {
+		return m.Score - 1000
+	}
+	return m.Score
 }

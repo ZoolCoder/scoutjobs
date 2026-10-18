@@ -31,7 +31,7 @@ var NextStatuses = map[string][]string{
 	"skipped":        {"ranked"},
 	"drafted":        {"applied", "skipped"},
 	"applied":        {"interview", "rejected", "no_response", "withdrawn"},
-	"interview":      {"offer", "rejected", "withdrawn"},
+	"interview":      {"offer", "rejected", "no_response", "withdrawn"},
 	"offer":          {"hired", "offer_declined"},
 	"rejected":       {"applied"},
 	"no_response":    {"applied", "withdrawn"},

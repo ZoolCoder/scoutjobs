@@ -458,6 +458,9 @@ func (v *server) apiSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = append(rows, rw)
 	}
+	if added > 0 {
+		_, _ = apply.Rank(v.s, false)
+	}
 	if res.Errors == nil {
 		res.Errors = []string{}
 	}

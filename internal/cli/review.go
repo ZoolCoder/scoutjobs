@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
@@ -191,4 +192,35 @@ func unresolved(rep apply.Report) error {
 	}
 	u := rep.Unresolved()
 	return fmt.Errorf("%d unresolved failure(s):\n  %s", len(u), strings.Join(u, "\n  "))
+}
+
+// runJobRank scores new jobs against the profile locally, so an agent only reads the postings worth it.
+func runJobRank(s *store.Store, rest []string, out io.Writer) error {
+	fs := flag.NewFlagSet("job rank", flag.ContinueOnError)
+	all := fs.Bool("all", false, "rescore every open job an agent has not scored, not only new ones")
+	asJSON := fs.Bool("json", false, "")
+	if _, err := parse(fs, rest); err != nil {
+		return err
+	}
+	ranked, err := apply.Rank(s, *all)
+	if err != nil {
+		return err
+	}
+	sort.SliceStable(ranked, func(a, b int) bool { return ranked[a].Job.FitScore > ranked[b].Job.FitScore })
+	rows := make([]map[string]any, 0, len(ranked))
+	for _, r := range ranked {
+		rows = append(rows, map[string]any{"id": r.Job.ID, "fit": r.Job.FitScore, "company": r.Job.Company, "title": r.Job.Title, "breaks": r.Match.Hard, "notes": strings.TrimPrefix(r.Job.FitNotes, apply.QuickPrefix)})
+	}
+	return emit(out, *asJSON, rows, func() {
+		var tbl [][]string
+		for _, r := range ranked {
+			score := fmt.Sprint(r.Job.FitScore)
+			if len(r.Match.Hard) > 0 {
+				score += "!"
+			}
+			tbl = append(tbl, []string{fmt.Sprint(r.Job.ID), score, trunc(r.Job.Company, 22), trunc(r.Job.Title, 44), trunc(strings.TrimPrefix(r.Job.FitNotes, apply.QuickPrefix), 60)})
+		}
+		table(out, "ID\tFIT\tCOMPANY\tTITLE\tWHY", tbl)
+		fmt.Fprintf(out, "%d jobs scored locally, best first (! breaks a must). An agent review is only worth it for the top ones.\n", len(ranked))
+	})
 }

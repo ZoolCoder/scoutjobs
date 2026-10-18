@@ -98,7 +98,7 @@ footer{color:var(--dim);text-align:center;padding:16px;font-size:12px;margin-top
 .next .btn{white-space:nowrap}
 
 /* kpis */
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
 .kpi{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-content:start;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;min-height:120px;box-shadow:var(--shadow);min-width:0}
 .kpi>b,.kpi>.hint,.kpi>meter{grid-column:1/-1}
 a.kpi:hover{text-decoration:none;border-color:color-mix(in srgb,var(--acc) 40%,var(--line))}
@@ -720,6 +720,8 @@ details.preview .pre{max-height:260px;overflow:auto;font-size:12.5px;margin:6px 
 .led .ver{display:inline-block;margin-top:5px;font:500 11px var(--mono,ui-monospace,monospace);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
 .led .ver:hover{color:var(--acc);border-color:var(--acc);text-decoration:none}
 .upgraded{position:fixed;right:20px;bottom:20px;z-index:60;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;background:var(--surface);border:1px solid var(--acc);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);font-size:13px}
+.refreshed{position:fixed;right:20px;bottom:20px;z-index:60;padding:6px 12px;background:var(--surface);border:1px solid var(--line2);border-radius:999px;font-size:12px;color:var(--muted);box-shadow:0 6px 18px rgba(0,0,0,.18);animation:fadeout 2.5s ease-in forwards}
+@keyframes fadeout{0%,70%{opacity:1}100%{opacity:0}}
 /* ---- preference review ---- */
 .review{border-color:var(--acc)}
 .proposals{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
@@ -827,7 +829,7 @@ ul.reads li div{display:grid}ul.reads li .muted{font-size:12px}
 .dash .next{grid-template-columns:auto 1fr;align-content:center;gap:8px 16px;padding:18px 20px}
 .dash .next h2{font-size:18px;margin:4px 0 2px}.dash .next p{font-size:13px}
 .dash .next .btn{grid-column:2;justify-self:start}
-.dash .kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.dash .kpis{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
 .dash .kpi{padding:14px 16px;min-height:0;column-gap:8px}
 .dash .kpi .ic{width:28px;height:28px}.dash .kpi .lbl{line-height:28px;font-size:12.5px}
 .dash .kpi b{font-size:28px;line-height:34px;margin-top:8px}

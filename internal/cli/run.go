@@ -19,7 +19,8 @@ func newRunner(s *store.Store, cfg Config) *runner.Runner {
 	if err != nil {
 		exe = "scoutjobs"
 	}
-	return &runner.Runner{Store: s, Exe: exe, Custom: cfg.AgentCommand, Agent: cfg.Agent, From: cfg.EmailFrom, CVSource: cfg.CVSource, CoverTemplate: cfg.CoverTemplate}
+	return &runner.Runner{Store: s, Exe: exe, Custom: cfg.AgentCommand, Agent: cfg.Agent, From: cfg.EmailFrom, CVSource: cfg.CVSource, CoverTemplate: cfg.CoverTemplate, Model: agentModel(cfg.AgentModel),
+		Effort: cfg.AgentEffort, Budget: cfg.AgentBudget, CheapModel: cfg.AgentCheapModel}
 }
 
 // job run: prepare one application end to end with an installed agent CLI. Nothing is sent.
@@ -78,4 +79,12 @@ func runJobRun(s *store.Store, rest []string, out io.Writer) error {
 		err = fmt.Errorf("run %s: %s", snap.State, strings.TrimSpace(snap.Error))
 	}
 	return err
+}
+
+// agentModel is the --model a claude run gets; "default" leaves the choice to the CLI.
+func agentModel(m string) string {
+	if m == "default" {
+		return ""
+	}
+	return m
 }

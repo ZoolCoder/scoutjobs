@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -78,16 +79,19 @@ func (s *Store) Stats(followUpDays, staleDays int) (Stats, error) {
 	st.Streak = s.streak()
 
 	fu := time.Now().UTC().AddDate(0, 0, -followUpDays).Format(time.RFC3339)
-	stale := time.Now().UTC().AddDate(0, 0, -staleDays).Format(time.RFC3339)
-	st.DueFollowUps, _ = s.quiet("applied", stale, fu)
-	st.Stale, _ = s.quiet("applied", "", stale)
+	stale := "" // stale_days 0 turns the stale list off
+	if staleDays > 0 {
+		stale = time.Now().UTC().AddDate(0, 0, -staleDays).Format(time.RFC3339)
+		st.Stale, _ = s.quiet(`status IN ('applied','interview')`, "", stale)
+	}
+	st.DueFollowUps, _ = s.quiet(`status='applied' AND (SELECT COUNT(*) FROM events e WHERE e.job_id=jobs.id AND e.kind='`+FollowUpEvent+`') < `+fmt.Sprint(MaxFollowUps), stale, fu)
 	return st, nil
 }
 
-// quiet lists jobs in status whose last activity is between lo and hi (RFC3339, "" = unbounded).
-func (s *Store) quiet(status, lo, hi string) ([]Job, error) {
-	q := `SELECT ` + jobCols + ` FROM jobs WHERE status=? AND updated_at <= ?`
-	args := []any{status, hi}
+// quiet lists jobs matching where whose last activity is between lo and hi (RFC3339, "" = unbounded).
+func (s *Store) quiet(where, lo, hi string) ([]Job, error) {
+	q := `SELECT ` + jobCols + ` FROM jobs WHERE ` + where + ` AND updated_at <= ?`
+	args := []any{hi}
 	if lo != "" {
 		q += ` AND updated_at > ?`
 		args = append(args, lo)

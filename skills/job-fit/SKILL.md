@@ -6,7 +6,9 @@ license: MIT
 
 # Job fit
 
-Input: jobs with status `new` (`scoutjobs job list --status new --json --compact`, then `scoutjobs job show <id> --json` per job), `profile.md`, `preferences.md`, and each job's `posting.md` (path from `scoutjobs job show <id> --json`, field `dir`). Output: a score, a short rationale, a status change to `ranked`, and a logged decision for anything the user skips.
+Start with `scoutjobs job verify` (free) so closed postings drop out, then the free local ranker: `scoutjobs job rank --all` scores every open job without an agent score against profile.md, best fit first, and moves `new` jobs to `ranked`. Its notes start with `quick: `. Read postings only for jobs it puts within 15 points of `fit_apply_floor` (config.yaml) or that the user names. Below that, its score stands: reading those postings spends tokens without changing the verdict.
+
+Input: the jobs the ranker shortlisted (`scoutjobs job show <id> --json` per job), `profile.md`, `preferences.md`, and each job's `posting.md` (path from `scoutjobs job show <id> --json`, field `dir`). Output: a score, a short rationale, a status change to `ranked`, and a logged decision for anything the user skips.
 
 ## Score (0-100)
 

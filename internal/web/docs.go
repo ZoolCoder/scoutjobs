@@ -295,6 +295,9 @@ func (v *server) autopilotOnce(ctx context.Context) autopilot.Report {
 			return v.cfg.Runner.Queue([]store.Job{j}, runner.Request{Steps: []string{"prep"}}) > 0
 		}
 	}
+	if src, _ := v.mailSourceAccount(); v.emailMode() == "auto" && (src == "gmail" || src == "imap") {
+		o.SyncMail = v.cfg.Mail.Sync // read locally, no tokens; the agent source waits for the Sync button
+	}
 	return autopilot.Daily(ctx, v.s, o, time.Now())
 }
 

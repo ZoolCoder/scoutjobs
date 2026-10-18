@@ -5,6 +5,7 @@ package search
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -54,7 +55,7 @@ func (p Posting) Job() store.Job {
 type Options struct {
 	Queries []string // every word of a query must appear; any query may match
 	Boards  []string // "greenhouse:stripe", "lever:netlify", "recruitee:acme", "rss:https://..." or a careers URL (see ParseBoard)
-	Remote  bool     // also query the remote boards (remotive, remoteok, arbeitnow, jobicy, himalayas)
+	Remote  bool     // also query the keyword boards (remotive, remoteok, arbeitnow, jobicy, himalayas, hn, freehire)
 	Off     []string // remote boards the user turned off, by name (see RemoteBoards)
 	Limit   int
 	Client  *http.Client
@@ -73,10 +74,10 @@ type Result struct {
 }
 
 // Boards lists the board sources that need a company slug.
-var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "recruitee", "bamboohr", "rss"}
+var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "recruitee", "bamboohr", "rss", "jobindex", "jobbank", "jobdanmark"}
 
 // RemoteBoards lists the keyword-searchable remote boards.
-var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas", "hn"}
+var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas", "hn", "freehire"}
 
 // OffSetting is the store setting that holds the remote boards turned off on the Connections page,
 // comma separated.
@@ -94,6 +95,10 @@ var defaultBase = map[string]string{
 	"hn":              "https://hn.algolia.com/api/v1",
 	"workable":        "https://apply.workable.com/api/v3/accounts",
 	"smartrecruiters": "https://api.smartrecruiters.com/v1/companies",
+	"jobindex":        "https://www.jobindex.dk/jobsoegning.rss",
+	"jobbank":         "https://jobbank.dk/job/rss/",
+	"jobdanmark":      "https://jobdanmark.dk/api/jobsearch/search/1",
+	"freehire":        "https://freehire.me/api/v1/agent/jobs/search",
 }
 
 type fetcher struct {
@@ -106,6 +111,16 @@ func (f fetcher) url(source string) string {
 		return u
 	}
 	return defaultBase[source]
+}
+
+// ErrGone marks a posting the ATS no longer serves: closed, filled or taken down.
+var ErrGone = errors.New("posting gone")
+
+func httpError(u string, code int) error {
+	if code == http.StatusNotFound || code == http.StatusGone {
+		return fmt.Errorf("%s: http %d: %w", u, code, ErrGone)
+	}
+	return fmt.Errorf("%s: http %d", u, code)
 }
 
 func (f fetcher) getJSON(ctx context.Context, u string, v any) error {
@@ -121,7 +136,7 @@ func (f fetcher) getJSON(ctx context.Context, u string, v any) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return fmt.Errorf("%s: http %d", u, res.StatusCode)
+		return httpError(u, res.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(res.Body, 20<<20))
 	if err != nil {
@@ -144,6 +159,9 @@ func Run(ctx context.Context, o Options) Result {
 		fn   func(context.Context) ([]Posting, error)
 	}
 	var feeds []feed
+	// searched feeds matched the query against the whole posting on the board, which their short
+	// snippet cannot show again, so the local word check would drop real matches
+	searched := map[string]bool{}
 	boards, errs := NormalizeBoards(o.Boards)
 	for _, b := range boards {
 		src, slug, _ := strings.Cut(b, ":")
@@ -166,20 +184,22 @@ func Run(ctx context.Context, o Options) Result {
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.bamboohr(ctx, slug) }})
 		case "rss":
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.rss(ctx, slug) }})
+		case "jobindex", "jobbank", "jobdanmark":
+			for _, q := range queriesOrAll(o.Queries) {
+				feeds = append(feeds, feed{b + ":" + q, func(ctx context.Context) ([]Posting, error) { return f.danish(ctx, src, q, slug) }})
+				searched[b+":"+q] = q != ""
+			}
 		}
 	}
 	if o.Remote {
-		qs := o.Queries
-		if len(qs) == 0 {
-			qs = []string{""}
-		}
-		for _, q := range qs {
+		for _, q := range queriesOrAll(o.Queries) {
 			feeds = append(feeds,
 				feed{"remotive:" + q, func(ctx context.Context) ([]Posting, error) { return f.remotive(ctx, q) }},
 				feed{"arbeitnow:" + q, func(ctx context.Context) ([]Posting, error) { return f.arbeitnow(ctx, q) }},
 				feed{"jobicy:" + q, func(ctx context.Context) ([]Posting, error) { return f.jobicy(ctx, q) }},
 				feed{"himalayas:" + q, func(ctx context.Context) ([]Posting, error) { return f.himalayas(ctx, q) }},
 				feed{"hn:" + q, func(ctx context.Context) ([]Posting, error) { return f.hn(ctx, q) }},
+				feed{"freehire:" + q, func(ctx context.Context) ([]Posting, error) { return f.freehire(ctx, q) }},
 			)
 		}
 		feeds = append(feeds, feed{"remoteok", func(ctx context.Context) ([]Posting, error) { return f.remoteok(ctx) }})
@@ -216,7 +236,7 @@ func Run(ctx context.Context, o Options) Result {
 		}
 		for _, p := range a.rows {
 			key := store.JobKey(p.Company, p.Title)
-			if seen[key] || !Matches(p, o.Queries) {
+			if seen[key] || !searched[feeds[i].name] && !Matches(p, o.Queries) {
 				continue
 			}
 			seen[key] = true

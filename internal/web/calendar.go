@@ -213,6 +213,9 @@ func (v *server) events(today time.Time) []calEvent {
 		if v.cfg.StaleDays > 0 && j.UpdatedAt < staleBefore {
 			continue // gone quiet past stale_days: the overview suggests no_response instead
 		}
+		if v.s.FollowUps(j.ID) >= store.MaxFollowUps {
+			continue
+		}
 		if e, ok := followUpEvent(j, v.cfg.FollowUpDays, today); ok {
 			out = append(out, e)
 		}

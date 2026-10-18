@@ -245,6 +245,9 @@ func (v *server) runSearch(w http.ResponseWriter, r *http.Request) {
 				f.Added++
 			}
 		}
+		if f.Added > 0 {
+			_, _ = apply.Rank(v.s, false)
+		}
 	}
 	f.Postings = v.searchRows(res.Postings, pr, f.Ranked)
 	f.TagCounts = tagCounts(f.Postings, 24)

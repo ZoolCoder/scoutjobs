@@ -31,7 +31,7 @@ func TestLinkedInImportAndContacts(t *testing.T) {
 	if err != nil || !strings.Contains(string(md), "Ada Lovelace") {
 		t.Fatalf("profile.md: %v %s", err, md)
 	}
-	if out := run(t, "contacts", "1", "--json"); !strings.Contains(out, `"name": "Bo Chen"`) && !strings.Contains(out, `"name":"Bo Chen"`) {
+	if out := run(t, "contacts", "1", "--json"); !strings.Contains(out, `"name":"Bo Chen"`) {
 		t.Errorf("contacts: %s", out)
 	}
 	if out := run(t, "contacts", "--company", "Acme"); !strings.Contains(out, "nobody") {
