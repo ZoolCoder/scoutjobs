@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
+	"github.com/zoolcoder/scoutjobs/internal/match"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -291,6 +292,17 @@ func TestSearchCommand(t *testing.T) {
 	}
 	if jobs := run(t, "job", "list"); !strings.Contains(jobs, "Zed") {
 		t.Errorf("added jobs missing: %s", jobs)
+	}
+}
+
+func TestRankKeyPutsMustBreakersLast(t *testing.T) {
+	far := match.Result{Score: 95, Hard: []string{"location: in pakistan, you want Denmark"}}
+	near := match.Result{Score: 40}
+	if rankKey(far) >= rankKey(near) {
+		t.Errorf("a posting that breaks a must ranks above one that does not: %d >= %d", rankKey(far), rankKey(near))
+	}
+	if rankKey(match.Result{Score: 70}) <= rankKey(near) {
+		t.Error("postings without a broken must keep their score order")
 	}
 }
 

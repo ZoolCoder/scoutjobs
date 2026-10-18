@@ -97,7 +97,7 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		return ok
 	}
 	if ranked {
-		opts.Rank = func(p search.Posting) int { return pr.Score(p).Score }
+		opts.Rank = func(p search.Posting) int { return rankKey(pr.Score(p)) }
 	}
 	r := search.Run(ctx, opts)
 	for _, e := range r.Errors {
@@ -426,4 +426,13 @@ func stampATS(s *store.Store, c store.CVCheck) error {
 		return err
 	}
 	return apply.StampATS(apply.Dir(s, j), filepath.Base(c.File))
+}
+
+// rankKey sorts a posting that breaks a must after every one that does not, whatever its score:
+// a strong match in the wrong country must not push the local jobs out of the limit.
+func rankKey(m match.Result) int {
+	if len(m.Hard) > 0 {
+		return m.Score - 1000
+	}
+	return m.Score
 }
