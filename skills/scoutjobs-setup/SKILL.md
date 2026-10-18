@@ -34,6 +34,8 @@ Write the profile in the template's sections. Rules:
 
 Show the user the draft, apply corrections, then write it.
 
+Later, to grow an existing profile, run `scoutjobs profile expand --json`: it lists skills found in `cv/`, `linkedin/` and the user's public GitHub repositories that the profile lacks, with where each showed up, without reading those sources into the conversation. Ask which are true, then `scoutjobs profile expand --add <skill,skill>`. Never add one the user did not confirm.
+
 ## 3. Record stated preferences
 
 Preferences drive scoring and tailoring. Record the ones the user said out loud with `--source stated`:

@@ -19,6 +19,7 @@ scoutjobs cv files --json
 - Only `resume.md`: `scoutjobs cv export` renders it as a single-column PDF in the same folder; offer it when the user needs a file to upload.
 - Several files: ask which one, unless the user named it.
 - Read the file. PDF and DOCX: use the platform's document reading; if it cannot be read, ask for a Markdown or text export. Never upload the file anywhere.
+- A PDF: run `scoutjobs cv verify <file.pdf> --json` first. It checks the page count, the text layer an ATS reads, the e-mail address and date-range dashes on the machine, for no tokens. Use its findings for the layout, contact and hygiene items below instead of judging them yourself.
 
 Also read `profile.md` (facts) and `preferences.md` (target roles, seniority, locations). With `--job <id>` or "against the Stripe job", read `scoutjobs job show <id> --json` and the saved `posting.md` in its `dir`.
 

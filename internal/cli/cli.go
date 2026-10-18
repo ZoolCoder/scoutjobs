@@ -34,7 +34,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   job verify [<id>...]       check new and ranked postings are still open; skips closed ones after 3 checks over 2 days
   job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--keep-going] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
-  cv files|log|list|export|cover   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF, cover letter from a Word template
+  cv files|log|list|export|verify|cover   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF, ATS checks on a PDF, cover letter from a Word template
   email draft|show|send   application e-mail from the cover letter; send needs --yes
   email test|sync         probe the SMTP/IMAP account; log inbox replies (Gmail API or IMAP) to applications
   email log <job>         record a message an agent's Gmail connector matched to a job
@@ -50,6 +50,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   contacts <job>|--company x who you know at a company (from the LinkedIn import)
   session log|list
   learn add|list|set
+  profile expand [--add s,s]  skills in cv/, linkedin/ and public GitHub repos that profile.md lacks
   stats [--funnel]           funnel, weekly numbers, follow-ups due; --funnel: what works by source, fit, month
   brief [--compact]          everything the daily briefing needs (json)
   daily [--json]             daily searches, follow-up drafts, prep packs: what serve does every hour (sends nothing)
@@ -114,6 +115,8 @@ func Run(args []string, out io.Writer) error {
 		return runSession(s, rest, out)
 	case "learn":
 		return runLearn(s, rest, out)
+	case "profile":
+		return runProfile(s, rest, out)
 	case "gmail", "google":
 		return runGmail(s, cfg, rest, out)
 	case "calendar":

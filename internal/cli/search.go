@@ -285,6 +285,8 @@ func runCV(s *store.Store, rest []string, out io.Writer) error {
 			_ = s.AddEvent(jobID, "cv:export", filepath.Base(dst))
 		}
 		return emit(out, *asJSON, map[string]any{"job": jobID, "file": dst, "bytes": size}, func() { fmt.Fprintf(out, "wrote %s (%d bytes)\n", dst, size) })
+	case "verify":
+		return runCVVerify(s, rest, out)
 	case "cover":
 		fs := flag.NewFlagSet("cv cover", flag.ContinueOnError)
 		tmpl := fs.String("template", "", "Word template with {{slot}} placeholders (default: cover_template in config.yaml)")
