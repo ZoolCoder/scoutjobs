@@ -20,7 +20,7 @@ func runDaily(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		return err
 	}
 	m := runner.NewManager(newRunner(s, cfg))
-	rep := autopilot.Daily(context.Background(), s, autopilot.Options{FollowUpDays: cfg.FollowUpDays, Prep: prepNow(m)}, time.Now())
+	rep := autopilot.Daily(context.Background(), s, autopilot.Options{FollowUpDays: cfg.FollowUpDays, Prep: prepNow(m), SyncMail: autoMail(s, cfg)}, time.Now())
 	return emit(out, *asJSON, rep, func() {
 		fmt.Fprintln(out, rep.Summary())
 		for _, x := range rep.Searches {

@@ -85,3 +85,30 @@ func TestCost(t *testing.T) {
 		}
 	}
 }
+
+func TestCheapModel(t *testing.T) {
+	claude := Agent{Name: "claude", Path: "/bin/claude", Model: "sonnet"}
+	claude.Cheap = CheapModel(claude, "")
+	if argv := strings.Join(claude.Light().command("/bin/scoutjobs", "/h", "/h/a"), " "); !strings.Contains(argv, "--model haiku") || strings.Contains(argv, "sonnet") {
+		t.Errorf("light claude session: %s", argv)
+	}
+	if argv := strings.Join(claude.command("/bin/scoutjobs", "/h", "/h/a"), " "); !strings.Contains(argv, "--model sonnet") {
+		t.Errorf("a full session lost agent_model: %s", argv)
+	}
+	if CheapModel(claude, "off") != "" || CheapModel(claude, "opus") != "opus" {
+		t.Error("agent_cheap_model is not honoured")
+	}
+	codex := Agent{Name: "codex", Path: "/bin/codex", Cheap: "mini"}
+	if argv := codex.Light().command("/bin/scoutjobs", "/h", "/h/a"); strings.Join(argv[len(argv)-3:], " ") != "-m mini -" {
+		t.Errorf("light codex session: %v", argv)
+	}
+	gemini := Agent{Name: "custom", Path: "/usr/bin/gemini", Args: []string{"--yolo"}}
+	gemini.Cheap = CheapModel(gemini, "")
+	if got := strings.Join(gemini.Light().command("", "", ""), " "); got != "/usr/bin/gemini --yolo -m flash" {
+		t.Errorf("light gemini session: %s", got)
+	}
+	aider := Agent{Name: "custom", Path: "/bin/aider"}
+	if CheapModel(aider, "") != "" || CheapModel(Agent{Name: "custom", Path: "/bin/gemini", Args: []string{"-m", "pro"}}, "") != "" {
+		t.Error("a custom command got a model it did not ask for")
+	}
+}

@@ -20,6 +20,8 @@ When Gmail is connected or `imap_host` is set, `email sync` reads metadata and G
 
 Its `review` list holds the few unmatched messages that look like they concern the search: an ATS sender, an open company's name (`company`), or application wording, with a `hint` from the wording. Classify only those, from `from`, `subject` and `snippet`. Open a full message through a connector only when the snippet cannot decide it.
 
+If `email sync` says email is off, stop: the user turned mail reading off (`email_sync: off` in config.yaml). Say so in one line and do not search a connector.
+
 If `email sync` says there is no inbox to read, tell the user once that `scoutjobs gmail setup` (or Connect Gmail on the dashboard's Inbox page) makes this check cheaper and private, then continue with step 2.
 
 ## 2. Connector fallback: search

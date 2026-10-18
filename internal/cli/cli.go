@@ -176,11 +176,24 @@ func sub(rest []string) (string, []string) {
 func emit(out io.Writer, asJSON bool, v any, human func()) error {
 	if asJSON {
 		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
+		if terminal(out) {
+			enc.SetIndent("", "  ")
+		}
 		return enc.Encode(v)
 	}
 	human()
 	return nil
+}
+
+// terminal is true when a person reads the output. Agents, pipes and the MCP server get JSON without
+// indentation: the spaces are a third of a nested payload's tokens.
+func terminal(out io.Writer) bool {
+	f, ok := out.(*os.File)
+	if !ok {
+		return false
+	}
+	st, err := f.Stat()
+	return err == nil && st.Mode()&os.ModeCharDevice != 0
 }
 
 func table(out io.Writer, header string, rows [][]string) {
@@ -265,6 +278,8 @@ agent: auto             # claude | codex | custom | auto (the first one found)
 agent_model: sonnet     # claude model for unattended runs: sonnet (default), haiku (cheapest), opus (priciest) or default (the CLI's own)
 agent_effort:           # claude reasoning effort for unattended runs: low (cheapest), medium, high; empty keeps the CLI's
 agent_budget_usd: 3     # a claude session stops once it has spent this many US dollars; 0 sets no cap
+agent_cheap_model:      # fit review and ATS check run on this cheaper model; empty: haiku (claude), the affordable
+                        # codex model, flash (gemini); "off" runs them on agent_model
 agent_command:          # any other agent that reads the prompt on stdin, e.g. "gemini --yolo"; used as "custom"
 cv_source:              # the CV tailored resumes start from, e.g. cv/resume.md or "cv/My CV.docx" (default: cv/resume.md)
 cover_template:         # the cover letter whose format every letter keeps (default: cv/cover-letter.md)
@@ -280,6 +295,8 @@ smtp_host:              # smtp.gmail.com:587 (STARTTLS) or host:465 (TLS); passw
 smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
+email_sync:             # reading replies: off (no Inbox, no mail tools for the AI), manual (only when asked), auto (also daily);
+                        # empty: auto once Gmail or IMAP is connected, else off
 
 # Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Google on the dashboard's Inbox page); it stores
 # the client in gmail-client.json, so these two stay empty unless you prefer them here

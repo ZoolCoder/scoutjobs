@@ -21,7 +21,7 @@ scoutjobs job set <id> --status rejected --note "rejected after screen: wanted m
 scoutjobs job set <id> --deadline 2026-10-31 --salary-min 80000 --salary-max 95000 --currency EUR
 scoutjobs interview add <id> --stage screen --at 2026-10-20T14:00 --format video --interviewer "Jane, EM"
 scoutjobs stats                                 # funnel, follow-ups due, stale list
-scoutjobs email sync [--dry-run]                # IMAP: log replies as reply:received, move to interview/rejected when the wording is clear
+scoutjobs email sync [--dry-run]                # needs email_sync on (manual or auto); IMAP or Gmail: log replies as reply:received, move to interview/rejected when the wording is clear
 ```
 
 Resolve jobs by id, by `company/title`, or by a unique company substring. If the CLI says the reference is ambiguous, list and ask.

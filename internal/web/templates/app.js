@@ -35,6 +35,86 @@
   document.addEventListener('visibilitychange', check);
 })();
 
+// Every page. When the data changes behind the page (the AI assistant writes through the MCP server,
+// the CLI or a run, or another tab), reload it while the user is idle so it never goes stale. Typing,
+// an open dialog, a drag or a live run holds the reload; edits in progress get a Refresh button instead.
+(function () {
+  var root = document.documentElement;
+  var mine = root.dataset.changes;
+  if (mine === undefined || !window.fetch) return;
+  var KEY = 'sj-refreshed', GAP = 20000;
+  var dirty = false, pressed = false, bar = null;
+
+  function get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function put(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } }
+
+  document.addEventListener('input', function (e) {
+    if (e.target.closest && e.target.closest('form') && !e.target.closest('[data-autosubmit]')) dirty = true;
+  });
+  document.addEventListener('submit', function () { dirty = false; });
+  document.addEventListener('pointerdown', function () { pressed = true; });
+  document.addEventListener('pointerup', function () { pressed = false; });
+  document.addEventListener('pointercancel', function () { pressed = false; });
+
+  function typing() {
+    var el = document.activeElement;
+    return !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+  }
+  function busy() {
+    return pressed || typing() || String(window.getSelection ? window.getSelection() : '') !== '' ||
+      document.querySelector('dialog[open], details.prep-pop[open], .runprog.live, button.working') !== null;
+  }
+
+  function offer() {
+    if (bar) return;
+    bar = document.createElement('div');
+    bar.className = 'upgraded';
+    bar.setAttribute('role', 'status');
+    var text = document.createElement('span');
+    text.textContent = 'This page has newer data.';
+    var btn = document.createElement('button');
+    btn.className = 'mini primary';
+    btn.textContent = 'Refresh';
+    btn.addEventListener('click', function () { put(KEY, String(Date.now())); location.reload(); });
+    bar.appendChild(text);
+    bar.appendChild(btn);
+    document.body.appendChild(bar);
+  }
+
+  var changed = false;
+  function check() {
+    if (document.hidden) return;
+    if (changed) return settle();
+    fetch('/changes', { cache: 'no-store', credentials: 'same-origin' }).then(function (res) {
+      return res.ok ? res.text() : null;
+    }).then(function (v) {
+      if (v === null || v.trim() === mine) return;
+      changed = true;
+      settle();
+    }).catch(function () { /* restarting: try again on the next tick */ });
+  }
+  function settle() {
+    if (dirty) return offer();
+    if (busy() || Date.now() - Number(get(KEY) || 0) < GAP) return;
+    put(KEY, String(Date.now()));
+    location.reload();
+  }
+
+  // after a reload this script caused, say so for a moment, quietly
+  var at = Number(get(KEY) || 0);
+  if (at && Date.now() - at < 5000) {
+    var toast = document.createElement('div');
+    toast.className = 'refreshed';
+    toast.setAttribute('role', 'status');
+    toast.textContent = 'Updated';
+    document.body.appendChild(toast);
+    setTimeout(function () { toast.remove(); }, 2500);
+  }
+
+  setInterval(check, 4000);
+  document.addEventListener('visibilitychange', check);
+})();
+
 // Job and Profile pages: while an agent run is going, show its progress, how long it has run and
 // when it last did something, so the user sees it is alive; reload when it ends.
 (function () {

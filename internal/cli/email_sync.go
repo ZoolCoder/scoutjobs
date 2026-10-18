@@ -99,9 +99,16 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) (err
 	limit := fs.Int("limit", 500, "newest messages to inspect at most")
 	dry := fs.Bool("dry-run", false, "show matches, change nothing")
 	via := fs.String("via", "auto", "agent (your AI agent's mail connector), gmail (API, after gmail connect), imap (imap_host), or auto")
+	auto := fs.Bool("auto", false, "only when email_sync is auto, and never through the AI agent; otherwise do nothing")
 	asJSON := fs.Bool("json", false, "")
 	if _, err := parse(fs, rest); err != nil {
 		return err
+	}
+	switch mode := emailMode(s, cfg); {
+	case *auto && mode != "auto":
+		return emit(out, *asJSON, []Reply{}, func() { fmt.Fprintf(out, "email_sync is %s: skipped\n", mode) })
+	case mode == "off" && cfg.EmailSync == "off":
+		return errEmailOff
 	}
 	from, err := parseSince(*since, time.Now())
 	if err != nil {
@@ -112,6 +119,9 @@ func runEmailSync(s *store.Store, cfg Config, rest []string, out io.Writer) (err
 		return err
 	}
 	if source == "agent" {
+		if *auto {
+			return emit(out, *asJSON, []Reply{}, func() { fmt.Fprintln(out, "mail is read by your AI agent: skipped") })
+		}
 		return agentSync(s, cfg, from, out)
 	}
 	// a sync stopped by Gmail's rate limit still logs the replies among the messages it read

@@ -30,7 +30,7 @@ type check struct {
 	Fix    string `json:"fix,omitempty"`
 }
 
-var configKeys = map[string]bool{"follow_up_days": true, "stale_days": true, "weekly_apply_target": true, "fit_apply_floor": true, "currency": true, "dashboard_addr": true, "api_token": true, "webhook_url": true, "webhook_secret": true, "email_from": true, "smtp_host": true, "smtp_user": true, "imap_host": true, "imap_user": true, "gmail_client_id": true, "gmail_client_secret": true, "search_queries": true, "search_boards": true, "search_remote": true, "agent": true, "agent_command": true, "agent_model": true, "agent_effort": true, "agent_budget_usd": true, "cv_source": true, "cover_template": true, "theme": true}
+var configKeys = map[string]bool{"follow_up_days": true, "stale_days": true, "weekly_apply_target": true, "fit_apply_floor": true, "currency": true, "dashboard_addr": true, "api_token": true, "webhook_url": true, "webhook_secret": true, "email_from": true, "smtp_host": true, "smtp_user": true, "imap_host": true, "imap_user": true, "email_sync": true, "gmail_client_id": true, "gmail_client_secret": true, "search_queries": true, "search_boards": true, "search_remote": true, "agent": true, "agent_command": true, "agent_model": true, "agent_effort": true, "agent_budget_usd": true, "agent_cheap_model": true, "cv_source": true, "cover_template": true, "theme": true}
 
 var agentSkillDirs = []struct{ name, dir string }{
 	{"claude code", ".claude/skills"}, {"codex", ".codex/skills"}, {"agent skills", ".agents/skills"},

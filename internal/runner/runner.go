@@ -226,6 +226,7 @@ type Runner struct {
 	Model         string  // config.yaml agent_model: the claude model of unattended sessions
 	Effort        string  // config.yaml agent_effort
 	Budget        float64 // config.yaml agent_budget_usd: the most one session may spend
+	CheapModel    string  // config.yaml agent_cheap_model: the model scoring steps run on; "off" keeps the usual one
 }
 
 // Agents lists the agent CLIs found on this machine.
@@ -289,6 +290,7 @@ func (rn *Runner) pick(name string) (Agent, error) {
 	ag, ok := Pick(rn.Agents(), name)
 	if ok {
 		ag.Model, ag.Effort, ag.Budget = rn.Model, rn.Effort, rn.Budget
+		ag.Cheap = CheapModel(ag, rn.CheapModel)
 		return ag, nil
 	}
 	if name == "" || name == "auto" {
@@ -373,13 +375,20 @@ func (rn *Runner) exec(ctx context.Context, run *Run, ag Agent, j store.Job) err
 			run.logf("%s: %s", s.Name, detail)
 			continue
 		}
-		// consecutive AI steps share one agent session
+		// consecutive AI steps share one agent session; with a cheap model at hand, the scoring
+		// steps get a session of their own on it
+		cheap := ag.Cheap != "" && CheapSteps[s.Name]
 		group := []int{i}
-		for i+1 < len(run.Steps) && run.Steps[i+1].AI() && run.Steps[i+1].State != Skipped {
+		for i+1 < len(run.Steps) && run.Steps[i+1].AI() && run.Steps[i+1].State != Skipped &&
+			(ag.Cheap == "" || CheapSteps[run.Steps[i+1].Name] == cheap) {
 			i++
 			group = append(group, i)
 		}
-		if err := rn.session(ctx, run, ag, j, group); err != nil {
+		sag := ag
+		if cheap {
+			sag = ag.Light()
+		}
+		if err := rn.session(ctx, run, sag, j, group); err != nil {
 			return err
 		}
 	}
@@ -398,7 +407,11 @@ func (rn *Runner) session(ctx context.Context, run *Run, ag Agent, j store.Job, 
 		steps = append(steps, run.Steps[i].Step)
 		run.set(i, Running, "")
 	}
-	run.logf("%s: %s", ag.Name, labels(steps))
+	if ag.light {
+		run.logf("%s (%s): %s", ag.Name, ag.Cheap, labels(steps))
+	} else {
+		run.logf("%s: %s", ag.Name, labels(steps))
+	}
 	since := time.Now()
 	stop := make(chan struct{})
 	go rn.watch(run, j, group, since, stop)
@@ -566,7 +579,7 @@ func Prompt(j store.Job, dir, exe string, steps []Step) string {
 	for _, s := range steps {
 		if !seen[s.Skill] {
 			seen[s.Skill] = true
-			fmt.Fprintf(&b, "\n\n===== skill %s =====\n\n%s", s.Skill, skills.Text(s.Skill))
+			fmt.Fprintf(&b, "\n\n===== skill %s =====\n\n%s", s.Skill, skills.Unattended(s.Skill))
 		}
 	}
 	return b.String()

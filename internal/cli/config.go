@@ -27,6 +27,7 @@ type Config struct {
 	IMAPUser      string   `json:"-"`
 	GmailClientID string   `json:"-"`
 	GmailSecret   string   `json:"-"`
+	EmailSync     string   `json:"email_sync"` // off | manual | auto; empty: auto with a mailbox connected, else off
 	SearchQueries []string `json:"search_queries"`
 	SearchBoards  []string `json:"search_boards"`
 	SearchRemote  bool     `json:"search_remote"`
@@ -38,6 +39,8 @@ type Config struct {
 	AgentModel    string   `json:"agent_model"`      // claude model of unattended runs; "default" keeps the CLI's
 	AgentEffort   string   `json:"agent_effort"`     // claude reasoning effort of unattended runs; empty keeps the CLI's
 	AgentBudget   float64  `json:"agent_budget_usd"` // the most one unattended claude session may spend; 0 sets no cap
+	// AgentCheapModel runs the scoring steps of a preparation; empty picks the agent's cheap tier, "off" keeps agent_model
+	AgentCheapModel string `json:"agent_cheap_model"`
 }
 
 func DefaultConfig() Config {
@@ -108,6 +111,10 @@ func LoadConfig(home string) Config {
 			c.GmailClientID = strings.Trim(v, `"'`)
 		case "gmail_client_secret":
 			c.GmailSecret = strings.Trim(v, `"'`)
+		case "email_sync":
+			if v == "off" || v == "manual" || v == "auto" {
+				c.EmailSync = v
+			}
 		case "search_queries":
 			c.SearchQueries = splitList(v)
 		case "search_boards":
@@ -126,6 +133,8 @@ func LoadConfig(home string) Config {
 			if f, err := strconv.ParseFloat(strings.Trim(v, `"'`), 64); err == nil && f >= 0 {
 				c.AgentBudget = f
 			}
+		case "agent_cheap_model":
+			c.AgentCheapModel = strings.Trim(v, `"'`)
 		case "agent_command":
 			c.AgentCommand = strings.Trim(v, `"'`)
 		case "cv_source":

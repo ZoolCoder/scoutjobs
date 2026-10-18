@@ -438,6 +438,33 @@ func mailSource(s *store.Store, cfg Config, via string) (string, error) {
 	return "", fmt.Errorf("--via %q: use agent, gmail, imap or auto", via)
 }
 
+// emailMode resolves email_sync. Off hides mail reading from the dashboard, the MCP server and the
+// skills, so a search without a connected mailbox carries none of it; manual reads only when asked;
+// auto also reads on the daily pass. Unset means auto once a mailbox is connected.
+func emailMode(s *store.Store, cfg Config) string {
+	if cfg.EmailSync != "" {
+		return cfg.EmailSync
+	}
+	if _, err := mailSource(s, cfg, ""); err == nil {
+		return "auto"
+	}
+	return "off"
+}
+
+// autoMail is the daily pass's mail sync: only with email_sync auto and a mailbox ScoutJobs reads
+// itself, never the AI agent, so the pass spends no tokens.
+func autoMail(s *store.Store, cfg Config) func() (int, error) {
+	if emailMode(s, cfg) != "auto" {
+		return nil
+	}
+	if src, err := mailSource(s, cfg, ""); err != nil || src == "agent" {
+		return nil
+	}
+	return func() (int, error) { return SyncMail(s, cfg) }
+}
+
+var errEmailOff = errors.New("email is off: set email_sync: manual (or auto) in config.yaml to read replies")
+
 // fetchMail never reads mail from before the first tracked job: an older message cannot be a reply to
 // an application, and skipping it keeps the inbox, and the agent that triages it, small.
 func fetchMail(s *store.Store, cfg Config, source string, since time.Time, limit int) ([]mail.Mail, error) {
@@ -500,6 +527,7 @@ func mailHooks(s *store.Store, cfg Config) web.MailHooks {
 			return err
 		},
 		Sync:  func() (int, error) { return SyncMail(s, cfg) },
+		Mode:  func() string { return emailMode(s, LoadConfig(s.Home)) },
 		Gmail: func() *gmail.Client { return gmailClient(s, LoadConfig(s.Home)) }, // config.yaml edits apply without a restart
 		Compose: func(id int64, kind string) (runner.MailTask, error) {
 			j, err := s.JobByID(id)

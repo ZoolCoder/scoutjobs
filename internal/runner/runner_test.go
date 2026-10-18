@@ -428,3 +428,33 @@ func TestInterviewSteps(t *testing.T) {
 		t.Errorf("mock session: %+v", sessions)
 	}
 }
+
+func TestScoringStepsRunOnTheCheapModel(t *testing.T) {
+	rn, j := setup(t, "")
+	// a Gemini CLI stand-in: it logs its arguments and writes what each session's prompt asks for
+	bin := t.TempDir()
+	gemini := filepath.Join(bin, "gemini")
+	script := fakeAgent + `echo "$*" >> calls.log
+grep -q "skill fit-review" prompt.txt && echo '{"requirements":[{"requirement":"Go","kind":"must","strength":"direct"}],"score":70}' > fit-review.json
+true
+`
+	if err := os.WriteFile(gemini, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	rn.Custom = gemini + " --yolo"
+	got := run(t, rn, j, Request{Steps: []string{"fit", "tailor", "cover"}})
+	if got.State != Done {
+		t.Fatalf("%s %s %s %v", got.State, got.Error, states(got), got.Log)
+	}
+	calls, _ := os.ReadFile(filepath.Join(apply.Dir(rn.Store, j), "calls.log"))
+	if string(calls) != "--yolo -m flash\n--yolo\n" {
+		t.Errorf("want the fit review on flash and the drafts on the usual model in one session, got:\n%s", calls)
+	}
+	rn.CheapModel = "off"
+	_ = os.Remove(filepath.Join(apply.Dir(rn.Store, j), "calls.log"))
+	_ = os.Remove(filepath.Join(apply.Dir(rn.Store, j), apply.ReviewName))
+	run(t, rn, j, Request{Steps: []string{"fit"}})
+	if calls, _ := os.ReadFile(filepath.Join(apply.Dir(rn.Store, j), "calls.log")); string(calls) != "--yolo\n" {
+		t.Errorf("agent_cheap_model: off still picked a model: %q", calls)
+	}
+}

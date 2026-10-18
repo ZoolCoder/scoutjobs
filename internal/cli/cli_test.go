@@ -122,7 +122,7 @@ func TestCVImportWebhookCompact(t *testing.T) {
 	imp := filepath.Join(home, "in.jsonl")
 	os.WriteFile(imp, []byte(`{"company":"Acme","title":"Go Dev","url":"https://a","remote":"remote","source":"remotive"}`+"\n"+`{"company":"Acme","title":"Go Dev"}`+"\n"+`{"company":"","title":"skip me"}`+"\n"), 0o600)
 	out := run(t, "job", "import", "--file", imp, "--json")
-	if !strings.Contains(out, `"created": 1`) || !strings.Contains(out, `"existing": 1`) {
+	if !strings.Contains(out, `"created":1`) || !strings.Contains(out, `"existing":1`) {
 		t.Errorf("import: %s", out)
 	}
 	if len(hits) != 1 || !strings.Contains(hits[0], `"event":"added"`) || !strings.Contains(hits[0], `"company":"Acme"`) {
@@ -140,7 +140,7 @@ func TestCVImportWebhookCompact(t *testing.T) {
 	}
 	run(t, "cv", "log", "--file", "resume.md", "--score", "72", "--ats", "64", "--summary", "ok", "--gaps", "add k8s,quantify", "--job", "1")
 	out = run(t, "cv", "list", "--json")
-	if !strings.Contains(out, `"ats_score": 64`) || !strings.Contains(out, `"job_id": 1`) {
+	if !strings.Contains(out, `"ats_score":64`) || !strings.Contains(out, `"job_id":1`) {
 		t.Errorf("cv list: %s", out)
 	}
 	if len(hits) != 2 || !strings.Contains(hits[1], `"event":"cv_check"`) {
@@ -148,7 +148,7 @@ func TestCVImportWebhookCompact(t *testing.T) {
 	}
 
 	out = run(t, "job", "list", "--json", "--compact")
-	if strings.Contains(out, "fit_notes") || !strings.Contains(out, `"company": "Acme"`) {
+	if strings.Contains(out, "fit_notes") || !strings.Contains(out, `"company":"Acme"`) {
 		t.Errorf("compact list: %s", out)
 	}
 	out = run(t, "brief", "--compact")
@@ -171,7 +171,7 @@ func TestEmailDraftAndSend(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "resume.md"), []byte("# Me"), 0o600)
 	os.WriteFile(filepath.Join(home, "config.yaml"), []byte("email_from: me@x.test\nsmtp_host: 127.0.0.1:1\n"), 0o600)
 	out := run(t, "email", "draft", "1", "--json")
-	if !strings.Contains(out, `"to": "jobs@acme.test"`) || !strings.Contains(out, `"subject": "Application: Go Dev at Acme"`) || !strings.Contains(out, "resume.md") {
+	if !strings.Contains(out, `"to":"jobs@acme.test"`) || !strings.Contains(out, `"subject":"Application: Go Dev at Acme"`) || !strings.Contains(out, "resume.md") {
 		t.Errorf("draft: %s", out)
 	}
 	for _, f := range []string{"email.json", "email.eml"} {
@@ -189,7 +189,7 @@ func TestEmailDraftAndSend(t *testing.T) {
 		t.Errorf("send without password: %v", err)
 	}
 	out = run(t, "job", "show", "1", "--json")
-	if !strings.Contains(out, `"status": "new"`) || !strings.Contains(out, "email:draft") || strings.Contains(out, "email:sent") || !strings.Contains(out, "check:skipped") {
+	if !strings.Contains(out, `"status":"new"`) || !strings.Contains(out, "email:draft") || strings.Contains(out, "email:sent") || !strings.Contains(out, "check:skipped") {
 		t.Errorf("job after failed send: %s", out)
 	}
 	// a local PDF is preparation: it is written with a warning, and sending stays blocked
@@ -212,7 +212,7 @@ func TestEmailDraftAndSend(t *testing.T) {
 		t.Errorf("master export: %s", out)
 	}
 	run(t, "job", "set", "1", "--contact", "hr@acme.test")
-	if out = run(t, "job", "show", "1", "--json"); !strings.Contains(out, `"contact": "hr@acme.test"`) {
+	if out = run(t, "job", "show", "1", "--json"); !strings.Contains(out, `"contact":"hr@acme.test"`) {
 		t.Errorf("contact not stored: %s", out)
 	}
 }
@@ -233,7 +233,7 @@ func TestDoctor(t *testing.T) {
 		}
 	}
 	js := run(t, "doctor", "--json")
-	if !strings.Contains(js, `"fails":`) || !strings.Contains(js, `"item": "smtp"`) {
+	if !strings.Contains(js, `"fails":`) || !strings.Contains(js, `"item":"smtp"`) {
 		t.Errorf("json: %s", js)
 	}
 }
@@ -305,13 +305,13 @@ func TestStatsAndExport(t *testing.T) {
 			t.Errorf("stats lacks %q:\n%s", want, out)
 		}
 	}
-	if js := run(t, "stats", "--json"); !strings.Contains(js, `"total": 1`) {
+	if js := run(t, "stats", "--json"); !strings.Contains(js, `"total":1`) {
 		t.Errorf("stats json: %s", js)
 	}
 	if f := run(t, "stats", "--funnel"); !strings.Contains(f, "by source") {
 		t.Errorf("stats --funnel:\n%s", f)
 	}
-	if js := run(t, "stats", "--funnel", "--json"); !strings.Contains(js, `"applied": 1`) {
+	if js := run(t, "stats", "--funnel", "--json"); !strings.Contains(js, `"applied":1`) {
 		t.Errorf("stats --funnel --json: %s", js)
 	}
 	var dump map[string]any
@@ -359,7 +359,7 @@ func TestJobFitReviewAndCheck(t *testing.T) {
 		t.Error("fit-review.json not written")
 	}
 	out = run(t, "job", "show", "1", "--json")
-	if !strings.Contains(out, `"fit_score": 70`) || !strings.Contains(out, `"veto": "work permit: EU passport required"`) || !strings.Contains(out, "fit:review") || !strings.Contains(out, "1 direct, 1 gap") {
+	if !strings.Contains(out, `"fit_score":70`) || !strings.Contains(out, `"veto":"work permit: EU passport required"`) || !strings.Contains(out, "fit:review") || !strings.Contains(out, "1 direct, 1 gap") {
 		t.Errorf("job after fit: %s", out)
 	}
 	if out = run(t, "job", "list"); !strings.Contains(out, "veto") {
@@ -370,7 +370,7 @@ func TestJobFitReviewAndCheck(t *testing.T) {
 	}
 	run(t, "job", "set", "1", "--veto", "")
 	out = run(t, "job", "show", "1", "--json")
-	if !strings.Contains(out, `"veto": ""`) || !strings.Contains(out, "veto:cleared") {
+	if !strings.Contains(out, `"veto":""`) || !strings.Contains(out, "veto:cleared") {
 		t.Errorf("clear veto: %s", out)
 	}
 	dir := filepath.Join(home, "applications", "acme_go-dev")
@@ -387,7 +387,7 @@ func TestJobFitReviewAndCheck(t *testing.T) {
 	}
 	run(t, "job", "review", "1", "--verdict", "send", "--notes", "all claims in profile")
 	out = run(t, "job", "check", "1", "--json")
-	if !strings.Contains(out, `"ok": true`) {
+	if !strings.Contains(out, `"ok":true`) {
 		t.Errorf("check: %s", out)
 	}
 	out = run(t, "job", "check", "1")

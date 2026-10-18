@@ -43,6 +43,8 @@ type Options struct {
 	// Prep queues the interview prep pack for a job and reports whether it was queued; nil means no
 	// AI assistant is reachable here, so no pack is asked for.
 	Prep func(store.Job) bool
+	// SyncMail reads the inbox into the pipeline; nil unless email_sync is auto with a local mailbox.
+	SyncMail func() (int, error)
 }
 
 // SearchRun is one daily search that ran.
@@ -60,6 +62,7 @@ type Report struct {
 	FollowUps []string    `json:"follow_ups"` // "Globex: followup"
 	Prep      []string    `json:"prep"`       // companies whose prep pack was queued
 	Closed    []string    `json:"closed"`     // postings skipped because the ATS closed them
+	Replies   int         `json:"replies"`    // new replies the mail sync matched to jobs
 	Errors    []string    `json:"errors,omitempty"`
 }
 
@@ -68,6 +71,13 @@ func Daily(ctx context.Context, s *store.Store, o Options, now time.Time) Report
 	var r Report
 	r.searches(ctx, s, o, now)
 	r.verify(ctx, s, o, now)
+	if o.SyncMail != nil {
+		n, err := o.SyncMail()
+		r.Replies = n
+		if err != nil {
+			r.Errors = append(r.Errors, "mail sync: "+err.Error())
+		}
+	}
 	if s.Setting(FollowUpsSetting) == "on" {
 		r.followUps(s, o, now)
 	}
@@ -238,6 +248,9 @@ func (r Report) Summary() string {
 	}
 	if n := len(r.FollowUps); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d %s drafted", n, plural(n, "follow-up", "follow-ups")))
+	}
+	if r.Replies > 0 {
+		parts = append(parts, fmt.Sprintf("%d new %s", r.Replies, plural(r.Replies, "reply", "replies")))
 	}
 	if n := len(r.Closed); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d closed %s skipped", n, plural(n, "posting", "postings")))

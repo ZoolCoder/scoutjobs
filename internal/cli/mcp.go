@@ -10,6 +10,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+
+	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
 // `scoutjobs mcp` is a stdio MCP server: newline-delimited JSON-RPC 2.0 on stdin/stdout. Every tool
@@ -329,8 +331,9 @@ func mcpHandle(req rpcRequest) (rpcResponse, bool) {
 		resp.Result = map[string]any{}
 	case "tools/list":
 		var list []map[string]any
+		mailOff := mcpMailOff()
 		for _, t := range mcpTools {
-			if !mcpOffered(t.Name) {
+			if !mcpOffered(t.Name) || mailOff && slices.Contains(mcpMailTools, t.Name) {
 				continue
 			}
 			tool := map[string]any{"name": t.Name, "description": t.Desc, "inputSchema": t.schema()}
@@ -393,6 +396,18 @@ func mcpCall(name string, in map[string]any) (string, error) {
 func mcpOffered(name string) bool {
 	only := os.Getenv("SCOUTJOBS_MCP_TOOLS")
 	return only == "" || slices.Contains(strings.Split(only, ","), name)
+}
+
+// mcpMailTools read the mailbox; with email_sync off their schemas would only cost every request tokens.
+var mcpMailTools = []string{"email_sync", "email_log", "email_show", "gmail_status", "gmail_draft"}
+
+func mcpMailOff() bool {
+	s, err := store.Open()
+	if err != nil {
+		return false
+	}
+	defer s.Close()
+	return emailMode(s, LoadConfig(s.Home)) == "off"
 }
 
 // mcpReadOnly are the tools that change nothing, so a client may run them without asking.

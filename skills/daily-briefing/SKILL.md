@@ -9,7 +9,7 @@ license: MIT
 One command gives everything:
 
 ```bash
-scoutjobs email sync --json 2>/dev/null || true   # when imap_host is set: log replies first so the brief knows who answered
+scoutjobs email sync --auto --json 2>/dev/null || true   # only with email_sync: auto; reads on the machine, never through you
 scoutjobs daily --json      # due daily searches and follow-up drafts; idempotent, sends nothing
 scoutjobs brief --compact   # full payload: `scoutjobs brief` (only when a section needs notes or urls)
 ```

@@ -66,6 +66,7 @@ type MailHooks struct {
 	// Compose builds the e-mail the AI agent files as a draft when it reads the mail
 	Compose func(jobID int64, kind string) (runner.MailTask, error)
 	Gmail   func() *gmail.Client // the OAuth client from config.yaml or gmail-client.json; the Inbox page connects it
+	Mode    func() string        // email_sync resolved: off | manual | auto
 }
 
 func day(s string) string {
@@ -413,6 +414,11 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	})
 	mux.HandleFunc("GET /palette.json", srv.paletteJSON)
 	mux.HandleFunc("GET /notify.json", srv.notifyJSON)
+	mux.HandleFunc("GET /changes", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write([]byte(changes(s.Home)))
+	})
 	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
@@ -509,6 +515,9 @@ type page struct {
 	Mini   bool   // the sidebar is folded to icons, from the side cookie app.js sets
 	Path   string
 	Sub    string
+	Email  string // email_sync resolved: off hides the Inbox
+	// Changes is the data version the page was rendered from; app.js reloads the page when it moves
+	Changes string
 }
 
 // initial and hue draw a company avatar: first letter, one of eight colors picked by the name.
@@ -563,11 +572,31 @@ func (v *server) render(w http.ResponseWriter, r *http.Request, name, active str
 			}
 		}
 	}
-	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Mini: sideMini(r), Path: r.URL.RequestURI(), Sub: subtitles[active], Nav: v.navCounts()}
+	p := page{Title: title, Bare: bare, Active: active, Data: data, Cfg: v.cfg, Now: time.Now().Format("Mon 02 Jan 15:04"), Theme: theme, Mini: sideMini(r), Path: r.URL.RequestURI(), Sub: subtitles[active], Nav: v.navCounts(), Changes: changes(v.s.Home), Email: v.emailMode()}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := v.tpl.ExecuteTemplate(w, name, p); err != nil {
 		http.Error(w, err.Error(), 500)
 	}
+}
+
+// emailMode is email_sync as config.yaml has it now; without the hook (tests, other embedders) mail is on.
+func (v *server) emailMode() string {
+	if v.cfg.Mail.Mode == nil {
+		return "manual"
+	}
+	return v.cfg.Mail.Mode()
+}
+
+// changes names the database's current version from its files' size and time, so a write from any
+// process (the MCP server an AI assistant runs, the CLI, the runner) shows without a query.
+func changes(home string) string {
+	var b strings.Builder
+	for _, name := range []string{"scoutjobs.db", "scoutjobs.db-wal"} {
+		if st, err := os.Stat(filepath.Join(home, name)); err == nil {
+			fmt.Fprintf(&b, "%x.%x.", st.ModTime().UnixNano(), st.Size())
+		}
+	}
+	return b.String()
 }
 
 // theme stores the choice in a cookie and goes back where the user was.

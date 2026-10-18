@@ -666,3 +666,33 @@ func TestSplitPast(t *testing.T) {
 		t.Errorf("ahead %v past %v", ahead, past)
 	}
 }
+
+func TestChangesMovesOnWrite(t *testing.T) {
+	s := testStore(t)
+	h, _ := Handler(s, Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5})
+	token := func() string {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", "/changes", nil))
+		return rec.Body.String()
+	}
+	before := token()
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if before == "" || !strings.Contains(rec.Body.String(), `data-changes="`+before+`"`) {
+		t.Fatalf("page not stamped with %q", before)
+	}
+	if token() != before {
+		t.Error("reading the page changed the token")
+	}
+	other, err := store.Open() // a second connection, as the MCP server or CLI holds
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	if err := other.AddEvent(1, "note", "from the assistant"); err != nil {
+		t.Fatal(err)
+	}
+	if token() == before {
+		t.Error("a write from another connection did not move the token")
+	}
+}

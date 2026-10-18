@@ -21,6 +21,75 @@ type Agent struct {
 	Effort string
 	// Budget stops a claude session once it has spent this many US dollars; 0 sets no cap
 	Budget float64
+	// Cheap is the agent's cheaper model, which scoring steps run on; empty runs them on the usual one
+	Cheap string
+	// light runs this session on Cheap
+	light bool
+}
+
+// CheapSteps need reading and scoring more than writing, so a cheap model does them about as well.
+var CheapSteps = map[string]bool{"fit": true, "ats": true}
+
+// Light is the agent set to run a session of cheap steps, or itself when it has no cheap model.
+func (a Agent) Light() Agent {
+	a.light = a.Cheap != ""
+	return a
+}
+
+// CheapModel is the model scoring steps run on: the configured one ("off" turns it off), else the
+// agent's own cheap tier. Custom agents keep their command as written, except Gemini CLI.
+func CheapModel(a Agent, configured string) string {
+	switch {
+	case configured == "off":
+		return ""
+	case configured != "":
+		return configured
+	}
+	switch a.Name {
+	case "claude":
+		return "haiku"
+	case "codex":
+		return codexCheapModel()
+	case "custom":
+		if filepath.Base(a.Path) == "gemini" && !hasModelFlag(a.Args) {
+			return "flash"
+		}
+	}
+	return ""
+}
+
+// codexCheapModel is the first model Codex itself describes as affordable, from the model list
+// it caches; names change too often to hard-code one.
+func codexCheapModel() string {
+	h, _ := os.UserHomeDir()
+	data, err := os.ReadFile(filepath.Join(h, ".codex", "models_cache.json"))
+	if err != nil {
+		return ""
+	}
+	var cache struct {
+		Models []struct {
+			Slug        string `json:"slug"`
+			Description string `json:"description"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(data, &cache) != nil {
+		return ""
+	}
+	for _, m := range cache.Models {
+		if strings.Contains(strings.ToLower(m.Description), "affordable") {
+			return m.Slug
+		}
+	}
+	return ""
+}
+
+func hasModelFlag(args []string) bool {
+	for _, a := range args {
+		if a == "-m" || a == "--model" || strings.HasPrefix(a, "--model=") {
+			return true
+		}
+	}
+	return false
 }
 
 // PrepTools are the scoutjobs MCP tools a preparation session sees. Each tool's schema rides along with
@@ -30,7 +99,9 @@ const PrepTools = "run,job_show,job_set"
 // claudeTuning is the model, effort and spending cap flags of a claude session.
 func (a Agent) claudeTuning() []string {
 	var out []string
-	if a.Model != "" {
+	if a.light {
+		out = append(out, "--model", a.Cheap)
+	} else if a.Model != "" {
 		out = append(out, "--model", a.Model)
 	}
 	if a.Effort != "" {
@@ -111,11 +182,19 @@ func (a Agent) command(exe, home, dir string) []string {
 			"--disallowedTools", "Bash", "WebFetch", "WebSearch"}, a.claudeTuning()...)
 	case "codex":
 		env := `{SCOUTJOBS_HOME=` + strconv.Quote(home) + `,SCOUTJOBS_RUNNER="1",SCOUTJOBS_MCP_TOOLS=` + strconv.Quote(PrepTools) + `}`
-		return []string{a.Path, "exec", "--json", "--skip-git-repo-check", "--cd", dir, "--sandbox", "workspace-write",
+		argv := []string{a.Path, "exec", "--json", "--skip-git-repo-check", "--cd", dir, "--sandbox", "workspace-write",
 			"-c", "mcp_servers.scoutjobs.command=" + strconv.Quote(exe), "-c", `mcp_servers.scoutjobs.args=["mcp"]`,
-			"-c", "mcp_servers.scoutjobs.env=" + env, "-c", `approval_policy="never"`, "-"}
+			"-c", "mcp_servers.scoutjobs.env=" + env, "-c", `approval_policy="never"`}
+		if a.light {
+			argv = append(argv, "-m", a.Cheap)
+		}
+		return append(argv, "-")
 	}
-	return append([]string{a.Path}, a.Args...)
+	argv := append([]string{a.Path}, a.Args...)
+	if a.light {
+		argv = append(argv, "-m", a.Cheap)
+	}
+	return argv
 }
 
 // CostEvent is the job event an agent session's spend is logged under, in US dollars first.

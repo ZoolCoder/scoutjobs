@@ -190,7 +190,7 @@ func MasterPrompt(home, exe string, steps []Step) string {
 	}
 	for _, s := range steps {
 		if s.Skill != "" {
-			fmt.Fprintf(&b, "\n\n===== skill %s =====\n\n%s", s.Skill, skills.Text(s.Skill))
+			fmt.Fprintf(&b, "\n\n===== skill %s =====\n\n%s", s.Skill, skills.Unattended(s.Skill))
 		}
 	}
 	return b.String()

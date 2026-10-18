@@ -20,7 +20,7 @@ func newRunner(s *store.Store, cfg Config) *runner.Runner {
 		exe = "scoutjobs"
 	}
 	return &runner.Runner{Store: s, Exe: exe, Custom: cfg.AgentCommand, Agent: cfg.Agent, From: cfg.EmailFrom, CVSource: cfg.CVSource, CoverTemplate: cfg.CoverTemplate, Model: agentModel(cfg.AgentModel),
-		Effort: cfg.AgentEffort, Budget: cfg.AgentBudget}
+		Effort: cfg.AgentEffort, Budget: cfg.AgentBudget, CheapModel: cfg.AgentCheapModel}
 }
 
 // job run: prepare one application end to end with an installed agent CLI. Nothing is sent.
