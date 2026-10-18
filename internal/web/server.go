@@ -50,6 +50,7 @@ type Config struct {
 	SearchRemote                               bool              // search page default for the remote boards
 	IMAP                                       bool              // imap_host is set in config.yaml
 	Currency                                   string            // default on the add-job form
+	Country                                    string            // search page "Where?" when the profile names no place
 	SearchBaseURL                              map[string]string // test override per search source
 	Version                                    string            // shown in the footer next to the release link
 	MCP                                        http.Handler      // MCP over HTTP, mounted on /mcp when api_token is set
@@ -588,10 +589,11 @@ func (v *server) emailMode() string {
 }
 
 // changes names the database's current version from its files' size and time, so a write from any
-// process (the MCP server an AI assistant runs, the CLI, the runner) shows without a query.
+// process (the MCP server an AI assistant runs, the CLI, the runner) shows without a query. The
+// profile and the config count too: an agent filling profile.md refreshes the open pages.
 func changes(home string) string {
 	var b strings.Builder
-	for _, name := range []string{"scoutjobs.db", "scoutjobs.db-wal"} {
+	for _, name := range []string{"scoutjobs.db", "scoutjobs.db-wal", "profile.md", "config.yaml"} {
 		if st, err := os.Stat(filepath.Join(home, name)); err == nil {
 			fmt.Fprintf(&b, "%x.%x.", st.ModTime().UnixNano(), st.Size())
 		}

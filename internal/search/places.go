@@ -41,7 +41,10 @@ var Regions = map[string]string{
 // cities maps the cities postings name most to their country.
 var cities = map[string]string{
 	"berlin": "germany", "munich": "germany", "hamburg": "germany", "frankfurt": "germany", "cologne": "germany",
-	"stuttgart": "germany", "düsseldorf": "germany", "london": "united kingdom", "manchester": "united kingdom",
+	"stuttgart": "germany", "düsseldorf": "germany", "leipzig": "germany", "dresden": "germany", "hanover": "germany",
+	"hannover": "germany", "nuremberg": "germany", "nürnberg": "germany", "karlsruhe": "germany", "bremen": "germany",
+	"essen": "germany", "dortmund": "germany", "bonn": "germany", "mannheim": "germany", "heidelberg": "germany",
+	"münster": "germany", "aachen": "germany", "freiburg": "germany", "potsdam": "germany", "london": "united kingdom", "manchester": "united kingdom",
 	"edinburgh": "united kingdom", "dublin": "ireland", "paris": "france", "lyon": "france", "amsterdam": "netherlands",
 	"rotterdam": "netherlands", "madrid": "spain", "barcelona": "spain", "lisbon": "portugal", "porto": "portugal",
 	"milan": "italy", "rome": "italy", "vienna": "austria", "zurich": "switzerland", "geneva": "switzerland",
@@ -53,7 +56,7 @@ var cities = map[string]string{
 	"toronto": "canada", "vancouver": "canada", "montreal": "canada",
 	"são paulo": "brazil", "sao paulo": "brazil", "buenos aires": "argentina", "mexico city": "mexico", "bogota": "colombia",
 	"bangalore": "india", "bengaluru": "india", "hyderabad": "india", "pune": "india", "tokyo": "japan",
-	"sydney": "australia", "melbourne": "australia", "tel aviv": "israel", "dubai": "uae",
+	"sydney": "australia", "melbourne": "australia", "tel aviv": "israel", "jerusalem": "israel", "haifa": "israel", "dubai": "uae",
 }
 
 // aliases are other names of a place in Regions.
@@ -205,7 +208,8 @@ func Expand(want string) []string {
 
 // LocationMatch says whether a posting fits the places the user wants. A remote posting fits when
 // it is open to their region; an on-site or hybrid one when it is in their city, or in the country
-// or region they named. ok is true with a note when the posting states no location.
+// or region they named. ok is true with a note when the posting states no location, or one this
+// table does not know ("г Москва"): the caller ranks it below a known fit instead of dropping it.
 func LocationMatch(p Posting, wants []string) (ok bool, note string) {
 	if len(wants) == 0 {
 		return true, ""
@@ -215,6 +219,9 @@ func LocationMatch(p Posting, wants []string) (ok bool, note string) {
 		places = PostingPlaces(p)
 	}
 	if len(places) == 0 {
+		if loc := strings.TrimSpace(p.Location); loc != "" && !IsRemote(p) {
+			return true, "location not recognised: " + loc
+		}
 		return true, "location not stated"
 	}
 	remote := IsRemote(p)

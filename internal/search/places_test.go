@@ -50,10 +50,18 @@ func TestLocationMatch(t *testing.T) {
 		{"onsite country wanted", onsite("Munich, Germany"), []string{"Germany"}, true},
 		{"onsite region wanted", onsite("Paris, France"), []string{"Europe"}, true},
 		{"onsite abroad", onsite("Austin, TX, United States"), []string{"Europe"}, false},
+		{"onsite smaller german city", onsite("Karlsruhe"), []string{"Germany"}, true},
+		{"onsite jerusalem for germany", Posting{Location: "Jerusalem, Jerusalem District", Remote: "hybrid"}, []string{"Germany"}, false},
 		{"no want", onsite("Austin"), nil, true},
 	} {
 		if ok, note := LocationMatch(c.p, c.want); ok != c.ok {
 			t.Errorf("%s: ok = %v (%s), want %v", c.name, ok, note, c.ok)
 		}
+	}
+	if ok, note := LocationMatch(onsite("г Москва"), []string{"Germany"}); !ok || note != "location not recognised: г Москва" {
+		t.Errorf("unknown place: %v %q", ok, note)
+	}
+	if ok, note := LocationMatch(remote("Remote"), []string{"Germany"}); !ok || note != "location not stated" {
+		t.Errorf("no place: %v %q", ok, note)
 	}
 }

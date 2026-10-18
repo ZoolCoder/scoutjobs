@@ -35,6 +35,8 @@ func TestLevelEmploymentVisa(t *testing.T) {
 		{"", "Go Developer", "This is a full-time, permanent role.", "full-time"},
 		{"", "Go Developer", "A 6 month contract role.", "contract"},
 		{"", "Go Developer", "", ""},
+		{"", "Werkstudent Softwareentwicklung (m/w/d)", "", "internship"},
+		{"", "Backend Entwickler (m/w/d)", "Unbefristete Festanstellung in Vollzeit.", "full-time"},
 	} {
 		if got := Employment(c.hint, c.title, c.desc); got != c.want {
 			t.Errorf("Employment(%q, %q) = %q, want %q", c.hint, c.title, got, c.want)

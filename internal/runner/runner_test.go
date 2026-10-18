@@ -193,9 +193,15 @@ func TestDryRunAndCancel(t *testing.T) {
 		}
 	}
 	m := NewManager(rn)
+	if !m.Idle() {
+		t.Error("new manager not idle")
+	}
 	r, err := m.Start(j, Request{Steps: []string{"tailor"}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if m.Idle() {
+		t.Error("idle during a run: a dashboard restart would kill it")
 	}
 	if _, err := m.Start(j, Request{Steps: []string{"tailor"}}); err == nil {
 		t.Error("second run of the same job started")
@@ -207,6 +213,9 @@ func TestDryRunAndCancel(t *testing.T) {
 	}
 	if got := r.Snapshot(); got.State != "cancelled" || got.Steps[0].State != Skipped {
 		t.Errorf("after cancel: %s %s", got.State, states(got))
+	}
+	if !m.Idle() {
+		t.Error("not idle after the run ended")
 	}
 }
 

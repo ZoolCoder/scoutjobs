@@ -23,7 +23,7 @@ test-unit:
 
 lint:
 	go vet $(PKG)
-	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run || echo "golangci-lint not installed, go vet only"
+	@if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run; else echo "golangci-lint not installed, go vet only"; fi
 
 fmt:
 	gofmt -l -w cmd internal

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/apply"
+	"github.com/zoolcoder/scoutjobs/internal/country"
 	"github.com/zoolcoder/scoutjobs/internal/match"
 	"github.com/zoolcoder/scoutjobs/internal/search"
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -28,7 +29,7 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	var queries, boards listFlag
 	fs.Var(&queries, "query", "keyword query, repeatable (all words must match; any query may)")
-	fs.Var(&boards, "board", "company board, repeatable: source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, the careers page URL, or a Danish board with an area: jobindex:dk, jobbank:aarhus, jobdanmark:odense")
+	fs.Var(&boards, "board", "company board, repeatable: source:<slug> (greenhouse, lever, ashby, workable, smartrecruiters, personio, recruitee, bamboohr), rss:<url>, the careers page URL, a Danish board with an area: jobindex:dk, jobbank:aarhus, jobdanmark:odense, or the German Arbeitsagentur: arbeitsagentur:de, arbeitsagentur:berlin")
 	var feeds listFlag
 	fs.Var(&feeds, "rss", "RSS or Atom job feed url, repeatable (same as --board rss:<url>)")
 	remote := fs.Bool("remote", cfg.SearchRemote, "query the remote boards too")
@@ -36,7 +37,7 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	add := fs.Bool("add", false, "add matches to the tracker as status new")
 	asJSON := fs.Bool("json", false, "print JSON lines (description included)")
 	compact := fs.Bool("compact", false, "with --json: drop descriptions")
-	location := fs.String("location", "", "keep jobs in, or remote and open to, these comma separated cities, countries or regions")
+	location := fs.String("location", "", "keep jobs in, or remote and open to, these comma separated cities, countries or regions (default: the profile's locations, else the country in config.yaml; any searches everywhere)")
 	rank := fs.Bool("rank", true, "score each posting against profile.md and the preferences, best fit first")
 	hide := fs.Bool("hide-mismatches", false, "drop postings that break a must in the profile: place, engagement, salary floor")
 	suggest := fs.Bool("suggest", false, "print searches built from the profile and exit")
@@ -66,6 +67,12 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		})
 	}
 	wants := splitList(*location)
+	switch {
+	case strings.EqualFold(*location, "any"):
+		wants = nil
+	case len(wants) == 0:
+		wants = focus(pr, cfg)
+	}
 	if len(wants) > 0 {
 		pr.Places = wants // the place searched for is the place to score against
 	}
@@ -96,8 +103,16 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		}
 		return ok
 	}
-	if ranked {
+	switch {
+	case ranked:
 		opts.Rank = func(p search.Posting) int { return rankKey(pr.Score(p)) }
+	case len(wants) > 0: // no profile to score by: a known fit before an unknown or unstated place
+		opts.Rank = func(p search.Posting) int {
+			if _, note := search.LocationMatch(p, wants); note != "" {
+				return 0
+			}
+			return 1
+		}
 	}
 	r := search.Run(ctx, opts)
 	for _, e := range r.Errors {
@@ -170,8 +185,11 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 	}
 	table(out, "ID\tFIT\tSOURCE\tCOMPANY\tTITLE\tREMOTE\tLOCATION\tPOSTED", tbl)
 	fmt.Fprintf(out, "%d postings", len(rows))
+	if len(wants) > 0 {
+		fmt.Fprintf(out, ", focus %s", strings.Join(wants, ", "))
+	}
 	if dropped > 0 {
-		fmt.Fprintf(out, ", %d dropped by --location or --hide-mismatches", dropped)
+		fmt.Fprintf(out, ", %d dropped by the focus or --hide-mismatches", dropped)
 	}
 	if ranked {
 		fmt.Fprint(out, ", best fit first (! breaks a must)")
@@ -180,7 +198,22 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, ", %d added (= already tracked)", added)
 	}
 	fmt.Fprintln(out)
+	if len(wants) > 0 && *location == "" {
+		fmt.Fprintln(out, "search everywhere: --location any; another place: --location <city, country or region>")
+	}
 	return nil
+}
+
+// focus is where a search looks when no place is given: the profile's locations, else the
+// country in config.yaml, so results stay in one country and the remote jobs open to its region.
+func focus(pr match.Profile, cfg Config) []string {
+	if len(pr.Places) > 0 {
+		return pr.Places
+	}
+	if c, ok := country.Lookup(cfg.Country); ok {
+		return []string{c.Name}
+	}
+	return splitList(cfg.Country)
 }
 
 // runImport reads JSON lines (or a JSON array) of postings from a file or stdin and upserts them.

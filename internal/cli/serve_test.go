@@ -42,6 +42,39 @@ func TestWatchBinarySeesUpgrade(t *testing.T) {
 	}
 }
 
+func TestWatchFileSeesEdit(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("country: DK\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		_ = os.WriteFile(path, []byte("country: DE\n"), 0o600)
+	}()
+	if !watchFile(ctx, path, 20*time.Millisecond) {
+		t.Fatal("edit not seen")
+	}
+	quiet, stop := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer stop()
+	if watchFile(quiet, path, 20*time.Millisecond) {
+		t.Error("unchanged file reported as changed")
+	}
+}
+
+func TestWaitIdleHoldsForARun(t *testing.T) {
+	runs := 3
+	if !waitIdle(context.Background(), func() bool { runs--; return runs > 0 }, time.Millisecond) || runs != 0 {
+		t.Errorf("returned with %d polls left", runs)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if waitIdle(ctx, func() bool { return true }, time.Millisecond) {
+		t.Error("a stopped server must not restart")
+	}
+}
+
 func TestDevBuild(t *testing.T) {
 	defer func(v string) { Version = v }(Version)
 	for v, want := range map[string]bool{"dev": true, "0.3.0-2-ga3e2185-dev": true, "0.3.0-dev": true, "0.3.0": false, "0.4.0-rc.1": false} {

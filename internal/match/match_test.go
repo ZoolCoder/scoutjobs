@@ -129,3 +129,19 @@ func TestSourceAnswersMoveTheScore(t *testing.T) {
 		t.Errorf("remotive = %+v, base %d", down, base)
 	}
 }
+
+func TestLanguagesMoveTheScore(t *testing.T) {
+	pr := Parse(profile, []store.Preference{{Key: "languages", Value: "English (C2), Arabic", Source: "stated"}})
+	if strings.Join(pr.Speaks, ",") != "english,arabic" {
+		t.Fatalf("speaks %v", pr.Speaks)
+	}
+	en := pr.Score(posting("Senior Backend Engineer (Go)", "Europe", "remote", "Go and Postgres. Fluent English."))
+	de := pr.Score(posting("Senior Backend Engineer (Go)", "Europe", "remote", "Go and Postgres. Fluent German and English."))
+	if de.Score > en.Score-10 || !strings.Contains(strings.Join(de.Miss, ";"), "asks for German, which you do not list") {
+		t.Errorf("german required: %d vs %d, %+v", de.Score, en.Score, de)
+	}
+	pr.Speaks = append(pr.Speaks, "german")
+	if de := pr.Score(posting("Senior Backend Engineer (Go)", "Europe", "remote", "Go and Postgres. Fluent German.")); !strings.Contains(strings.Join(de.Why, ";"), "which you speak") {
+		t.Errorf("german spoken: %+v", de)
+	}
+}

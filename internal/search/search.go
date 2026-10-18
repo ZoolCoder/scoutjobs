@@ -43,6 +43,7 @@ type Posting struct {
 	Employment string   `json:"employment,omitempty"` // full-time, part-time, contract, freelance, internship
 	Regions    []string `json:"regions,omitempty"`    // countries and regions it is in or open to; worldwide
 	Visa       string   `json:"visa,omitempty"`       // yes, no, or empty when not mentioned
+	Speaks     []string `json:"speaks,omitempty"`     // human languages it requires: german, english
 }
 
 // Job converts a posting into a tracker row.
@@ -74,7 +75,7 @@ type Result struct {
 }
 
 // Boards lists the board sources that need a company slug.
-var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "recruitee", "bamboohr", "rss", "jobindex", "jobbank", "jobdanmark"}
+var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "recruitee", "bamboohr", "rss", "jobindex", "jobbank", "jobdanmark", "arbeitsagentur"}
 
 // RemoteBoards lists the keyword-searchable remote boards.
 var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas", "hn", "freehire"}
@@ -99,6 +100,9 @@ var defaultBase = map[string]string{
 	"jobbank":         "https://jobbank.dk/job/rss/",
 	"jobdanmark":      "https://jobdanmark.dk/api/jobsearch/search/1",
 	"freehire":        "https://freehire.me/api/v1/agent/jobs/search",
+	"arbeitsagentur":  "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs",
+	// v6 has no details endpoint yet
+	"arbeitsagentur-detail": "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobdetails",
 }
 
 type fetcher struct {
@@ -189,6 +193,11 @@ func Run(ctx context.Context, o Options) Result {
 				feeds = append(feeds, feed{b + ":" + q, func(ctx context.Context) ([]Posting, error) { return f.danish(ctx, src, q, slug) }})
 				searched[b+":"+q] = q != ""
 			}
+		case "arbeitsagentur":
+			for _, q := range queriesOrAll(o.Queries) {
+				feeds = append(feeds, feed{b + ":" + q, func(ctx context.Context) ([]Posting, error) { return f.arbeitsagentur(ctx, q, slug) }})
+				searched[b+":"+q] = q != ""
+			}
 		}
 	}
 	if o.Remote {
@@ -235,7 +244,7 @@ func Run(ctx context.Context, o Options) Result {
 			continue
 		}
 		for _, p := range a.rows {
-			key := store.JobKey(p.Company, p.Title)
+			key := store.JobKey(store.CompanyName(p.Company), p.Title) // one board's "Acme GmbH" is another's "Acme"
 			if seen[key] || !searched[feeds[i].name] && !Matches(p, o.Queries) {
 				continue
 			}

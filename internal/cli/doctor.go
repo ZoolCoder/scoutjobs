@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/gmail"
+	"github.com/zoolcoder/scoutjobs/internal/match"
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
 
@@ -112,6 +113,12 @@ func configChecks(home string, cfg Config) []check {
 	} else {
 		cs = append(cs, check{"ok", "search", fmt.Sprintf("%d queries, %d boards, remote=%v", len(cfg.SearchQueries), len(cfg.SearchBoards), cfg.SearchRemote), ""})
 	}
+	prof, _ := os.ReadFile(filepath.Join(home, "profile.md"))
+	if places := focus(match.Parse(string(prof), nil), cfg); len(places) > 0 {
+		cs = append(cs, check{"ok", "focus", "search stays in " + strings.Join(places, ", "), ""})
+	} else {
+		cs = append(cs, check{"warn", "focus", "no country or locations: searches return jobs from every country", "scoutjobs country set <code>, e.g. DE"})
+	}
 	if cfg.Currency != "" && !store.KnownCurrency(cfg.Currency) {
 		cs = append(cs, check{"warn", "currency", cfg.Currency + " has no rate; salaries are stored as quoted", "use an ISO code such as EUR, USD, GBP"})
 	}
@@ -123,8 +130,8 @@ func fileChecks(home string) []check {
 	prof := filepath.Join(home, "profile.md")
 	if b, err := os.ReadFile(prof); err != nil {
 		cs = append(cs, check{"fail", "profile.md", "missing", "scoutjobs init, then the scoutjobs-setup skill"})
-	} else if strings.Contains(string(b), "Filled by the scoutjobs-setup skill") && len(b) <= len(profileTemplate)+64 {
-		cs = append(cs, check{"warn", "profile.md", "still the template", "run the scoutjobs-setup skill in your agent"})
+	} else if match.Parse(string(b), nil).Empty() {
+		cs = append(cs, check{"warn", "profile.md", "still the template: no roles, skills or places to rank jobs by", "run the scoutjobs-setup skill in your agent"})
 	} else {
 		cs = append(cs, check{"ok", "profile.md", fmt.Sprintf("%d bytes", len(b)), ""})
 	}
@@ -203,6 +210,10 @@ func agentChecks(home string) []check {
 			continue
 		}
 		linked++
+		if missing := unlinkedSkills(dir); len(missing) > 0 {
+			cs = append(cs, check{"warn", a.name, "not linked into " + dir + ": " + strings.Join(missing, ", "), "./install.sh"})
+			continue
+		}
 		n, _ := filepath.Glob(filepath.Join(dir, "*", "SKILL.md"))
 		cs = append(cs, check{"ok", a.name, fmt.Sprintf("%d skills in %s", len(n), dir), ""})
 	}
@@ -226,6 +237,29 @@ func agentChecks(home string) []check {
 		cs = append(cs, check{"warn", "agents", home + "/agents missing; mock-interview personas unavailable outside Claude Code", "./install.sh"})
 	}
 	return cs
+}
+
+// unlinkedSkills lists the repository's skills that an agent's skills folder lacks. It follows the
+// scoutjobs-setup link back to the repository, so a skill added after ./install.sh shows up; a
+// copied install has no repository to compare with.
+func unlinkedSkills(dir string) []string {
+	src, err := filepath.EvalSymlinks(filepath.Join(dir, "scoutjobs-setup"))
+	if err != nil {
+		return nil
+	}
+	repo := filepath.Dir(src)
+	if real, err := filepath.EvalSymlinks(dir); err == nil && real == repo {
+		return nil
+	}
+	all, _ := filepath.Glob(filepath.Join(repo, "*", "SKILL.md"))
+	var missing []string
+	for _, f := range all {
+		name := filepath.Base(filepath.Dir(f))
+		if _, err := os.Stat(filepath.Join(dir, name, "SKILL.md")); err != nil {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 // releaseURL is GitHub's latest-release endpoint; tests point it at a local server.

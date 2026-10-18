@@ -168,6 +168,9 @@ func (v *server) searchPage(w http.ResponseWriter, r *http.Request) {
 	}
 	pr := match.Load(v.s)
 	f.Filter.Location = strings.Join(pr.Places, ", ")
+	if f.Filter.Location == "" {
+		f.Filter.Location = v.cfg.Country
+	}
 	f.Suggestions = pr.Suggest()
 	f.Saved, _ = v.s.SavedSearches()
 	v.render(w, r, "search.html", "search", f)

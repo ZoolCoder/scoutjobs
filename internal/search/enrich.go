@@ -165,24 +165,25 @@ func Employment(hint, title, description string) string {
 	}
 	t := strings.ToLower(title)
 	switch {
-	case hasWord(t, "freelance") || hasWord(t, "freelancer") || hasWord(t, "independent"):
+	case hasWord(t, "freelance") || hasWord(t, "freelancer") || hasWord(t, "independent") || hasWord(t, "freiberuflich"):
 		return "freelance"
 	case hasWord(t, "contract") || hasWord(t, "contractor"):
 		return "contract"
-	case hasWord(t, "part-time") || hasWord(t, "part time"):
+	case hasWord(t, "part-time") || hasWord(t, "part time") || hasWord(t, "teilzeit"):
 		return "part-time"
-	case hasWord(t, "intern") || hasWord(t, "internship"):
+	case hasWord(t, "intern") || hasWord(t, "internship") || hasWord(t, "praktikum") || hasWord(t, "werkstudent"):
 		return "internship"
 	}
 	d := strings.ToLower(description)
 	switch {
 	case hasWord(d, "freelance") || hasWord(d, "freelancer") || hasWord(d, "independent contractor"):
 		return "freelance"
-	case hasWord(d, "full-time") || hasWord(d, "full time") || hasWord(d, "permanent position") || hasWord(d, "permanent role"):
+	case hasWord(d, "full-time") || hasWord(d, "full time") || hasWord(d, "permanent position") || hasWord(d, "permanent role") ||
+		hasWord(d, "vollzeit") || hasWord(d, "festanstellung") || hasWord(d, "unbefristet"):
 		return "full-time"
 	case hasWord(d, "contractor") || hasWord(d, "contract role") || hasWord(d, "contract position") || hasWord(d, "b2b contract") || hasWord(d, "1099"):
 		return "contract"
-	case hasWord(d, "part-time") || hasWord(d, "part time"):
+	case hasWord(d, "part-time") || hasWord(d, "part time") || hasWord(d, "teilzeit"):
 		return "part-time"
 	}
 	return ""
@@ -206,7 +207,7 @@ func Visa(description string) string {
 	return ""
 }
 
-// Enrich derives the skills, level, employment type, regions and visa stance of a posting from its
+// Enrich derives the skills, level, employment type, regions, visa stance and languages of a posting from its
 // title, the board's tags and the description.
 func Enrich(p *Posting) {
 	head := p.Description
@@ -226,10 +227,11 @@ func Enrich(p *Posting) {
 	p.Employment = Employment(hint, p.Title, head)
 	p.Regions = PostingPlaces(*p)
 	p.Visa = Visa(head)
+	p.Speaks = Speaks(p.Title, head)
 }
 
 // AllTags is the board's tags plus the derived ones: skills as plain words, the rest as level:,
-// type:, region: and visa: tags, so the pipeline can filter on them.
+// type:, region:, visa: and speaks: tags, so the pipeline can filter on them.
 func (p Posting) AllTags() string {
 	var tags []string
 	have := map[string]bool{}
@@ -261,6 +263,9 @@ func (p Posting) AllTags() string {
 	}
 	if p.Visa != "" {
 		add("visa:" + p.Visa)
+	}
+	for _, l := range p.Speaks {
+		add("speaks:" + l)
 	}
 	return strings.Join(tags, ",")
 }

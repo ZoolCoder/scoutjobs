@@ -24,6 +24,7 @@ Hard rules, applied before scoring:
 - A stated preference with confidence 1 violated outright (for example onsite-only when `remote: remote only`): cap at 30 and say which rule.
 - Missing work authorization with no sponsorship mentioned: cap at 40.
 - Missing information is neutral, never a penalty. Say what is missing.
+- Spoken languages: the local score (`scoutjobs job rank --all --json`) finds the languages a posting requires (from phrases such as "fluent German", "Deutschkenntnisse", or a posting written in German) and compares them with the `languages` preference. A required language the user does not list costs points, but it is not a veto, because the detection is heuristic. Read the posting before you call it a blocker. A language described as "a plus" or "von Vorteil" is not required.
 
 Hard eligibility failures (no work permit and no sponsorship, a licence or clearance the user lacks, an on-site location ruled out with confidence 1) are vetoes, not score input. Name them as such and record them with `--veto` so sending stays blocked:
 

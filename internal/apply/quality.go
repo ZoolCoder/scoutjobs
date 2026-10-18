@@ -127,20 +127,6 @@ func gateClaims(home, dir string, drafts map[string]string) Gate {
 	return Gate{"claims", Pass, "every figure traces to your profile, CV, stories or the posting", nil}
 }
 
-var companySuffix = regexp.MustCompile(`(?i)[,.]?\s+(inc|corp|corporation|gmbh|ltd|llc|ag|se|plc|co|bv|sa|limited)\.?$`)
-
-// companyName is the name a letter would use: "Acme Corp, Inc." reads "Acme Corp".
-func companyName(c string) string {
-	c = strings.TrimSpace(c)
-	for {
-		n := strings.TrimSpace(companySuffix.ReplaceAllString(c, ""))
-		if n == c || n == "" {
-			return c
-		}
-		c = n
-	}
-}
-
 // gateSpecific warns about a cover letter that could go to any company: it should name the company
 // and something from this posting, the title or a requirement.
 func gateSpecific(j store.Job, review FitReview, drafts map[string]string) Gate {
@@ -150,7 +136,7 @@ func gateSpecific(j store.Job, review FitReview, drafts map[string]string) Gate 
 	}
 	text := fold(letter)
 	var miss []string
-	if name := companyName(j.Company); name != "" && !strings.Contains(text, fold(name)) {
+	if name := store.CompanyName(j.Company); name != "" && !strings.Contains(text, fold(name)) {
 		miss = append(miss, "does not name "+name)
 	}
 	specific := j.Title != "" && strings.Contains(text, fold(j.Title))
