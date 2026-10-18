@@ -140,6 +140,7 @@
         <label>Message <textarea name="body" rows="11">{{.Msg.Body}}</textarea></label>
         <div class="runbar"><button name="action" value="save">Save</button><span class="grow"></span><a class="btn" href="{{mailto .Msg}}">Open in mail app</a>{{if $.Data.CanGmail}}<button class="primary" name="action" value="gmail">Save as {{lower $.Data.DraftLabel}}</button>{{end}}</div>
       </form>
+      {{if eq .Kind "followup"}}<form class="runbar" method="post" action="/jobs/{{$j.ID}}/followed-up"><input type="hidden" name="back" value="{{$.Data.Self}}"><span class="small muted">Sent it from your mailbox? Log it, and the next nudge (at most two) waits a full interval.</span><span class="grow"></span><button class="go">I sent it</button></form>{{end}}
     </article>{{end}}
   </div>
   </div>

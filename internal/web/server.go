@@ -338,6 +338,9 @@ func handler(s *store.Store, cfg Config) (*server, http.Handler, error) {
 	mux.HandleFunc("GET /jobs/{id}/view/{name}", srv.jobView)
 	mux.HandleFunc("POST /jobs/{id}/emails/{kind}", srv.saveEmail)
 	mux.HandleFunc("POST /jobs/prepare-all", srv.prepareAll)
+	mux.HandleFunc("POST /jobs/rank", srv.rankJobs)
+	mux.HandleFunc("POST /jobs/sweep", srv.sweepJobs)
+	mux.HandleFunc("POST /jobs/{id}/followed-up", srv.followedUp)
 	mux.HandleFunc("POST /pipeline/prepare", srv.preparePicked)
 	mux.HandleFunc("GET /pipeline/queue", srv.queueJSON)
 	mux.HandleFunc("POST /pipeline/queue/{id}/remove", srv.unqueue)
@@ -598,6 +601,8 @@ type overviewData struct {
 	Checks   []store.CVCheck
 	Target   int
 	Today    []todo
+	Spend    store.Spend // agent sessions over the last 30 days
+	Model    string
 }
 
 type funnelRow struct {
@@ -624,6 +629,33 @@ type weekBar struct {
 	Count int64
 	Pct   int    // 0-100 in steps of 5, rendered as a CSS height class
 	Label string // the Monday the week starts, "now" for the last bar
+}
+
+// collapseFeed folds runs of the same event, such as a search adding 30 jobs, into one row and keeps 8 rows.
+func collapseFeed(events []store.Event) []store.Event {
+	var out []store.Event
+	for i := 0; i < len(events) && len(out) < 8; {
+		n := i + 1
+		for n < len(events) && events[n].Kind == events[i].Kind && events[i].Kind != "status" {
+			n++
+		}
+		e := events[i]
+		if n-i > 1 {
+			var names []string
+			seen := map[string]bool{}
+			for _, o := range events[i:n] {
+				if o.Company != "" && !seen[o.Company] && len(names) < 3 {
+					seen[o.Company] = true
+					names = append(names, o.Company)
+				}
+			}
+			e.JobID, e.Company = 0, ""
+			e.Note = fmt.Sprintf("%d times: %s", n-i, strings.Join(names, ", "))
+		}
+		out = append(out, e)
+		i = n
+	}
+	return out
 }
 
 func (v *server) overview(w http.ResponseWriter, r *http.Request) {
@@ -656,11 +688,16 @@ func (v *server) overview(w http.ResponseWriter, r *http.Request) {
 	open, _ := v.s.Interviews(0, true)
 	var waiting []store.Interview
 	d.Upcoming, waiting = splitPast(open, time.Now().UTC())
-	d.Recent, _ = v.s.Events(0, 8)
+	d.Recent, _ = v.s.Events(0, 40)
 	d.Learning, _ = v.s.LearningItems()
 	d.TodoJobs, _ = v.s.ListJobs(store.JobFilter{Status: "drafted", Limit: 5})
 	d.Checks, _ = v.s.CVChecks(1)
 	d.Today = v.today(st, d.Upcoming, waiting)
+	d.Recent = collapseFeed(d.Recent)
+	d.Spend, _ = v.s.SpendSince(time.Now().UTC().AddDate(0, 0, -30).Format(time.RFC3339))
+	if v.cfg.Runner != nil {
+		d.Model = v.cfg.Runner.Model
+	}
 	v.render(w, r, "overview.html", "overview", d)
 }
 
@@ -890,6 +927,47 @@ func (v *server) setStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, back(r, "/pipeline"), http.StatusSeeOther)
+}
+
+// rankJobs scores the new jobs locally against the profile: no agent, no tokens.
+func (v *server) rankJobs(w http.ResponseWriter, r *http.Request) {
+	if _, err := apply.Rank(v.s, r.FormValue("all") != ""); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, back(r, "/pipeline?sort=fit"), http.StatusSeeOther)
+}
+
+// followedUp logs a follow-up the user sent from their own mail.
+func (v *server) followedUp(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	j, err := v.s.JobByID(id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if _, err := apply.FollowedUp(v.s, j, ""); err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, back(r, "/"), http.StatusSeeOther)
+}
+
+// sweepJobs closes every application quiet past stale_days as no_response.
+func (v *server) sweepJobs(w http.ResponseWriter, r *http.Request) {
+	st, err := v.s.Stats(v.cfg.FollowUpDays, v.cfg.StaleDays)
+	if err == nil && v.cfg.StaleDays > 0 {
+		err = v.s.CloseStale(st.Stale)
+	}
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	http.Redirect(w, r, back(r, "/"), http.StatusSeeOther)
 }
 
 // changeStatus is shared by the form and the API; terminal choices are logged as decisions so learn-preferences sees them.

@@ -1,6 +1,8 @@
 package web
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/zoolcoder/scoutjobs/internal/store"
@@ -12,6 +14,7 @@ var activityGroups = []string{"jobs", "status", "applications", "assistant", "em
 // eventTitles names an event kind in plain words. Kinds missing here fall back on their group.
 var eventTitles = map[string]string{
 	"added":                    "Job added",
+	"ai:cost":                  "AI spend",
 	"scored":                   "Fit scored",
 	"fit:review":               "Fit reviewed",
 	"status":                   "Status changed",
@@ -68,7 +71,7 @@ func eventGroup(kind string) string {
 		return "status"
 	case "cv", "cv_check", "review", "quality", "check":
 		return "applications"
-	case "run":
+	case "run", "ai":
 		return "assistant"
 	case "email", "gmail":
 		return "emails"
@@ -112,6 +115,11 @@ func activityRowOf(e store.Event) activityRow {
 		agent, msg, _ := strings.Cut(note, " ")
 		row.Note = agentTitle(agent) + " finished. Check the drafts before you send anything."
 		row.Detail = msg
+	case e.Kind == "ai:cost":
+		usd, who, _ := strings.Cut(note, " ")
+		if f, err := strconv.ParseFloat(usd, 64); err == nil {
+			row.Note = fmt.Sprintf("$%.2f · %s", f, strings.TrimSpace(who))
+		}
 	case e.Kind == "run:cancelled":
 		row.Name, row.Note = "Assistant stopped", "You stopped the run. Drafts already written stay."
 	case e.Kind == "run:failed", strings.HasPrefix(note, "failed: "):

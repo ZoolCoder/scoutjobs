@@ -98,7 +98,7 @@ footer{color:var(--dim);text-align:center;padding:16px;font-size:12px;margin-top
 .next .btn{white-space:nowrap}
 
 /* kpis */
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
 .kpi{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-content:start;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;min-height:120px;box-shadow:var(--shadow);min-width:0}
 .kpi>b,.kpi>.hint,.kpi>meter{grid-column:1/-1}
 a.kpi:hover{text-decoration:none;border-color:color-mix(in srgb,var(--acc) 40%,var(--line))}
@@ -827,7 +827,7 @@ ul.reads li div{display:grid}ul.reads li .muted{font-size:12px}
 .dash .next{grid-template-columns:auto 1fr;align-content:center;gap:8px 16px;padding:18px 20px}
 .dash .next h2{font-size:18px;margin:4px 0 2px}.dash .next p{font-size:13px}
 .dash .next .btn{grid-column:2;justify-self:start}
-.dash .kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.dash .kpis{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
 .dash .kpi{padding:14px 16px;min-height:0;column-gap:8px}
 .dash .kpi .ic{width:28px;height:28px}.dash .kpi .lbl{line-height:28px;font-size:12.5px}
 .dash .kpi b{font-size:28px;line-height:34px;margin-top:8px}

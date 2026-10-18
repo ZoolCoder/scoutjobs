@@ -85,7 +85,7 @@
 {{define "runprog"}}<div class="runprog{{if eq .State "running"}} live{{end}}" data-started="{{.Started}}" data-last="{{.Last}}" data-ended="{{.Ended}}">
   <progress max="{{len .Steps}}" value="{{.Finished}}" aria-label="steps finished">{{.Finished}} of {{len .Steps}}</progress>
   <p class="runnow" role="status">{{if eq .State "running"}}<span class="spin" aria-hidden="true"></span><b data-now>{{with .Current}}{{.}}{{else}}Starting{{end}}</b>{{else}}<b>{{title .State}}</b>{{end}}
-  <span class="muted"> · <span data-count>{{.Finished}}/{{len .Steps}}</span> steps · <span data-elapsed></span>{{if eq .State "running"}} · <span data-ago>working</span>{{end}}</span></p>
+  <span class="muted"> · <span data-count>{{.Finished}}/{{len .Steps}}</span> steps · <span data-elapsed></span>{{if .CostUSD}} · <span title="what the agent sessions reported spending">{{printf "$%.2f" .CostUSD}}</span>{{end}}{{if eq .State "running"}} · <span data-ago>working</span>{{end}}</span></p>
 </div>{{end}}
 
 {{/* Google: the panels the Inbox and Connections share. The dot is a googleView. */}}

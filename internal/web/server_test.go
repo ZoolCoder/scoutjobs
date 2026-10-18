@@ -318,6 +318,16 @@ func TestPosts(t *testing.T) {
 	if ls[0].Hours != 3.5 || ls[0].Status != "in_progress" {
 		t.Errorf("learning patch: %+v", ls[0])
 	}
+	if rec := post(h, "/jobs/1/followed-up", nil); rec.Code != 303 || s.FollowUps(1) != 1 {
+		t.Errorf("followed-up: %d, %d logged", rec.Code, s.FollowUps(1))
+	}
+	_, _ = s.DB.Exec(`UPDATE jobs SET updated_at='2000-01-01T00:00:00Z' WHERE id=1`)
+	if rec := post(h, "/jobs/sweep", nil); rec.Code != 303 {
+		t.Fatalf("sweep: %d %s", rec.Code, rec.Body.String())
+	}
+	if j, _ := s.JobByID(1); j.Status != "no_response" {
+		t.Errorf("swept job is %s", j.Status)
+	}
 }
 
 func TestAPIParity(t *testing.T) {
@@ -438,7 +448,7 @@ func TestSearchForm(t *testing.T) {
 	}
 	// a careers URL works as a board, and a tracked posting shows its stage instead of an Add button
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://boards.greenhouse.io/acme/"}})
-	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "In pipeline · new") || strings.Contains(b, `name="company" value="acme"`) {
+	if b := rec.Body.String(); rec.Code != 200 || !strings.Contains(b, "In pipeline · ranked") || strings.Contains(b, `name="company" value="acme"`) {
 		t.Errorf("tracked mark: %d %s", rec.Code, b)
 	}
 	rec = post(h, "/search", url.Values{"queries": {"go"}, "boards": {"https://www.linkedin.com/jobs/"}})

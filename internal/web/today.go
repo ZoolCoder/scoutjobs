@@ -20,6 +20,8 @@ type todo struct {
 	Status  string // a one-click status change, posted to /jobs/{JobID}/status
 	JobID   int64
 	StatusL string
+	Post    string // a one-click action posted to this URL
+	PostL   string
 }
 
 type todoLink struct {
@@ -74,8 +76,9 @@ func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []to
 			}
 			drafted[j.ID] = true
 			href := fmt.Sprintf("/jobs/%d?tab=mail#emails", j.ID)
-			out = append(out, todo{Kind: "followup", Title: "Review follow-up to " + j.Company, Detail: j.Title + " · drafted for you, not sent",
-				Href: href, Links: []todoLink{{"Review draft", href, false}}, JobID: j.ID, Status: "no_response", StatusL: "No response"})
+			out = append(out, todo{Kind: "followup", Title: "Review follow-up to " + j.Company, Detail: j.Title + " · drafted for you, not sent" + v.followUpCount(j),
+				Href: href, Links: []todoLink{{"Review draft", href, false}}, JobID: j.ID, Status: "no_response", StatusL: "No response",
+				Post: fmt.Sprintf("/jobs/%d/followed-up", j.ID), PostL: "Mark sent"})
 		}
 	}
 	if met, err := v.s.ListJobs(store.JobFilter{Status: "interview"}); err == nil {
@@ -100,9 +103,25 @@ func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []to
 		}
 		drafted[j.ID] = true
 		n++
-		out = append(out, todo{Kind: "followup", Title: "Follow up with " + j.Company, Detail: j.Title + " · quiet since " + day(j.UpdatedAt),
+		out = append(out, todo{Kind: "followup", Title: "Follow up with " + j.Company, Detail: j.Title + " · quiet since " + day(j.UpdatedAt) + v.followUpCount(j),
 			Href:  fmt.Sprintf("/pipeline?job=%d", j.ID),
-			Links: []todoLink{{"Write in Gmail", composeFollowUp(j), true}}, JobID: j.ID, Status: "no_response", StatusL: "No response"})
+			Links: []todoLink{{"Write in Gmail", composeFollowUp(j), true}}, JobID: j.ID, Status: "no_response", StatusL: "No response",
+			Post: fmt.Sprintf("/jobs/%d/followed-up", j.ID), PostL: "Mark sent"})
+	}
+	if len(st.Stale) > 0 {
+		var names []string
+		for _, j := range st.Stale {
+			drafted[j.ID] = true
+			if len(names) < 3 {
+				names = append(names, j.Company)
+			}
+		}
+		if len(st.Stale) > len(names) {
+			names = append(names, fmt.Sprintf("%d more", len(st.Stale)-len(names)))
+		}
+		out = append(out, todo{Kind: "quiet", Title: fmt.Sprintf("Close %d %s quiet %d+ days", len(st.Stale), plural(len(st.Stale), "application", "applications"), v.cfg.StaleDays),
+			Detail: strings.Join(names, ", ") + " · marks them no response; reopen any later", Href: "/pipeline?status=applied",
+			Post: "/jobs/sweep", PostL: "Close all"})
 	}
 	out = append(out, v.quiet(now, drafted)...)
 	if n := v.digestCount(now); n > 0 {
@@ -117,7 +136,7 @@ func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []to
 				JobID: j.ID, Status: "applied", StatusL: "Mark applied"})
 		}
 	}
-	horizon := now.AddDate(0, 0, 3).Format("2006-01-02")
+	horizon := now.AddDate(0, 0, 7).Format("2006-01-02")
 	open, _ := v.s.ListJobs(store.JobFilter{})
 	unscored := 0
 	for _, j := range open {
@@ -128,12 +147,13 @@ func (v *server) today(st store.Stats, upcoming, waiting []store.Interview) []to
 			unscored++
 		}
 		if j.Deadline != "" && j.Deadline <= horizon && (j.Status == "new" || j.Status == "ranked" || j.Status == "drafted") {
-			out = append(out, todo{Kind: "deadline", Title: "Deadline " + j.Deadline + ": " + j.Company, Detail: j.Title, Href: fmt.Sprintf("/pipeline?job=%d", j.ID)})
+			out = append(out, deadlineTodo(j, now))
 		}
 	}
 	if unscored > 0 {
 		out = append(out, todo{Kind: "score", Title: fmt.Sprintf("Score %d new %s", unscored, plural(unscored, "job", "jobs")),
-			Detail: "run /scoutjobs:fit or the fit-scorer agent", Href: "/pipeline?sort=updated"})
+			Detail: "free local match against your profile; an agent review is only worth it for the top ones", Href: "/pipeline?sort=fit",
+			Post: "/jobs/rank", PostL: "Score now"})
 	}
 	return out
 }
@@ -186,6 +206,33 @@ func (v *server) digestCount(now time.Time) int {
 		}
 	}
 	return n
+}
+
+// deadlineTodo puts urgency in the title: closing today, in a few days, or already closed.
+func deadlineTodo(j store.Job, now time.Time) todo {
+	t := todo{Kind: "deadline", Detail: j.Title + " · closes " + j.Deadline, Href: fmt.Sprintf("/pipeline?job=%d", j.ID)}
+	due, err := time.ParseInLocation("2006-01-02", j.Deadline, time.Local)
+	days := int(due.Sub(midnight(now)).Hours() / 24)
+	switch {
+	case err != nil:
+		t.Title = "Deadline " + j.Deadline + ": " + j.Company
+	case days < 0:
+		t.Title = "Deadline passed: " + j.Company
+		t.JobID, t.Status, t.StatusL = j.ID, "skipped", "Skip"
+	case days == 0:
+		t.Title = "Closes today: " + j.Company
+	default:
+		t.Title = fmt.Sprintf("Closes in %d %s: %s", days, plural(days, "day", "days"), j.Company)
+	}
+	return t
+}
+
+// followUpCount says how many follow-ups went out, once there was one.
+func (v *server) followUpCount(j store.Job) string {
+	if n := v.s.FollowUps(j.ID); n > 0 {
+		return fmt.Sprintf(" · %d of %d follow-ups sent", n, store.MaxFollowUps)
+	}
+	return ""
 }
 
 func composeFollowUp(j store.Job) string {

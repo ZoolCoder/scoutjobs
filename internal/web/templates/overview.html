@@ -28,8 +28,8 @@
 {{else}}
 <section class="next c4">
   <span class="gauge lg g0"><b>{{.Stats.Open}}</b></span>
-  <div><span class="next-k">Next best move</span><h2>Find and rank new jobs</h2><p>Run <code>scoutjobs search --remote --add</code> or the <code>job-search</code> skill, then score fit.</p></div>
-  <a class="btn primary" href="/pipeline">Open pipeline</a>
+  <div><span class="next-k">Next best move</span><h2>Find and rank new jobs</h2><p>Search the boards and add matches: each one is scored against your profile for free, best fit first.</p></div>
+  <a class="btn primary" href="/search">Find jobs</a>
 </section>
 {{end}}
 
@@ -37,7 +37,8 @@
   <a class="kpi" href="/pipeline"><span class="ic">{{template "ico-doc"}}</span><span class="lbl">Open jobs</span><b>{{.Stats.Open}}</b><span class="hint">in your pipeline</span></a>
   <a class="kpi" href="/pipeline?q=drafted"><span class="ic">{{template "ico-send"}}</span><span class="lbl">Applied this week</span><b>{{.Stats.AppliedWeek}}<small>/ {{.Target}}</small></b><meter min="0" max="{{.Target}}" value="{{.Stats.AppliedWeek}}"></meter></a>
   <a class="kpi" href="/interviews"><span class="ic">{{template "ico-calendar"}}</span><span class="lbl">Upcoming interviews</span><b>{{len .Upcoming}}</b><span class="hint">{{with .Upcoming}}{{$n := index . 0}}next {{mon $n.At}} {{dom $n.At}} · {{$n.Company}}{{else}}none scheduled{{end}}</span></a>
-  <a class="kpi" href="/activity"><span class="ic">{{template "ico-bars"}}</span><span class="lbl">Response rate</span><b>{{pct .Stats.ResponseRate}}</b><meter min="0" max="1" value="{{.Stats.ResponseRate}}"></meter></a>
+  <a class="kpi" href="/activity"><span class="ic">{{template "ico-bars"}}</span><span class="lbl">Response rate</span>{{if .Stats.AppliedTotal}}<b>{{pct .Stats.ResponseRate}}</b><meter min="0" max="1" value="{{.Stats.ResponseRate}}"></meter>{{else}}<b>–</b><span class="hint">no applications yet</span>{{end}}</a>
+  <a class="kpi" href="/activity?kind=assistant" title="what the assistant's runs cost, as Claude reports it"><span class="ic">{{template "ico-pulse"}}</span><span class="lbl">AI spend, 30d</span><b>{{printf "$%.2f" .Spend.USD}}</b><span class="hint">{{.Spend.Sessions}} {{if eq .Spend.Sessions 1}}session{{else}}sessions{{end}}{{with .Model}} · {{.}}{{end}}</span></a>
 </section>
 
 <section class="panel c3">
@@ -62,7 +63,7 @@
   {{if .Today}}<ul class="todo">{{range .Today}}<li class="t-{{.Kind}}">
     <span class="tk">{{.Kind}}</span>
     <div><a href="{{.Href}}"><b>{{.Title}}</b></a><small class="muted">{{.Detail}}</small></div>
-    <div class="tact">{{range .Links}}<a class="btn mini" href="{{.Href}}"{{if .External}} rel="noopener noreferrer" target="_blank"{{end}}>{{.Label}}</a>{{end}}{{if .Status}}<form method="post" action="/jobs/{{.JobID}}/status"><input type="hidden" name="back" value="/"><button class="mini go" name="status" value="{{.Status}}">{{.StatusL}}</button></form>{{end}}</div>
+    <div class="tact">{{range .Links}}<a class="btn mini" href="{{.Href}}"{{if .External}} rel="noopener noreferrer" target="_blank"{{end}}>{{.Label}}</a>{{end}}{{if .Status}}<form method="post" action="/jobs/{{.JobID}}/status"><input type="hidden" name="back" value="/"><button class="mini go" name="status" value="{{.Status}}">{{.StatusL}}</button></form>{{end}}{{if .Post}}<form method="post" action="{{.Post}}"><button class="mini go">{{.PostL}}</button></form>{{end}}</div>
   </li>{{end}}</ul>
   {{else}}<p class="empty">Nothing needs a hand right now.</p>{{end}}
 </section>
@@ -100,7 +101,7 @@
 
 <section class="panel c3">
   <div class="panel-h"><h2>Recent activity</h2><a class="act" href="/activity">Full log</a></div>
-  <ul class="feed">{{range .Recent}}{{$e := evrow .}}<li><span>{{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a> · {{end}}{{or $e.Note .Note}}</span><small><span class="mono">{{when .At}}</span> · {{$e.Name}}</small></li>{{else}}<li><span class="muted">Empty. Add a job: <code>scoutjobs search --remote --add</code></span></li>{{end}}</ul>
+  <ul class="feed">{{range .Recent}}{{$e := evrow .}}<li><span>{{if .JobID}}<a href="/jobs/{{.JobID}}">{{.Company}}</a> · {{end}}{{or $e.Note .Note}}</span><small><span class="mono">{{when .At}}</span> · {{$e.Name}}</small></li>{{else}}<li><span class="muted">Empty. <a href="/search">Find jobs</a> to get started.</span></li>{{end}}</ul>
 </section>
 </div>
 {{end}}
