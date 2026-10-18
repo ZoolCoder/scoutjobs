@@ -13,7 +13,17 @@
 <a href="https://github.com/ZoolCoder/scoutjobs/issues"><img src="https://img.shields.io/github/issues/ZoolCoder/scoutjobs" alt="Issues"></a>
 </p>
 
-Your job search, on your machine. An open-source job-search operating system for the person looking for a job, driven by AI coding agents. One repo gives you:
+<p align="center"><b>Your job search, on your machine.</b></p>
+
+ScoutJobs is a free, open-source job-search assistant that runs locally. The AI agent you already use (Claude Code, Codex, Cursor, Gemini CLI, Copilot) finds postings, scores them against your profile, tailors your CV and cover letter to each one, and preps you for the interview. You review everything and decide what gets sent. No accounts, no telemetry: your data stays in `~/.scoutjobs`.
+
+<p align="center"><img src="docs/modules/ROOT/images/hero.png" width="900" alt="The ScoutJobs dashboard in light and dark: the overview with the next best move, and the pipeline board"></p>
+
+<p align="center"><a href="#quick-start">Quick start</a> · <a href="https://zoolcoder.github.io/scoutjobs/scoutjobs/getting-started.html">Your first job search</a> · <a href="https://zoolcoder.github.io/scoutjobs/">User manual</a></p>
+
+<p align="center"><img src="docs/modules/ROOT/images/demo.gif" width="860" alt="A tour of the dashboard: overview, job search with match reasons, pipeline board, one job ready for AI, the dark theme"></p>
+
+## What's inside
 
 - **Skills** (Agent Skills standard) for the whole loop: find jobs, score fit, check your CV, tailor resume and cover letter, track applications, prep and mock interviews, debrief, negotiate, upskill.
 - **A learning loop**: every skip, apply, withdraw and declined offer is logged with your reason. `learn-preferences` turns those into preferences you confirm, and the scorer and tailoring skills read them. It gets better the longer you use it.
@@ -67,7 +77,10 @@ scoutjobs serve          # dashboard at http://127.0.0.1:7070
 
 CLI only: `brew install --cask zoolcoder/scoutjobs/scoutjobs`, a `deb`, `rpm` or `apk` package, or a binary for macOS, Linux and Windows from [Releases](https://github.com/zoolcoder/scoutjobs/releases). `scoutjobs doctor` checks the install, `scoutjobs update` installs the next release (checksum verified; Homebrew and package installs are handed to their manager).
 
-![The overview: next best move, the four numbers, pipeline health, today's tasks, interviews, CV health, learning and activity](docs/modules/ROOT/images/overview.png)
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="docs/modules/ROOT/images/overview-dark.png">
+<img src="docs/modules/ROOT/images/overview.png" alt="The overview: next best move, the four numbers, pipeline health, today's tasks, interviews, CV health, learning and activity">
+</picture>
 
 ### Your first job search, in the dashboard
 
