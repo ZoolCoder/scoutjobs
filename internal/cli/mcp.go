@@ -98,6 +98,10 @@ var mcpTools = []mcpTool{
 		p("pages", "integer", "most pages allowed, default 2", "pages"), p("contains", "array", "phrases the text must hold", "contains")}, true},
 	{"profile_expand", "Skills found in cv/, linkedin/ and the user's public GitHub repos that profile.md does not list yet, with where each showed up. Runs locally. Pass add only with skills the user confirmed.", []string{"profile", "expand"}, []mcpProp{
 		p("github", "string", "GitHub user; default the link in profile.md", "github"), p("add", "string", "comma separated confirmed skills to append to Working", "add")}, true},
+	{"country_show", "What a country implies for the search: currency, local job boards, posting languages, time zone, CV norms, work-rights note. Changes nothing.", []string{"country", "show"}, []mcpProp{
+		req("country", "string", "ISO code or name, e.g. DK or Denmark", "")}, true},
+	{"country_set", "Set the user's country: writes country, currency and local boards to config.yaml and proposes locations, languages, timezone and cv_norms for the user to confirm with pref review. Never suggests salary.", []string{"country", "set"}, []mcpProp{
+		req("country", "string", "ISO code or name, e.g. DK or Denmark", "")}, true},
 	{"cv_cover", "Fill the Word cover letter template (cover_template in config.yaml) with cover-letter.slots.json: writes cover-letter.docx, cover-letter.md and, with LibreOffice, cover-letter.pdf, and reports template and page problems.", []string{"cv", "cover"}, []mcpProp{jobRef,
 		p("template", "string", "Word template; default cover_template", "template")}, true},
 	{"email_draft", "Build the application e-mail (email.json and email.eml) from the cover letter. Nothing is sent.", []string{"email", "draft"}, []mcpProp{jobRef,
@@ -416,7 +420,7 @@ func mcpMailOff() bool {
 }
 
 // mcpReadOnly are the tools that change nothing, so a client may run them without asking.
-var mcpReadOnly = []string{"brief", "stats", "funnel", "doctor", "job_list", "job_show", "cv_files", "cv_list", "cv_verify",
+var mcpReadOnly = []string{"brief", "stats", "funnel", "doctor", "job_list", "job_show", "cv_files", "cv_list", "cv_verify", "country_show",
 	"email_show", "gmail_status", "decision_summary", "pref_list", "pref_review", "interview_list", "contacts", "session_list", "learn_list"}
 
 func (t mcpTool) readOnly() bool { return slices.Contains(mcpReadOnly, t.Name) }

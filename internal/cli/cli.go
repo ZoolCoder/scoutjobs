@@ -51,6 +51,7 @@ Usage: scoutjobs <command> [subcommand] [flags]
   session log|list
   learn add|list|set
   profile expand [--add s,s]  skills in cv/, linkedin/ and public GitHub repos that profile.md lacks
+  country list|show|set <c>  set currency and local boards from the country, propose the preferences it implies
   stats [--funnel]           funnel, weekly numbers, follow-ups due; --funnel: what works by source, fit, month
   brief [--compact]          everything the daily briefing needs (json)
   daily [--json]             daily searches, follow-up drafts, prep packs: what serve does every hour (sends nothing)
@@ -117,6 +118,8 @@ func Run(args []string, out io.Writer) error {
 		return runLearn(s, rest, out)
 	case "profile":
 		return runProfile(s, rest, out)
+	case "country":
+		return runCountry(s, rest, out)
 	case "gmail", "google":
 		return runGmail(s, cfg, rest, out)
 	case "calendar":
@@ -272,6 +275,7 @@ follow_up_days: 10      # quiet applications older than this get a follow-up sug
 stale_days: 60          # quiet applications older than this get a stale sweep
 weekly_apply_target: 5  # applications per week the dashboard measures against
 fit_apply_floor: 60     # the job-fit skill suggests skipping below this score
+country:                # where you search from; scoutjobs country set DK fills currency and local boards
 currency: EUR           # salaries converted to yearly figures in this currency, original kept in notes
 dashboard_addr: 127.0.0.1:7070
 theme: light            # dashboard: light | dark | auto (follow system)

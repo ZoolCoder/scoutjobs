@@ -15,6 +15,7 @@ type Config struct {
 	WeeklyApplyTarget int    `json:"weekly_apply_target"`
 	FitApplyFloor     int    `json:"fit_apply_floor"`
 	Currency          string `json:"currency"`
+	Country           string `json:"country"`
 	DashboardAddr     string `json:"dashboard_addr"`
 	// integrations
 	APIToken      string   `json:"-"`
@@ -87,6 +88,8 @@ func LoadConfig(home string) Config {
 			if v != "" {
 				c.Currency = v
 			}
+		case "country":
+			c.Country = strings.Trim(v, `"'`)
 		case "dashboard_addr":
 			if v != "" {
 				c.DashboardAddr = v
