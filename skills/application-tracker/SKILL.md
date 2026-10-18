@@ -41,4 +41,8 @@ Resolve jobs by id, by `company/title`, or by a unique company substring. If the
 
 ## Follow-ups
 
-`scoutjobs stats` lists applications quiet for more than `follow_up_days` (config, default 10). For each, offer a two-sentence follow-up message the user can send. After they send it, `scoutjobs job set <id> --note "follow-up sent"` which resets the quiet timer. Applications quiet past `stale_days` (default 60) get `no_response` only when the user agrees.
+`scoutjobs job followup --json` lists every applied job with `days_quiet`, `follow_ups` sent and `next` (`due`, `in Nd`, `done`, `sweep`). An application gets at most 2 follow-ups, each `follow_up_days` (config, default 10) after the last activity. Never chase a `drafted` job: it was not sent.
+
+For each `due` job, offer a follow-up of 60 to 120 words that adds no new claim: the role, still interested, one line on fit already in the application, a question about next steps. The second and last one is shorter and asks for a brief note if the role is filled. Log it only after the user says it went out: `scoutjobs job followup <id>`, which restarts the quiet timer.
+
+`scoutjobs job sweep` lists applied and interviewing jobs quiet past `stale_days` (default 60). Show the list and ask: close all, pick some, or skip. Then `scoutjobs job sweep --yes`, or `scoutjobs job sweep <id> <id> --yes` for a selection. Never sweep without that answer.
