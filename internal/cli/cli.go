@@ -299,7 +299,7 @@ smtp_user:
 imap_host:              # imap.gmail.com:993; lets "scoutjobs email sync" log replies to your applications
 imap_user:              # defaults to email_from; password from $SCOUTJOBS_IMAP_PASSWORD (falls back to $SCOUTJOBS_SMTP_PASSWORD)
 email_sync:             # reading replies: off (no Inbox, no mail tools for the AI), manual (only when asked), auto (also daily);
-                        # empty: auto once Gmail or IMAP is connected, else off
+                        # empty: auto once Gmail or IMAP is connected, manual with the agent mailbox, else off
 
 # Gmail API instead of IMAP: run scoutjobs gmail setup (or Connect Google on the dashboard's Inbox page); it stores
 # the client in gmail-client.json, so these two stay empty unless you prefer them here

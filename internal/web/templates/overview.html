@@ -59,7 +59,7 @@
 </section>
 
 <section class="panel c6 today">
-  <div class="panel-h"><h2>Today</h2><span class="n">{{len .Today}}</span><a class="act" href="/inbox">Inbox</a></div>
+  <div class="panel-h"><h2>Today</h2><span class="n">{{len .Today}}</span>{{if ne $.Email "off"}}<a class="act" href="/inbox">Inbox</a>{{end}}</div>
   {{if .Today}}<ul class="todo">{{range .Today}}<li class="t-{{.Kind}}">
     <span class="tk">{{.Kind}}</span>
     <div><a href="{{.Href}}"><b>{{.Title}}</b></a><small class="muted">{{.Detail}}</small></div>

@@ -445,10 +445,14 @@ func emailMode(s *store.Store, cfg Config) string {
 	if cfg.EmailSync != "" {
 		return cfg.EmailSync
 	}
-	if _, err := mailSource(s, cfg, ""); err == nil {
-		return "auto"
+	src, err := mailSource(s, cfg, "")
+	switch {
+	case err != nil:
+		return "off"
+	case src == "agent": // every sync through the agent spends tokens, so it runs only when asked
+		return "manual"
 	}
-	return "off"
+	return "auto"
 }
 
 // autoMail is the daily pass's mail sync: only with email_sync auto and a mailbox ScoutJobs reads

@@ -149,7 +149,7 @@
 </section>
 <section class="panel">
   <div class="panel-h"><h2>Messages</h2><span class="n">{{len .Mails}}</span><a class="act" href="{{$p.MailSearch}}" rel="noopener noreferrer" target="_blank">Search Gmail ↗</a></div>
-  {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="empty">No messages for this job yet<small>Replies show up here after you check your inbox on the <a href="/inbox">Inbox</a> page.</small></p>{{end}}
+  {{if .Mails}}{{template "mail-list" .Mails}}{{else}}<p class="empty">No messages for this job yet{{if ne $.Email "off"}}<small>Replies show up here after you check your inbox on the <a href="/inbox">Inbox</a> page.</small>{{end}}</p>{{end}}
 </section>
 {{else if eq $tab "interviews"}}{{$today := today}}
 <section class="panel">
