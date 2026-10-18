@@ -61,6 +61,22 @@ func (m *Manager) Start(j store.Job, req Request) (*Run, error) {
 	return run, nil
 }
 
+// Idle is true when no run of any kind (preparation, master CV, mail) is going or queued; a
+// dashboard restart waits for it.
+func (m *Manager) Idle() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.queue) > 0 || m.draining {
+		return false
+	}
+	for _, r := range m.runs {
+		if st := r.Snapshot().State; st == Pending || st == Running {
+			return false
+		}
+	}
+	return true
+}
+
 // Get returns a run by id.
 func (m *Manager) Get(id string) (*Run, bool) {
 	m.mu.Lock()
