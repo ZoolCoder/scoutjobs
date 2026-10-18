@@ -32,13 +32,14 @@ func TestRunAgainstFakeBoards(t *testing.T) {
 	mux.HandleFunc("/jobicy", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(500) })
 	mux.HandleFunc("/himalayas", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"jobs":[]}`)) })
 	mux.HandleFunc("/hn/search_by_date", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"hits":[]}`)) })
+	mux.HandleFunc("/freehire", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"data":[]}`)) })
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
 	r := Run(context.Background(), Options{
 		Queries: []string{"go"}, Boards: []string{"greenhouse:acme", "lever:netlify", "bogus"}, Remote: true, Limit: 10, Client: srv.Client(),
 		BaseURL: map[string]string{"greenhouse": srv.URL + "/gh", "lever": srv.URL + "/lever", "remotive": srv.URL + "/remotive", "remoteok": srv.URL + "/remoteok",
-			"arbeitnow": srv.URL + "/arbeitnow", "jobicy": srv.URL + "/jobicy", "himalayas": srv.URL + "/himalayas", "hn": srv.URL + "/hn"},
+			"arbeitnow": srv.URL + "/arbeitnow", "jobicy": srv.URL + "/jobicy", "himalayas": srv.URL + "/himalayas", "hn": srv.URL + "/hn", "freehire": srv.URL + "/freehire"},
 	})
 	var titles []string
 	for _, p := range r.Postings {
@@ -59,7 +60,7 @@ func TestRunAgainstFakeBoards(t *testing.T) {
 		t.Errorf("errors: %v", r.Errors)
 	}
 	off := Run(context.Background(), Options{
-		Queries: []string{"go"}, Remote: true, Off: []string{"remoteok", "jobicy", "hn"}, Limit: 10, Client: srv.Client(),
+		Queries: []string{"go"}, Remote: true, Off: []string{"remoteok", "jobicy", "hn", "freehire"}, Limit: 10, Client: srv.Client(),
 		BaseURL: map[string]string{"remotive": srv.URL + "/remotive", "remoteok": srv.URL + "/remoteok",
 			"arbeitnow": srv.URL + "/arbeitnow", "jobicy": srv.URL + "/jobicy", "himalayas": srv.URL + "/himalayas", "hn": srv.URL + "/hn"},
 	})

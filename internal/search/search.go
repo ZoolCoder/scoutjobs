@@ -55,7 +55,7 @@ func (p Posting) Job() store.Job {
 type Options struct {
 	Queries []string // every word of a query must appear; any query may match
 	Boards  []string // "greenhouse:stripe", "lever:netlify", "recruitee:acme", "rss:https://..." or a careers URL (see ParseBoard)
-	Remote  bool     // also query the remote boards (remotive, remoteok, arbeitnow, jobicy, himalayas)
+	Remote  bool     // also query the keyword boards (remotive, remoteok, arbeitnow, jobicy, himalayas, hn, freehire)
 	Off     []string // remote boards the user turned off, by name (see RemoteBoards)
 	Limit   int
 	Client  *http.Client
@@ -74,10 +74,10 @@ type Result struct {
 }
 
 // Boards lists the board sources that need a company slug.
-var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "recruitee", "bamboohr", "rss"}
+var Boards = []string{"greenhouse", "lever", "ashby", "workable", "smartrecruiters", "personio", "recruitee", "bamboohr", "rss", "jobindex", "jobbank", "jobdanmark"}
 
 // RemoteBoards lists the keyword-searchable remote boards.
-var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas", "hn"}
+var RemoteBoards = []string{"remotive", "remoteok", "arbeitnow", "jobicy", "himalayas", "hn", "freehire"}
 
 // OffSetting is the store setting that holds the remote boards turned off on the Connections page,
 // comma separated.
@@ -95,6 +95,10 @@ var defaultBase = map[string]string{
 	"hn":              "https://hn.algolia.com/api/v1",
 	"workable":        "https://apply.workable.com/api/v3/accounts",
 	"smartrecruiters": "https://api.smartrecruiters.com/v1/companies",
+	"jobindex":        "https://www.jobindex.dk/jobsoegning.rss",
+	"jobbank":         "https://jobbank.dk/job/rss/",
+	"jobdanmark":      "https://jobdanmark.dk/api/jobsearch/search/1",
+	"freehire":        "https://freehire.me/api/v1/agent/jobs/search",
 }
 
 type fetcher struct {
@@ -177,20 +181,21 @@ func Run(ctx context.Context, o Options) Result {
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.bamboohr(ctx, slug) }})
 		case "rss":
 			feeds = append(feeds, feed{b, func(ctx context.Context) ([]Posting, error) { return f.rss(ctx, slug) }})
+		case "jobindex", "jobbank", "jobdanmark":
+			for _, q := range queriesOrAll(o.Queries) {
+				feeds = append(feeds, feed{b + ":" + q, func(ctx context.Context) ([]Posting, error) { return f.danish(ctx, src, q, slug) }})
+			}
 		}
 	}
 	if o.Remote {
-		qs := o.Queries
-		if len(qs) == 0 {
-			qs = []string{""}
-		}
-		for _, q := range qs {
+		for _, q := range queriesOrAll(o.Queries) {
 			feeds = append(feeds,
 				feed{"remotive:" + q, func(ctx context.Context) ([]Posting, error) { return f.remotive(ctx, q) }},
 				feed{"arbeitnow:" + q, func(ctx context.Context) ([]Posting, error) { return f.arbeitnow(ctx, q) }},
 				feed{"jobicy:" + q, func(ctx context.Context) ([]Posting, error) { return f.jobicy(ctx, q) }},
 				feed{"himalayas:" + q, func(ctx context.Context) ([]Posting, error) { return f.himalayas(ctx, q) }},
 				feed{"hn:" + q, func(ctx context.Context) ([]Posting, error) { return f.hn(ctx, q) }},
+				feed{"freehire:" + q, func(ctx context.Context) ([]Posting, error) { return f.freehire(ctx, q) }},
 			)
 		}
 		feeds = append(feeds, feed{"remoteok", func(ctx context.Context) ([]Posting, error) { return f.remoteok(ctx) }})
