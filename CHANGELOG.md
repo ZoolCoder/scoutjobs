@@ -7,6 +7,47 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-18
+
+### Added
+- `scoutjobs country list | show | set <code or name>`: one answer sets up
+  the search. It writes `country`, `currency` and the country's local job
+  boards to `config.yaml`, and proposes `locations`, `languages`, `timezone`
+  and `cv_norms` for you to confirm with `pref review` or on the Preferences
+  page. It never suggests a salary. The table has 49 countries and costs no
+  tokens; the setup skill now starts with it.
+- Danish boards `jobindex:dk`, `jobbank:dk`, `jobdanmark:dk` and the
+  freehire.me feed.
+- `scoutjobs cv verify` checks an exported PDF the way an ATS reads it: page
+  count, text layer, e-mail, required phrases, date-range dashes.
+- `scoutjobs profile expand` lists skills in `cv/`, `linkedin/` and your
+  public GitHub repositories that `profile.md` lacks; `--add` writes only the
+  ones you name.
+- `job rank` scores jobs locally against `profile.md`, free and best fit
+  first.
+- `job followup`, `job sweep` and `job verify`: at most two follow-ups per
+  application, quiet ones closed as no response after `stale_days`, and
+  postings closed on their ATS skipped. The dashboard marks follow-ups sent,
+  sweeps stale jobs and flags deadlines.
+- Search checks that postings are still live and honours `robots.txt`.
+- `email_sync: off | manual | auto` makes reading mail optional.
+- The dashboard refreshes live when the CLI or an agent changes data.
+- MCP tools `country_show`, `country_set`, `cv_verify` and `profile_expand`;
+  `mcp` exposes only the tools the enabled features need.
+
+### Changed
+- Unattended runs scope their tools, stop at `agent_budget_usd`, reuse the
+  prompt cache and run scoring on `agent_cheap_model`; skills return compact
+  JSON. Agent token use drops sharply.
+- Search ranks postings that break a must (wrong place, below your salary
+  floor) after every posting that does not.
+- With the agent mailbox, reading mail stays manual: each sync spends tokens.
+
+### Fixed
+- Danish board matches are kept when the short feed snippet does not show
+  the query.
+- Inbox links are hidden when e-mail is off.
+
 ## [0.10.0] - 2026-10-13
 
 ### Added
@@ -428,7 +469,8 @@ All notable changes to ScoutJobs. The format follows
 - Releases: binaries for macOS, Linux and Windows, Homebrew cask, `deb`,
   `rpm` and `apk` packages, `install.sh`.
 
-[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/ZoolCoder/scoutjobs/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ZoolCoder/scoutjobs/compare/v0.7.0...v0.8.0
