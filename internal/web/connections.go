@@ -34,7 +34,7 @@ var sourceTitles = map[string]string{
 	"remotive": "Remotive", "remoteok": "RemoteOK", "arbeitnow": "Arbeitnow", "jobicy": "Jobicy", "himalayas": "Himalayas", "hn": "HN Who is hiring", "freehire": "freehire",
 	"greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "workable": "Workable", "smartrecruiters": "SmartRecruiters",
 	"personio": "Personio", "recruitee": "Recruitee", "bamboohr": "BambooHR", "rss": "RSS feed",
-	"jobindex": "Jobindex", "jobbank": "Jobbank", "jobdanmark": "Jobdanmark",
+	"jobindex": "Jobindex", "jobbank": "Jobbank", "jobdanmark": "Jobdanmark", "arbeitsagentur": "Arbeitsagentur",
 }
 
 // option is one choice on a Connections card.

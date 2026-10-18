@@ -36,7 +36,7 @@ var table = []Country{
 	{"EE", "Estonia", "EUR", []string{"Estonian", "English"}, "EET (UTC+2)", "EU", nil, "optional", "1-2 pages", []string{"Eesti"}},
 	{"FI", "Finland", "EUR", []string{"Finnish", "English", "Swedish"}, "EET (UTC+2)", "EU", nil, "optional", "1-2 pages", []string{"Suomi"}},
 	{"FR", "France", "EUR", []string{"French", "English"}, "CET (UTC+1)", "EU", nil, "optional", "1 page (2 when senior)", nil},
-	{"DE", "Germany", "EUR", []string{"German", "English"}, "CET (UTC+1)", "EU", nil, "common", "2 pages", []string{"Deutschland"}},
+	{"DE", "Germany", "EUR", []string{"German", "English"}, "CET (UTC+1)", "EU", []string{"arbeitsagentur:de"}, "common", "2 pages", []string{"Deutschland"}},
 	{"GR", "Greece", "EUR", []string{"Greek", "English"}, "EET (UTC+2)", "EU", nil, "common", "1-2 pages", []string{"Hellas"}},
 	{"HU", "Hungary", "HUF", []string{"Hungarian", "English"}, "CET (UTC+1)", "EU", nil, "common", "1-2 pages", []string{"Magyarország"}},
 	{"IE", "Ireland", "EUR", []string{"English"}, "GMT (UTC+0)", "EU", nil, "leave out", "2 pages", nil},

@@ -30,6 +30,10 @@ Rules the search applies: every word of a query must appear as a whole word (so 
 
 Company boards take `source:slug` or the careers URL as the user pasted it: `boards.greenhouse.io/<slug>`, `jobs.lever.co/<slug>`, `jobs.ashbyhq.com/<slug>`, `apply.workable.com/<slug>`, `jobs.smartrecruiters.com/<company>`, `<slug>.jobs.personio.de`, `<slug>.recruitee.com`, `<slug>.bamboohr.com`. Any RSS or Atom job feed works with `--rss <url>`. `--remote` also covers the Hacker News "Who is hiring" thread (source `hn`, loosely parsed: trust the description over the fields). LinkedIn, Indeed, Glassdoor, XING and StepStone have no public API: the command says so; ask the user to paste the posting text. Ask the user for target companies once and store them in config: `search_boards: greenhouse:stripe, lever:netlify` in `$(scoutjobs path)/config.yaml`, next to `search_queries`.
 
+Country boards take an area: `jobindex:dk`, `jobbank:aarhus`, `jobdanmark:odense` for Denmark, `arbeitsagentur:de` (all of Germany) or `arbeitsagentur:berlin` (within 25 km) for the Bundesagentur für Arbeit. `scoutjobs country set <code>` writes the country's boards to `search_boards`.
+
+Location focus: with no `--location`, the search keeps to the profile's locations, else the `country` in `config.yaml`, and the footer says `focus <places>`. Remote postings stay when they are open to that country or its region; on-site ones only when they are in it. `--location any` searches everywhere; `--location Berlin` or `--location Europe` narrows or widens it for one run. The CLI already drops wrong-country postings, so do not filter them again by hand.
+
 Token budget: use `--compact` and `--limit`; only read a description when `job-fit` needs it (it is in `scoutjobs job show <id> --json` as `notes` when saved below).
 
 ### Single URL or pasted text
@@ -38,7 +42,7 @@ For a posting on Greenhouse, Lever, Ashby, Workable, SmartRecruiters, Personio, 
 
 ## Filter before adding
 
-Read `preferences.md`. Drop a posting without asking when it violates a stated preference with confidence 1 (wrong country without remote, below salary floor when salary is shown, a role family in `avoid`). For learned preferences (confidence under 1) keep the posting but note the conflict in `--notes`.
+Read `preferences.md`. Drop a posting without asking when it violates a stated preference with confidence 1 (below salary floor when salary is shown, a role family in `avoid`). For learned preferences (confidence under 1) keep the posting but note the conflict in `--notes`.
 
 Prefer `scoutjobs search --json --compact` without `--add`, filter, then add the survivors with `scoutjobs job import` (JSON lines from the search output) or `scoutjobs job add`.
 

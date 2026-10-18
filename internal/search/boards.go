@@ -225,6 +225,13 @@ func FetchPosting(ctx context.Context, rawURL string, client *http.Client, base 
 	if strings.TrimPrefix(u.Hostname(), "www.") == "remotive.com" {
 		return f.remotiveJob(ctx, u, rawURL)
 	}
+	if ref, ok := strings.CutPrefix(u.Path, "/jobsuche/jobdetail/"); ok && strings.TrimPrefix(u.Hostname(), "www.") == "arbeitsagentur.de" {
+		p, err := f.arbeitsagenturJob(ctx, strings.Trim(ref, "/"))
+		if err == nil {
+			Enrich(&p)
+		}
+		return p, err
+	}
 	src, slug, id, ok := locate(u)
 	if !ok {
 		if name := closedBoard(u.Host); name != "" {

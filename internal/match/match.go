@@ -30,6 +30,7 @@ type Profile struct {
 	OnsiteBreaker  bool     `json:"onsite_breaker,omitempty"` // on-site work is a deal-breaker
 	SalaryFloor    int64    `json:"salary_floor,omitempty"`
 	SalaryCurrency string   `json:"salary_currency,omitempty"`
+	Speaks         []string `json:"speaks,omitempty"` // languages the user works in: german, english
 	// Answers is the answer rate of each source that clearly beats or trails the rest, from the user's own applications.
 	Answers         map[string]SourceRate `json:"-"`
 	locationWritten string
@@ -121,6 +122,8 @@ func Parse(profile string, prefs []store.Preference) Profile {
 			p.SalaryFloor, p.SalaryCurrency = salary(val)
 		case strings.HasPrefix(k, "deal-breaker") || strings.HasPrefix(k, "dealbreaker"):
 			dealBreakers += " " + val
+		case k == "languages":
+			p.Speaks = languages(val)
 		case k == "strong":
 			p.Strong = search.Skills(val)
 		case k == "working":
@@ -151,6 +154,8 @@ func Parse(profile string, prefs []store.Preference) Profile {
 			p.Level = search.Level(v, "")
 		case "roles", "target_roles":
 			p.Roles = roles(v)
+		case "languages", "spoken_languages":
+			p.Speaks = languages(v)
 		}
 	}
 	if len(p.Places) == 0 && p.locationWritten != "" {
@@ -182,6 +187,26 @@ var nouns = map[string]bool{"engineer": true, "developer": true, "programmer": t
 	"devops": true, "manager": true, "designer": true, "scientist": true, "analyst": true, "lead": true}
 
 // roles splits "Backend / Go engineer" into "backend engineer" and "go engineer".
+// languages reads "German (C1), English" into the spoken languages it names.
+func languages(v string) []string {
+	var out []string
+	for _, part := range strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == ';' || r == '/' || r == '|' }) {
+		if w := strings.Fields(strings.ReplaceAll(part, "(", " ")); len(w) > 0 {
+			if l := search.Language(w[0]); l != "" {
+				out = append(out, l)
+			}
+		}
+	}
+	return unique(out)
+}
+
+func capital(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
 func roles(v string) []string {
 	parts := strings.FieldsFunc(strings.ToLower(v), func(r rune) bool { return r == '/' || r == ',' || r == ';' || r == '|' })
 	noun := ""
@@ -354,6 +379,17 @@ func (pr Profile) Score(p search.Posting) Result {
 		}
 	} else {
 		score += 5
+	}
+
+	if len(pr.Speaks) > 0 {
+		for _, l := range p.Speaks {
+			if !has(pr.Speaks, l) {
+				score -= 15
+				r.Miss = append(r.Miss, "asks for "+capital(l)+", which you do not list")
+			} else if l != "english" {
+				r.Why = append(r.Why, "asks for "+capital(l)+", which you speak")
+			}
+		}
 	}
 
 	avoided := 0

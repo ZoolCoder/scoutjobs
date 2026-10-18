@@ -295,6 +295,30 @@ func TestSearchCommand(t *testing.T) {
 	}
 }
 
+func TestSearchKeepsToTheCountry(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SCOUTJOBS_HOME", home)
+	run(t, "init")
+	if err := os.WriteFile(filepath.Join(home, "config.yaml"), []byte("search_remote: false\ncountry: DE\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `<?xml version="1.0"?><rss version="2.0"><channel><title>Jobs</title><item><title>Remote Go Engineer at Zed</title><link>https://zed.test/1</link><description>Remote role, must be located in Germany</description></item><item><title>Remote Go Dev at Yank</title><link>https://yank.test/2</link><description>Remote role, must be located in USA</description></item></channel></rss>`)
+	}))
+	defer feed.Close()
+	out := run(t, "search", "--rss", feed.URL+"/feed.xml")
+	if !strings.Contains(out, "Zed") || strings.Contains(out, "Yank") || !strings.Contains(out, "focus Germany") || !strings.Contains(out, "--location any") {
+		t.Errorf("country focus: %s", out)
+	}
+	out = run(t, "search", "--rss", feed.URL+"/feed.xml", "--location", "any")
+	if !strings.Contains(out, "Zed") || !strings.Contains(out, "Yank") || strings.Contains(out, "focus") {
+		t.Errorf("--location any: %s", out)
+	}
+	if out = run(t, "doctor"); !strings.Contains(out, "search stays in Germany") {
+		t.Errorf("doctor focus: %s", out)
+	}
+}
+
 func TestRankKeyPutsMustBreakersLast(t *testing.T) {
 	far := match.Result{Score: 95, Hard: []string{"location: in pakistan, you want Denmark"}}
 	near := match.Result{Score: 40}
@@ -476,5 +500,31 @@ func TestGmailClientTakesTheImportedSecretForTheSameID(t *testing.T) {
 	}
 	if c := gmailClient(s, Config{GmailClientID: "2-b.apps.googleusercontent.com"}); c.Secret != "" || c.CheckConfig() == nil {
 		t.Errorf("another id must not borrow the secret: %+v", c)
+	}
+}
+
+func TestUnlinkedSkills(t *testing.T) {
+	repo, agent := t.TempDir(), t.TempDir()
+	for _, n := range []string{"scoutjobs-setup", "job-fit", "inbox-triage"} {
+		if err := os.MkdirAll(filepath.Join(repo, n), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(repo, n, "SKILL.md"), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, n := range []string{"scoutjobs-setup", "job-fit"} {
+		if err := os.Symlink(filepath.Join(repo, n), filepath.Join(agent, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := unlinkedSkills(agent); len(got) != 1 || got[0] != "inbox-triage" {
+		t.Errorf("unlinked %v, want [inbox-triage]", got)
+	}
+	if err := os.Symlink(filepath.Join(repo, "inbox-triage"), filepath.Join(agent, "inbox-triage")); err != nil {
+		t.Fatal(err)
+	}
+	if got := unlinkedSkills(agent); len(got) != 0 {
+		t.Errorf("all linked, got %v", got)
 	}
 }

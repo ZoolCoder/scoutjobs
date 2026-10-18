@@ -67,3 +67,14 @@ func TestRekeyJobs(t *testing.T) {
 		t.Errorf("rekey: %q", k3)
 	}
 }
+
+func TestCompanyName(t *testing.T) {
+	for in, want := range map[string]string{
+		"Acme GmbH": "Acme", "Acme GmbH & Co. KG": "Acme", "Acme Corp, Inc.": "Acme", "Zed AG": "Zed",
+		"Nordic ApS": "Nordic", "Acme": "Acme", "GmbH": "GmbH",
+	} {
+		if got := CompanyName(in); got != want {
+			t.Errorf("CompanyName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

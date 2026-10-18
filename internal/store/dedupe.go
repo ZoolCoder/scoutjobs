@@ -28,6 +28,21 @@ func TitleKey(title string) string {
 	return strings.Join(words, "-")
 }
 
+var companySuffix = regexp.MustCompile(`(?i)[,.]?\s+(&\s*co\.?\s*kg|inc|corp|corporation|gmbh|ltd|llc|ag|se|plc|co|bv|b\.v|sa|limited|kg|ug|aps|a/s|ab|oy|e\.v)\.?$`)
+
+// CompanyName is the name without its legal form, as a letter would use it and as boards that
+// drop it show it: "Acme GmbH & Co. KG" reads "Acme".
+func CompanyName(c string) string {
+	c = strings.TrimSpace(c)
+	for {
+		n := strings.TrimSpace(companySuffix.ReplaceAllString(c, ""))
+		if n == c || n == "" {
+			return c
+		}
+		c = n
+	}
+}
+
 // JobKey identifies a posting across boards: company slug plus the normalised title.
 func JobKey(company, title string) string { return Slug(company) + "|" + TitleKey(title) }
 
