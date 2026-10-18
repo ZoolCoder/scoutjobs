@@ -7,6 +7,28 @@ All notable changes to ScoutJobs. The format follows
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-18
+
+### Added
+- Board `arbeitsagentur:de|<city>` for the Bundesagentur für Arbeit;
+  `country set DE` adds it.
+- Postings get `speaks:` tags for the languages they require. A required
+  language your profile lacks costs 15 fit points.
+- `doctor` warns about skills not linked into an agent and about a search
+  with no country or location focus.
+
+### Changed
+- Searches stay in the profile's locations, else the config country.
+  `--location any` searches everywhere.
+- Postings with a location the search cannot place rank below known fits
+  instead of being dropped.
+- Board duplicates merge across company suffixes (Acme GmbH and Acme).
+- The dashboard restarts when `config.yaml` changes and refreshes when
+  `profile.md` changes. A restart waits until no agent run is going.
+- `make lint` runs golangci-lint only when it is installed.
+- README: a pitch up front, a hero image, a tour GIF and fresh screenshots
+  from a demo workspace.
+
 ## [0.11.0] - 2026-10-18
 
 ### Added
