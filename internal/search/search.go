@@ -159,6 +159,9 @@ func Run(ctx context.Context, o Options) Result {
 		fn   func(context.Context) ([]Posting, error)
 	}
 	var feeds []feed
+	// searched feeds matched the query against the whole posting on the board, which their short
+	// snippet cannot show again, so the local word check would drop real matches
+	searched := map[string]bool{}
 	boards, errs := NormalizeBoards(o.Boards)
 	for _, b := range boards {
 		src, slug, _ := strings.Cut(b, ":")
@@ -184,6 +187,7 @@ func Run(ctx context.Context, o Options) Result {
 		case "jobindex", "jobbank", "jobdanmark":
 			for _, q := range queriesOrAll(o.Queries) {
 				feeds = append(feeds, feed{b + ":" + q, func(ctx context.Context) ([]Posting, error) { return f.danish(ctx, src, q, slug) }})
+				searched[b+":"+q] = q != ""
 			}
 		}
 	}
@@ -232,7 +236,7 @@ func Run(ctx context.Context, o Options) Result {
 		}
 		for _, p := range a.rows {
 			key := store.JobKey(p.Company, p.Title)
-			if seen[key] || !Matches(p, o.Queries) {
+			if seen[key] || !searched[feeds[i].name] && !Matches(p, o.Queries) {
 				continue
 			}
 			seen[key] = true

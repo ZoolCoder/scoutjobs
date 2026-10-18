@@ -18,10 +18,10 @@ func TestDanishBoardsAndFreehire(t *testing.T) {
 		if r.URL.Query().Get("q") != "python" {
 			t.Errorf("jobindex query: %s", r.URL.RawQuery)
 		}
-		// ISO-8859-1: \xf8 is ø
+		// ISO-8859-1: \xf8 is ø. The first item names python only in the full posting: the board's match stands.
 		w.Write([]byte("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><rss version=\"2.0\"><channel><title>Jobindex</title>" +
-			"<item><title>Python Developer, Novo Nordisk A/S</title><link>https://www.jobindex.dk/vis-job/h1</link>" +
-			"<description>&#x3C;span class=&#x22;jix_robotjob--area&#x22;&#x3E;K\xf8benhavn K&#x3C;/span&#x3E;&#x3C;p&#x3E;Python and data&#x3C;/p&#x3E;</description>" +
+			"<item><title>Data Engineer, Novo Nordisk A/S</title><link>https://www.jobindex.dk/vis-job/h1</link>" +
+			"<description>&#x3C;span class=&#x22;jix_robotjob--area&#x22;&#x3E;K\xf8benhavn K&#x3C;/span&#x3E;&#x3C;p&#x3E;Data platforms&#x3C;/p&#x3E;</description>" +
 			"<pubDate>Fri, 16 Oct 2026 00:00:00 +0200</pubDate></item>" +
 			"<item><title>Python Engineer, Grundfos</title><link>https://www.jobindex.dk/vis-job/h2</link>" +
 			"<description>&#x3C;span class=&#x22;jix_robotjob--area&#x22;&#x3E;Bjerringbro&#x3C;/span&#x3E;</description></item></channel></rss>"))
@@ -54,7 +54,7 @@ func TestDanishBoardsAndFreehire(t *testing.T) {
 		got = append(got, p.Source+"/"+p.Company+"/"+p.Title+"/"+p.Location+"/"+p.PostedAt)
 	}
 	want := []string{
-		"jobindex/Novo Nordisk A/S/Python Developer/København K/2026-10-16",
+		"jobindex/Novo Nordisk A/S/Data Engineer/København K/2026-10-16",
 		"jobdanmark/Syddansk Universitet/Python Analyst/Odense M/2026-10-15",
 		"freehire/Acme/Senior Python Engineer/Berlin/2026-10-10",
 	}
