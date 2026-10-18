@@ -26,9 +26,8 @@ func TestProposalsFollowWhereTheJobStands(t *testing.T) {
 		j, _ = s.JobByID(j.ID)
 		return j
 	}
-	now := time.Now()
-
 	j = status("applied")
+	now := time.Now() // after applying: a clock read earlier makes 11 days come out as 10.99
 	if got := kinds(Proposals(s, j, 10, now)); got != "" {
 		t.Fatalf("fresh application proposes %q", got)
 	}
