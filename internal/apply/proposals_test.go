@@ -40,6 +40,24 @@ func TestProposalsFollowWhereTheJobStands(t *testing.T) {
 	if m.To != "jobs@acme.test" || m.Subject != "Re: Application: Go Engineer at Acme Corp" || !strings.HasSuffix(m.Body, "Jane Doe\n") || !strings.Contains(m.Body, "11 days ago") {
 		t.Errorf("follow-up %+v", m)
 	}
+	// one follow-up sent: the next falls due a full interval later, and the third never
+	_ = SaveProposal(s, j, "followup", m)
+	if _, err := FollowedUp(s, j, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(Dir(s, j), DraftFile("followup"))); err == nil {
+		t.Error("the sent follow-up's draft is kept")
+	}
+	if got := kinds(Proposals(s, j, 10, now.Add(5*24*time.Hour))); got != "" {
+		t.Fatalf("5 days after a follow-up %q", got)
+	}
+	if ps = Proposals(s, j, 10, now.Add(11*24*time.Hour)); kinds(ps) != "followup" || ps[0].Label != "Last follow-up" {
+		t.Fatalf("second follow-up %q %+v", kinds(ps), ps)
+	}
+	_, _ = FollowedUp(s, j, "")
+	if got := kinds(Proposals(s, j, 10, now.Add(60*24*time.Hour))); got != "" {
+		t.Fatalf("a third follow-up %q", got)
+	}
 	// a reply from the company: nothing to chase
 	_, _ = s.LogMail(store.Mail{MessageID: "<r1>", JobID: j.ID, Dir: "in", From: "Sam <sam@acme.test>", Subject: "Your application", Date: now.Add(24 * time.Hour).Format(time.RFC3339)})
 	if got := kinds(Proposals(s, j, 10, now.Add(11*24*time.Hour))); got != "" {

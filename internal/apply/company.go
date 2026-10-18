@@ -136,6 +136,21 @@ func RecordIntel(s *store.Store, j store.Job) (bool, error) {
 	return true, os.WriteFile(dst, b, 0o600)
 }
 
+// ReuseIntel copies the company research kept from an earlier job into this job's folder when it is
+// younger than maxAge, and reports when it was written.
+func ReuseIntel(s *store.Store, j store.Job, maxAge time.Duration) (time.Time, bool) {
+	src := filepath.Join(CompanyDir(s, j.Company), CompanyIntel)
+	st, err := os.Stat(src)
+	if err != nil || time.Since(st.ModTime()) > maxAge {
+		return time.Time{}, false
+	}
+	b, err := os.ReadFile(src)
+	if err != nil || os.MkdirAll(Dir(s, j), 0o755) != nil || os.WriteFile(filepath.Join(Dir(s, j), IntelName), b, 0o600) != nil {
+		return time.Time{}, false
+	}
+	return st.ModTime(), true
+}
+
 // RecordQuestions files the likely questions the prep step listed in questions.json.
 func RecordQuestions(s *store.Store, j store.Job) (int, error) {
 	b, err := os.ReadFile(filepath.Join(Dir(s, j), QuestionsName))

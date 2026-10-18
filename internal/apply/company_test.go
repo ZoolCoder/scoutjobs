@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/zoolcoder/scoutjobs/internal/store"
 )
@@ -133,5 +134,26 @@ func TestMockFlow(t *testing.T) {
 	}
 	if m2, _ := StartMock(s, j); m2.N != 2 {
 		t.Errorf("next mock number: %d", m2.N)
+	}
+}
+
+func TestReuseIntel(t *testing.T) {
+	s, j := testJob(t)
+	if _, ok := ReuseIntel(s, j, time.Hour); ok {
+		t.Fatal("no research kept yet")
+	}
+	src := filepath.Join(CompanyDir(s, j.Company), CompanyIntel)
+	os.MkdirAll(filepath.Dir(src), 0o755)
+	os.WriteFile(src, []byte("## Snapshot\nacme"), 0o600)
+	if _, ok := ReuseIntel(s, j, time.Hour); !ok {
+		t.Fatal("fresh research not reused")
+	}
+	if b, _ := os.ReadFile(filepath.Join(Dir(s, j), IntelName)); string(b) != "## Snapshot\nacme" {
+		t.Errorf("copied: %q", b)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	os.Chtimes(src, old, old)
+	if _, ok := ReuseIntel(s, j, time.Hour); ok {
+		t.Error("stale research reused")
 	}
 }
