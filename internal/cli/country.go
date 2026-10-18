@@ -62,7 +62,13 @@ func runCountrySet(s *store.Store, write bool, rest []string, out io.Writer) err
 		c = country.Country{Name: name}
 	}
 	cfg := LoadConfig(s.Home)
-	boards := cfg.SearchBoards
+	// another country's local boards go when the country changes; the user's own boards stay
+	var boards []string
+	for _, b := range cfg.SearchBoards {
+		if owner := country.BoardOwner(b); owner == "" || owner == c.Code {
+			boards = append(boards, b)
+		}
+	}
 	for _, b := range c.Boards {
 		if !slices.Contains(boards, b) {
 			boards = append(boards, b)

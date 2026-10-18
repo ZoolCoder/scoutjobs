@@ -45,12 +45,17 @@ func TestCountrySet(t *testing.T) {
 		t.Errorf("boards duplicated: %d", n)
 	}
 
+	run(t, "country", "set", "SE") // moving drops the Danish boards and keeps the user's own
+	if b := LoadConfig(home).SearchBoards; strings.Join(b, ",") != "greenhouse:stripe" {
+		t.Errorf("boards after moving: %v", b)
+	}
+
 	var e bytes.Buffer
 	if err := Run([]string{"country", "set", "Atlantis"}, &e); err == nil {
 		t.Error("an unknown country must fail")
 	}
 	out = run(t, "country", "set", "Kenya") // a region the location filter knows, without a table row
-	if cfg := LoadConfig(home); cfg.Country != "Kenya" || cfg.Currency != "DKK" || !strings.Contains(out, "no local boards") {
+	if cfg := LoadConfig(home); cfg.Country != "Kenya" || cfg.Currency != "SEK" || !strings.Contains(out, "no local boards") {
 		t.Errorf("fallback: %+v\n%s", cfg, out)
 	}
 }

@@ -90,3 +90,13 @@ func Lookup(s string) (Country, bool) {
 	}
 	return Country{}, false
 }
+
+// BoardOwner names the country whose local board this search_boards entry is, or "".
+func BoardOwner(board string) string {
+	for _, c := range table {
+		if slices.Contains(c.Boards, board) {
+			return c.Code
+		}
+	}
+	return ""
+}
