@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -105,6 +106,24 @@ func TestMCP(t *testing.T) {
 		if err := Run(args, &buf); err != nil && strings.Contains(err.Error(), "flag provided but not defined") {
 			t.Errorf("%s: %v (%v)", tool.Name, err, args)
 		}
+	}
+}
+
+func TestMCPToolScope(t *testing.T) {
+	t.Setenv("SCOUTJOBS_MCP_TOOLS", "run,job_show")
+	resp, _ := mcpHandle(rpcRequest{ID: []byte("1"), Method: "tools/list"})
+	var names []string
+	for _, tool := range resp.Result.(map[string]any)["tools"].([]map[string]any) {
+		names = append(names, tool["name"].(string))
+	}
+	if strings.Join(names, ",") != "job_show,run" {
+		t.Errorf("scoped list %v", names)
+	}
+	if _, err := mcpCall("job_list", nil); !errors.Is(err, errNoTool) {
+		t.Errorf("a tool outside the scope ran: %v", err)
+	}
+	if got := capOutput(strings.Repeat("x", mcpMaxOutput+10)); len(got) > mcpMaxOutput+200 || !strings.Contains(got, "cut at") {
+		t.Errorf("uncapped output: %d bytes", len(got))
 	}
 }
 

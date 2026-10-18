@@ -28,6 +28,10 @@ Usage: scoutjobs <command> [subcommand] [flags]
   version                    print the version
   update [--check] [--yes] [--version vX.Y.Z]   install the latest release over this binary (brew/deb/rpm installs are handed to their manager)
   job add [--from url]|list [--compact]|show|set|skip|rm|import
+  job rank [--all]           score jobs locally against profile.md, free, best fit first
+  job followup [<id>]        quiet applications and their follow-ups; with an id, log one you sent (at most 2)
+  job sweep [<id>...] [--yes]   close applications quiet past stale_days as no_response
+  job verify [<id>...]       check new and ranked postings are still open; skips closed ones after 3 checks over 2 days
   job run <id> [--steps fit,tailor,...] [--agent claude|codex|custom] [--force] [--keep-going] [--dry-run]
   search [--query q] [--board greenhouse:slug] [--remote] [--add]
   cv files|log|list|export|cover   resume files in ~/.scoutjobs/cv, CV check results, resume.md to PDF, cover letter from a Word template
@@ -258,6 +262,9 @@ theme: light            # dashboard: light | dark | auto (follow system)
 
 # job run and the dashboard's Prepare application: which agent CLI writes the drafts
 agent: auto             # claude | codex | custom | auto (the first one found)
+agent_model: sonnet     # claude model for unattended runs: sonnet (default), haiku (cheapest), opus (priciest) or default (the CLI's own)
+agent_effort:           # claude reasoning effort for unattended runs: low (cheapest), medium, high; empty keeps the CLI's
+agent_budget_usd: 3     # a claude session stops once it has spent this many US dollars; 0 sets no cap
 agent_command:          # any other agent that reads the prompt on stdin, e.g. "gemini --yolo"; used as "custom"
 cv_source:              # the CV tailored resumes start from, e.g. cv/resume.md or "cv/My CV.docx" (default: cv/resume.md)
 cover_template:         # the cover letter whose format every letter keeps (default: cv/cover-letter.md)
@@ -536,6 +543,14 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		return runJobReview(s, rest, out)
 	case "check":
 		return runJobCheck(s, rest, out)
+	case "rank":
+		return runJobRank(s, rest, out)
+	case "followup":
+		return runJobFollowup(s, rest, out)
+	case "sweep":
+		return runJobSweep(s, rest, out)
+	case "verify":
+		return runJobVerify(s, rest, out)
 	case "acknowledge":
 		return runJobAcknowledge(s, rest, out)
 	case "run":
@@ -554,7 +569,7 @@ func runJob(s *store.Store, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, "removed #%d\n", j.ID)
 		return nil
 	}
-	return errors.New("usage: job add|list|show|set|fit|check|acknowledge|review|skip|rm")
+	return errors.New("usage: job add|list|show|set|fit|rank|check|acknowledge|review|skip|followup|sweep|verify|rm")
 }
 
 func appDir(s *store.Store, j store.Job) string { return apply.Dir(s, j) }
@@ -1012,13 +1027,13 @@ func runStats(s *store.Store, rest []string, out io.Writer) error {
 		fmt.Fprintf(out, "applied this week: %d / target %d   response rate: %.0f%%   avg fit of applied: %.0f\n", st.AppliedWeek, cfg.WeeklyApplyTarget, st.ResponseRate*100, st.AvgFit)
 		fmt.Fprintf(out, "interviews this week: %d   practice sessions: %d   learning hours: %.1f   streak: %d days\n", st.InterviewsWeek, st.PracticeWeek, st.LearningHours, st.Streak)
 		if len(st.DueFollowUps) > 0 {
-			fmt.Fprintf(out, "\nfollow-ups due (%d+ days quiet):\n", cfg.FollowUpDays)
+			fmt.Fprintf(out, "\nfollow-ups due (%d+ days quiet; log one sent with scoutjobs job followup <id>):\n", cfg.FollowUpDays)
 			for _, j := range st.DueFollowUps {
 				fmt.Fprintf(out, "  #%d %s / %s (since %s)\n", j.ID, j.Company, j.Title, j.UpdatedAt[:10])
 			}
 		}
 		if len(st.Stale) > 0 {
-			fmt.Fprintf(out, "\nstale (%d+ days, consider no_response):\n", cfg.StaleDays)
+			fmt.Fprintf(out, "\nstale (%d+ days; close with scoutjobs job sweep --yes):\n", cfg.StaleDays)
 			for _, j := range st.Stale {
 				fmt.Fprintf(out, "  #%d %s / %s (since %s)\n", j.ID, j.Company, j.Title, j.UpdatedAt[:10])
 			}
@@ -1086,7 +1101,14 @@ func runBrief(s *store.Store, rest []string, out io.Writer) error {
 	slim := func(jobs []store.Job) []map[string]any {
 		out := make([]map[string]any, 0, len(jobs))
 		for _, j := range jobs {
-			out = append(out, map[string]any{"id": j.ID, "company": j.Company, "title": j.Title, "fit": j.FitScore, "remote": j.Remote, "updated": j.UpdatedAt[:10]})
+			row := map[string]any{"id": j.ID, "company": j.Company, "title": j.Title, "fit": j.FitScore, "remote": j.Remote, "updated": j.UpdatedAt[:10]}
+			if j.Deadline != "" {
+				row["deadline"] = j.Deadline
+			}
+			if j.Status == "applied" {
+				row["follow_ups"] = s.FollowUps(j.ID)
+			}
+			out = append(out, row)
 		}
 		return out
 	}

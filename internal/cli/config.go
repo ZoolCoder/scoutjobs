@@ -31,14 +31,17 @@ type Config struct {
 	SearchBoards  []string `json:"search_boards"`
 	SearchRemote  bool     `json:"search_remote"`
 	Theme         string   `json:"theme"`
-	Agent         string   `json:"agent"`          // agent CLI for job run: claude | codex | custom | auto
-	AgentCommand  string   `json:"agent_command"`  // any other agent: command that reads the prompt on stdin
-	CVSource      string   `json:"cv_source"`      // the CV tailored resumes start from, relative to the data dir
-	CoverTemplate string   `json:"cover_template"` // the cover letter whose format every letter keeps
+	Agent         string   `json:"agent"`            // agent CLI for job run: claude | codex | custom | auto
+	AgentCommand  string   `json:"agent_command"`    // any other agent: command that reads the prompt on stdin
+	CVSource      string   `json:"cv_source"`        // the CV tailored resumes start from, relative to the data dir
+	CoverTemplate string   `json:"cover_template"`   // the cover letter whose format every letter keeps
+	AgentModel    string   `json:"agent_model"`      // claude model of unattended runs; "default" keeps the CLI's
+	AgentEffort   string   `json:"agent_effort"`     // claude reasoning effort of unattended runs; empty keeps the CLI's
+	AgentBudget   float64  `json:"agent_budget_usd"` // the most one unattended claude session may spend; 0 sets no cap
 }
 
 func DefaultConfig() Config {
-	return Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5, FitApplyFloor: 60, Currency: "EUR", DashboardAddr: "127.0.0.1:7070", SearchRemote: true, Theme: "light"}
+	return Config{FollowUpDays: 10, StaleDays: 60, WeeklyApplyTarget: 5, FitApplyFloor: 60, Currency: "EUR", DashboardAddr: "127.0.0.1:7070", SearchRemote: true, Theme: "light", AgentModel: "sonnet", AgentBudget: 3}
 }
 
 func LoadConfig(home string) Config {
@@ -113,6 +116,16 @@ func LoadConfig(home string) Config {
 			c.SearchRemote = v != "false" && v != "no" && v != "0"
 		case "agent":
 			c.Agent = strings.Trim(v, `"'`)
+		case "agent_model":
+			if v = strings.Trim(v, `"'`); v != "" {
+				c.AgentModel = v
+			}
+		case "agent_effort":
+			c.AgentEffort = strings.Trim(v, `"'`)
+		case "agent_budget_usd":
+			if f, err := strconv.ParseFloat(strings.Trim(v, `"'`), 64); err == nil && f >= 0 {
+				c.AgentBudget = f
+			}
 		case "agent_command":
 			c.AgentCommand = strings.Trim(v, `"'`)
 		case "cv_source":

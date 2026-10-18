@@ -132,6 +132,12 @@ func runSearch(s *store.Store, cfg Config, rest []string, out io.Writer) error {
 		}
 		rows = append(rows, rw)
 	}
+	if added > 0 {
+		// new jobs land ranked by the same local score, so no agent has to triage them
+		if _, err := apply.Rank(s, false); err != nil {
+			return err
+		}
+	}
 	if *asJSON {
 		enc := json.NewEncoder(out)
 		for _, rw := range rows {
